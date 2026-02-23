@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Start Cura services via Docker Compose
 # Usage: start_cura [service...] [docker compose up flags]
-#   start_cura                  — start all services
+#   start_cura                  — start infra detached, then stream api+web logs
 #   start_cura postgres redis   — start specific services
-#   start_cura -d               — start in detached mode
+#   start_cura -d               — start all services in detached mode
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$SCRIPT_DIR/../infra/docker-compose.yml"
@@ -34,4 +34,10 @@ if [ "$current_hash" != "$stored_hash" ]; then
   echo "$current_hash" > "$HASH_FILE"
 fi
 
-exec docker compose -f "$COMPOSE_FILE" up "$@"
+if [ $# -eq 0 ]; then
+  # Start infra detached first so their startup logs aren't cleared when apps begin streaming
+  docker compose -f "$COMPOSE_FILE" up -d postgres redis soketi
+  exec docker compose -f "$COMPOSE_FILE" up api web
+else
+  exec docker compose -f "$COMPOSE_FILE" up "$@"
+fi
