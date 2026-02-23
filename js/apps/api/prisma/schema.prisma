@@ -1,0 +1,15 @@
+// Prisma Schema - Cura CRM
+// ID Strategy: ULIDs generated at the application layer using the `ulid` npm package.
+// All @id fields use String type; IDs are passed in by services before create/upsert calls.
+// See src/common/ulid.ts for the generateId() utility.
+//
+// Prisma 7: Connection URL is configured in prisma.config.ts (not here).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
