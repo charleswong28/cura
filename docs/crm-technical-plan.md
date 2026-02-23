@@ -157,6 +157,47 @@ model Candidate {
 
 **Alternative Considered:** Simple polling (rejected for poor UX)
 
+### 2.7 Monorepo & Build Tooling Strategy
+
+#### Package Manager: pnpm
+
+| Factor | pnpm | Bun |
+|--------|------|-----|
+| Workspace support | Mature, battle-tested | Works but newer |
+| NestJS compatibility | Perfect | Works with caveats |
+| Docker builds | Established patterns | Less documented |
+| Speed | Fast | Faster (25x npm) |
+| Stability | Production-proven | Emerging |
+
+> **Note on Vite:** Vite is a frontend *build tool*, not a package manager. For the Next.js frontend, Next.js 15's built-in Turbopack is the correct choice (SSR-capable; Vite is SPA-only).
+
+**Decision: pnpm** – best NestJS/Docker compatibility, industry standard for TypeScript monorepos.
+
+#### Monorepo Orchestration: Turborepo + pnpm workspaces
+
+| Factor | Plain Workspaces | Turborepo |
+|--------|-----------------|-----------|
+| Build caching | None (rebuild always) | Intelligent caching |
+| Task parallelization | Manual | Automatic |
+| CI/CD speed | Slow | Fast (only rebuild changed) |
+| Setup complexity | Low | Low–Medium |
+| DX | Basic | Great |
+
+**Decision: Turborepo + pnpm workspaces** – standard for 2025/26 production monorepos.
+
+**Monorepo Structure (`js/`):**
+```
+js/
+├── package.json          # root workspace (pnpm)
+├── pnpm-workspace.yaml   # workspace globs: apps/*, packages/*
+├── turbo.json            # pipeline: build, dev, lint, test
+├── tsconfig.base.json    # shared TS config
+├── apps/
+│   ├── api/              # NestJS GraphQL app
+│   └── web/              # Next.js frontend (future)
+└── packages/             # shared libs (future)
+```
+
 ---
 
 ## 3. Database Design (Core Entities)

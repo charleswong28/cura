@@ -1,0 +1,25 @@
+FROM node:20-alpine
+
+RUN npm install -g pnpm@9
+
+WORKDIR /app
+
+# Copy workspace manifests so pnpm can resolve the workspace
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY tsconfig.base.json ./
+COPY apps/api/package.json ./apps/api/package.json
+
+# Install Linux-native node_modules inside the container
+RUN pnpm install --frozen-lockfile
+
+# Copy build config (not source — source is bind-mounted for hot reload)
+COPY apps/api/tsconfig.json apps/api/tsconfig.build.json apps/api/nest-cli.json ./apps/api/
+
+# Fallback source copy (overridden by volume mount in dev)
+COPY apps/api/src ./apps/api/src
+
+WORKDIR /app/apps/api
+
+EXPOSE 3001
+
+CMD ["pnpm", "run", "dev"]

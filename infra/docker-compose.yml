@@ -48,6 +48,26 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build:
+      context: ../js
+      dockerfile: apps/api/Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-wecruit}:${POSTGRES_PASSWORD:-wecruit}@postgres:5432/${POSTGRES_DB:-wecruit_dev}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-wecruit}@redis:6379
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      - ../js/apps/api/src:/app/apps/api/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
