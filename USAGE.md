@@ -59,6 +59,7 @@ Forwards all arguments directly to `docker compose up`, so any Docker Compose fl
 | Redis 7 | `6379` | password: `cura` |
 | Soketi (WebSocket) | `6001` | app-id: `cura-app` / key: `cura-key` / secret: `cura-secret` |
 | API (NestJS) | `3001` | — |
+| Web (Next.js) | `3000` | — |
 
 Defaults can be overridden with a `.env` file alongside `infra/docker-compose.yml`.
 
