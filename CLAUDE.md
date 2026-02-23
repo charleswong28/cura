@@ -24,3 +24,9 @@ Whenever a meaningful technical or business decision is made, document it **befo
 2. Add a decision section: **what** was chosen, **why**, **alternatives considered**, **trade-offs** — comparison table where options exist
 3. If no document fits, create one and register it in this file under the correct section above
 4. See `docs/way-of-work.md` for the full decision format and document structure rules
+
+---
+
+## AI Behaviour Rules
+
+- **Never auto-commit.** Do not run `git commit` unless the prompt explicitly says to commit. Always let the human review changes before committing.
