@@ -13,6 +13,7 @@
 | `docs/project-plan.md` | Project Planning | Phase-by-phase implementation plan, human verification gates, module responsibilities, and architectural principles |
 | `docs/crm-technical-plan.md` | Technical Design | Phase 1 system architecture, core technical decisions (multi-tenancy, IDs, GraphQL, real-time, monorepo tooling), and database schema |
 | `js/cura-crm-project-management.md` | Project Management | EPIC/Story/Task breakdown for Phase 1 CRM (Candidates, Clients, Jobs CRUD). 5 EPICs, 11 Stories, 56 Tasks |
+| `USAGE.md` | Developer Guide | How to start the project locally, bin scripts reference, service ports, and Docker Compose commands |
 
 ---
 

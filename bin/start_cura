@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Start Cura services via Docker Compose
+# Usage: start_cura [service...] [docker compose up flags]
+#   start_cura                  — start all services
+#   start_cura postgres redis   — start specific services
+#   start_cura -d               — start in detached mode
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_FILE="$SCRIPT_DIR/../infra/docker-compose.yml"
+JS_DIR="$SCRIPT_DIR/../js"
+HASH_FILE="$SCRIPT_DIR/../.docker-build-hash"
+
+# Compute a hash of all files that affect the Docker image build.
+# If any of these change, the image must be rebuilt.
+_build_hash() {
+  cat \
+    "$JS_DIR/apps/api/Dockerfile.dev" \
+    "$JS_DIR/apps/api/package.json" \
+    "$JS_DIR/pnpm-lock.yaml" \
+    2>/dev/null | sha256sum | cut -d' ' -f1
+}
+
+current_hash=$(_build_hash)
+stored_hash=$(cat "$HASH_FILE" 2>/dev/null)
+
+if [ "$current_hash" != "$stored_hash" ]; then
+  echo "Dependencies or Dockerfile changed — rebuilding images..."
+  docker compose -f "$COMPOSE_FILE" build
+  build_exit=$?
+  if [ $build_exit -ne 0 ]; then
+    echo "Build failed — aborting." >&2
+    exit $build_exit
+  fi
+  echo "$current_hash" > "$HASH_FILE"
+fi
+
+exec docker compose -f "$COMPOSE_FILE" up "$@"
