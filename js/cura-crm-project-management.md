@@ -44,7 +44,7 @@
 - [x] **TASK-002:** Configure NestJS project with GraphQL
 - [x] **TASK-003:** Set up Prisma with ULID primary keys
 - [x] **TASK-004:** Configure Next.js frontend with TypeScript
-- [ ] **TASK-005:** Set up Shadcn/ui component library
+- [x] **TASK-005:** Set up Shadcn/ui component library
 
 #### Story 1.2: Database Schema Foundation  
 - [ ] **TASK-006:** Create core Prisma schema (Tenant, User, Candidate, Client, Job)
@@ -176,7 +176,7 @@
 ### Completion Status
 - **EPICs:** 0/5 Complete
 - **Stories:** 0/11 Complete  
-- **Tasks:** 4/56 Complete
+- **Tasks:** 5/56 Complete
 
 ### Current Sprint Focus
 **Sprint:** Not Started
