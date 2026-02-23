@@ -41,7 +41,7 @@
 
 #### Story 1.1: Development Environment Setup
 - [x] **TASK-001:** Set up Docker Compose (PostgreSQL, Redis, Soketi)
-- [ ] **TASK-002:** Configure NestJS project with GraphQL
+- [x] **TASK-002:** Configure NestJS project with GraphQL
 - [ ] **TASK-003:** Set up Prisma with ULID primary keys
 - [ ] **TASK-004:** Configure Next.js frontend with TypeScript
 - [ ] **TASK-005:** Set up Shadcn/ui component library
