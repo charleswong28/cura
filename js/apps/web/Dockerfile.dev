@@ -13,7 +13,7 @@ COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile
 
 # Copy build config (not source — source is bind-mounted for hot reload)
-COPY apps/web/tsconfig.json apps/web/next.config.ts ./apps/web/
+COPY apps/web/tsconfig.json apps/web/next.config.ts apps/web/postcss.config.mjs ./apps/web/
 
 # Fallback source copy (overridden by volume mount in dev)
 COPY apps/web/src ./apps/web/src
