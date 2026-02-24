@@ -47,7 +47,7 @@
 - [x] **TASK-005:** Set up Shadcn/ui component library
 
 #### Story 1.2: Database Schema Foundation  
-- [ ] **TASK-006:** Create core Prisma schema (Tenant, User, Candidate, Client, Job)
+- [x] **TASK-006:** Create core Prisma schema (Tenant, User, Candidate, Client, Job)
 - [ ] **TASK-007:** Implement tenant isolation with Prisma extension
 - [ ] **TASK-008:** Set up database migrations
 - [ ] **TASK-009:** Create seed data for development
@@ -176,7 +176,7 @@
 ### Completion Status
 - **EPICs:** 0/5 Complete
 - **Stories:** 0/11 Complete  
-- **Tasks:** 5/56 Complete
+- **Tasks:** 6/56 Complete
 
 ### Current Sprint Focus
 **Sprint:** Not Started

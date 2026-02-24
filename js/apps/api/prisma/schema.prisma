@@ -13,3 +13,144 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  RECRUITER
+}
+
+enum CandidateStatus {
+  ACTIVE
+  INACTIVE
+  PLACED
+  BLACKLISTED
+}
+
+enum ClientStatus {
+  PROSPECT
+  ACTIVE
+  INACTIVE
+}
+
+enum JobStatus {
+  OPEN
+  ON_HOLD
+  FILLED
+  CLOSED
+}
+
+enum JobPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+/// Represents a headhunting firm. Clerk Organization is the tenant boundary.
+model Tenant {
+  id         String   @id
+  clerkOrgId String   @unique @map("clerk_org_id")
+  name       String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  users      User[]
+  clients    Client[]
+  candidates Candidate[]
+  jobs       Job[]
+
+  @@map("tenants")
+}
+
+/// Recruiter or admin belonging to a tenant.
+model User {
+  id          String   @id
+  tenantId    String   @map("tenant_id")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  clerkUserId String   @unique @map("clerk_user_id")
+  email       String
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  role        UserRole @default(RECRUITER)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  assignedJobs Job[] @relation("JobAssignee")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+/// A job-seeker tracked by the tenant.
+model Candidate {
+  id             String          @id
+  tenantId       String          @map("tenant_id")
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  firstName      String          @map("first_name")
+  lastName       String          @map("last_name")
+  email          String?
+  phone          String?
+  currentCompany String?         @map("current_company")
+  currentTitle   String?         @map("current_title")
+  location       String?
+  status         CandidateStatus @default(ACTIVE)
+  notes          String?
+  lastUpdatedBy  String?         @map("last_updated_by")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  // email uniqueness is per-tenant; NULLs are intentionally allowed (multiple candidates may have no email)
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("candidates")
+}
+
+/// A client company that posts job orders.
+model Client {
+  id        String       @id
+  tenantId  String       @map("tenant_id")
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  name      String
+  industry  String?
+  website   String?
+  phone     String?
+  address   String?
+  status    ClientStatus @default(PROSPECT)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  jobs Job[]
+
+  @@index([tenantId])
+  @@map("clients")
+}
+
+/// An open position linked to a client company.
+model Job {
+  id           String      @id
+  tenantId     String      @map("tenant_id")
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  clientId     String      @map("client_id")
+  client       Client      @relation(fields: [clientId], references: [id])
+  title        String
+  description  String?
+  status       JobStatus   @default(OPEN)
+  priority     JobPriority @default(MEDIUM)
+  assignedToId String?     @map("assigned_to_id")
+  assignedTo   User?       @relation("JobAssignee", fields: [assignedToId], references: [id])
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@index([clientId])
+  @@map("jobs")
+}
