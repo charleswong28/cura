@@ -203,6 +203,39 @@ js/
 ## 3. Database Design (Core Entities)
 
 ### 3.1 Tenant Isolation Strategy
+
+**Decision:** Prisma client extension (`$extends`) for automatic query scoping
+
+**Implementation:** `src/prisma/tenant.extension.ts` defines `tenantExtension(tenantId)`.
+Consumed via `PrismaService.forTenant(tenantId)` in every service method.
+
+```typescript
+// In a NestJS service:
+const db = this.prisma.forTenant(tenantId);
+const candidates = await db.candidate.findMany(); // tenantId injected automatically
+```
+
+**Scoping rules applied by the extension:**
+
+| Operation type | Action |
+|----------------|--------|
+| `findMany`, `findFirst`, `findFirstOrThrow`, `count`, `aggregate`, `groupBy` | `where.tenantId` injected |
+| `findUnique` / `findUniqueOrThrow` | Rewritten to `findFirst` / `findFirstOrThrow` with `tenantId` in `where` |
+| `update`, `updateMany`, `delete`, `deleteMany` | `where.tenantId` injected |
+| `create`, `createMany`, `createManyAndReturn` | `data.tenantId` injected |
+| `upsert` | `where.tenantId` + `create.tenantId` injected |
+| `Tenant` model (any op) | Bypassed — Tenant IS the root, has no `tenantId` column |
+
+**Why `findUnique` is rewritten to `findFirst`:**
+Prisma validates that `findUnique.where` contains only the unique-constraint fields
+(e.g. `{ id }` alone for PK lookups).  Adding `tenantId` would break validation
+even though the intent is correct.  `findFirst` accepts arbitrary `where` predicates
+and produces identical semantics.
+
+**Alternative considered:** Row-level security (PostgreSQL RLS)
+Rejected for Phase 1 — adds DB-level complexity and requires per-connection role
+switching, which conflicts with the connection-pool model.
+
 ```sql
 -- Every table includes tenant_id for strict isolation
 CREATE TABLE candidates (
@@ -211,8 +244,6 @@ CREATE TABLE candidates (
   first_name VARCHAR NOT NULL,
   -- ... other fields
 );
-
--- Prisma extension auto-adds tenant_id to all queries
 ```
 
 ### 3.2 Core Schema (Simplified)
