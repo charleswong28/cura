@@ -7,6 +7,7 @@
  *   Right — <HeroVisual> animated pipeline Kanban (stacks below CTAs on mobile)
  */
 import HeroVisual from "@/components/HeroVisual";
+import WatchDemoButton from "@/components/WatchDemoButton";
 
 export default function HeroSection() {
   return (
@@ -85,14 +86,7 @@ export default function HeroSection() {
               </span>
             </a>
 
-            <a
-              href="#demo"
-              className="text-sm font-medium hover:text-cura-white transition-colors duration-200"
-              style={{ color: "rgba(245,245,243,0.50)" }}
-            >
-              Watch 90-second demo{" "}
-              <span aria-hidden="true">▶</span>
-            </a>
+            <WatchDemoButton />
           </div>
 
           {/* HP-017: Social-proof micro-copy */}

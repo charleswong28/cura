@@ -119,13 +119,13 @@
 
 #### Story HP-2.1: Hero Copy & Layout
 - [x] **HP-011:** Build `<HeroSection>` full-viewport (`min-h-screen`) layout — vertically centred, left-aligned text column, right-side animated visual panel
-- [ ] **HP-012:** Implement headline: `"Stop Clicking."` (display serif, white, ~96 px) / `"Start Connecting."` (display serif, indigo gradient, ~96 px) — two lines, separate color treatment
-- [ ] **HP-013:** Add subheadline: `"The AI-first recruitment platform that moves the deal — from first signal to signed offer — so you can focus on the relationships only you can build."` (~20 px, muted white, max-width 520 px); `"from first signal to signed offer"` counters RecruitCRM's "sourcing to placements" full-lifecycle claim
-- [ ] **HP-014:** Add supporting stat bar below subheadline: four micro-stats with dividers — `"3 hrs saved/day"` · `"5 tools replaced"` · `"Zero lost context"` · `"Human always in control"`; each stat in indigo, label in muted white; `"5 tools replaced"` is the stack-consolidation hook
+- [x] **HP-012:** Implement headline: `"Stop Clicking."` (display serif, white, ~96 px) / `"Start Connecting."` (display serif, indigo gradient, ~96 px) — two lines, separate color treatment
+- [x] **HP-013:** Add subheadline: `"The AI-first recruitment platform that moves the deal — from first signal to signed offer — so you can focus on the relationships only you can build."` (~20 px, muted white, max-width 520 px); `"from first signal to signed offer"` counters RecruitCRM's "sourcing to placements" full-lifecycle claim
+- [x] **HP-014:** Add supporting stat bar below subheadline: four micro-stats with dividers — `"3 hrs saved/day"` · `"5 tools replaced"` · `"Zero lost context"` · `"Human always in control"`; each stat in indigo, label in muted white; `"5 tools replaced"` is the stack-consolidation hook
 
 #### Story HP-2.2: Hero CTA
-- [ ] **HP-015:** Primary CTA button: `"Get Early Access →"` — indigo background, white text, pill-shaped, hover scale; clicking scrolls to `#waitlist`
-- [ ] **HP-016:** Secondary ghost link below: `"Watch 90-second demo ▶"` — opens a modal with embedded demo video placeholder
+- [x] **HP-015:** Primary CTA button: `"Get Early Access →"` — indigo background, white text, pill-shaped, hover scale; clicking scrolls to `#waitlist`
+- [x] **HP-016:** Secondary ghost link below: `"Watch 90-second demo ▶"` — opens a modal with embedded demo video placeholder
 - [ ] **HP-017:** Add social-proof micro-copy beneath CTAs: `"Trusted by 40+ recruitment agencies in beta"` with three avatar circles (placeholder)
 
 #### Story HP-2.3: Hero Visual
