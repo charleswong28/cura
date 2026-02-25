@@ -99,7 +99,7 @@ export default function OGImage() {
             fontWeight: 400,
           }}
         >
-          AI handles the administrative heavy lifting — so recruiters can focus on what AI can't replicate: human connection.
+          Cura handles the heavy lifting admin work so you can focus on the only thing that closes deals: human connection.
         </div>
 
         {/* Bottom accent rule */}

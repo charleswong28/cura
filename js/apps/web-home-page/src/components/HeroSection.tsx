@@ -42,11 +42,11 @@ export default function HeroSection() {
 
           {/* HP-013: Subheadline */}
           <p
-            className="text-lg xl:text-xl leading-relaxed mb-10 max-w-[520px]"
+            className="text-lg xl:text-xl leading-relaxed mb-10"
             style={{ color: "rgba(245,245,243,0.65)" }}
           >
-            Let the AI recruitment CRM handle the admin work
-            so you can focus on what AI can&apos;t replicate -
+            Cura handles the heavy lifting admin work so you can
+            focus on the only thing that closes deals:{" "}
             <em>human connection.</em>
           </p>
 

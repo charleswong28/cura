@@ -131,7 +131,7 @@
 #### Story HP-2.3: Hero Visual
 - [x] **HP-018:** Build `<HeroVisual>` right panel — dark frosted-glass card mockup of the Cura pipeline Kanban; populate with placeholder candidate cards with stage labels (`Sourced`, `Screened`, `Interviewing`, `Offer`)
 - [x] **HP-019:** Animate a candidate card auto-advancing from `Screened → Interviewing` with a subtle AI badge ("AI moved · just now") — CSS keyframe loop, 4 s interval
-- [x] **HP-020:** Add floating tooltip over the moving card: `"Cura detected calendar invite. Briefing note drafted."` — appears and fades after 2 s
+- [x] **HP-020:** Add floating tooltip over the moving card: `"Your Cura AI meeting notes are ready."` — appears and fades after 2 s
 
 ---
 
@@ -152,15 +152,15 @@
 ### EPIC-HP-004: ⚡ Core Value Propositions
 
 #### Story HP-4.1: Three-Pillar Feature Grid
-- [ ] **HP-025:** Build `<ValuePropsSection>` — alternating left/right layout, each pillar takes a full screen row
-- [ ] **HP-026:** **Pillar 1 — Autonomous Pipeline:** Headline `"AI that moves the deal."` Subtext: `"Cura agents watch your calendar syncs and emails. When a candidate is interviewed, their stage advances and a briefing note is ready — before you've had coffee."` Visual: animated pipeline with stage-advance arrow
-- [ ] **HP-027:** **Pillar 2 — Zero-Loss Memory:** Headline `"Every signal. One timeline."` Subtext: `"LinkedIn replies, Zoom transcripts, email opens — everything is synthesized into a single, permanent record. Enter every conversation knowing exactly where things stand."` Visual: stacked timeline feed (mock entries)
-- [ ] **HP-028:** **Pillar 3 — Human-in-the-Loop:** Headline `"AI drafts. You decide."` Subtext: `"No autonomous sending. No hallucination risk. For every high-stakes action — client submission, offer, key message — Cura presents a draft and waits for your approval."` Visual: approval modal mockup with `Approve & Send` button
-- [ ] **HP-029:** Each pillar section has a subtle indigo accent line (left border on the text block) and an icon badge top-left of the visual panel
+- [x] **HP-025:** Build `<ValuePropsSection>` — alternating left/right layout, each pillar takes a full screen row
+- [x] **HP-026:** **Pillar 1 — Autonomous Pipeline:** Headline `"AI that moves the deal."` Subtext: `"Cura reads your meeting notes and emails. When a candidate is interviewed, their stage advances and a briefing note is ready — before you've had coffee."` Visual: animated pipeline with stage-advance arrow
+- [x] **HP-027:** **Pillar 2 — Zero-Loss Memory:** Headline `"Every signal. One timeline."` Subtext: `"LinkedIn replies, Zoom transcripts, email opens — everything is synthesized into a single, permanent record. Enter every conversation knowing exactly where things stand."` Visual: stacked timeline feed (mock entries)
+- [x] **HP-028:** **Pillar 3 — Human-in-the-Loop:** Headline `"AI drafts. You decide."` Subtext: `"No autonomous sending. No hallucination risk. For every high-stakes action — client submission, offer, key message — Cura presents a draft and waits for your approval."` Visual: approval modal mockup with `Approve & Send` button
+- [x] **HP-029:** Each pillar section has a subtle indigo accent line (left border on the text block) and an icon badge top-left of the visual panel
 
 #### Story HP-4.2: Speed Statistic Interlude
-- [ ] **HP-030:** Build `<SpeedBanner>` full-width stripe between pillars 1 and 2 — dark indigo gradient, single bold stat: `"Recruiters using Cura reclaim an average of 3 hours per day."` with source footnote
-- [ ] **HP-031:** Add animated counter that counts up (`0 → 3 hrs`) when the stripe enters the viewport (Intersection Observer)
+- [x] **HP-030:** Build `<SpeedBanner>` full-width stripe between pillars 1 and 2 — dark indigo gradient, single bold stat: `"Recruiters using Cura reclaim an average of 3 hours per day."` with source footnote
+- [x] **HP-031:** Add animated counter that counts up (`0 → 3 hrs`) when the stripe enters the viewport (Intersection Observer)
 
 ---
 

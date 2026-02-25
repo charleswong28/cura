@@ -72,7 +72,7 @@ export default function ProblemSection() {
 
         {/* HP-024: Pull-quote — large, low-opacity, italic, centred */}
         <p
-          className="font-sans text-center italic mx-auto max-w-2xl"
+          className="font-sans text-center italic mx-auto"
           style={{
             fontSize: "clamp(1.5rem, 2.5vw, 2.25rem)",
             color: "rgba(13, 11, 30, 0.35)",

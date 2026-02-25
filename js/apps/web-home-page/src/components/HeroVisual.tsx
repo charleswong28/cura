@@ -186,7 +186,7 @@ export default function HeroVisual() {
           className="text-[11px] leading-snug"
           style={{ color: "rgba(245,245,243,0.65)", margin: 0 }}
         >
-          Cura detected calendar invite. Briefing note drafted.
+          Your Cura AI meeting notes are ready.
         </p>
       </div>
     </div>
