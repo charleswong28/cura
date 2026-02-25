@@ -30,7 +30,7 @@ export default function GradientBackground() {
           height: "600px",
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(99,102,241,0.28) 0%, transparent 70%)",
           filter: "blur(40px)",
           animation: "blob-float 18s ease-in-out infinite",
         }}
@@ -46,7 +46,7 @@ export default function GradientBackground() {
           height: "500px",
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(139,92,246,0.22) 0%, transparent 70%)",
           filter: "blur(50px)",
           animation: "blob-float-alt 22s ease-in-out infinite",
           animationDelay: "-7s",
@@ -63,7 +63,7 @@ export default function GradientBackground() {
           height: "400px",
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(124,58,237,0.07) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(124,58,237,0.18) 0%, transparent 70%)",
           filter: "blur(60px)",
           animation: "blob-float 26s ease-in-out infinite",
           animationDelay: "-13s",
