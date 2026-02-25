@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Start Cura services via Docker Compose
 # Usage: start_cura [service...] [docker compose up flags]
-#   start_cura                  — start infra detached, then stream api+web logs
-#   start_cura postgres redis   — start specific services
+#   start_cura                  — stop existing containers, then start all services
+#   start_cura postgres redis   — start specific services only (no auto-stop)
 #   start_cura -d               — start all services in detached mode
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,10 +34,14 @@ if [ "$current_hash" != "$stored_hash" ]; then
   echo "$current_hash" > "$HASH_FILE"
 fi
 
+# Stop any running containers (including orphans from renamed/removed services)
+# before starting fresh to avoid port conflicts.
+docker compose -f "$COMPOSE_FILE" down --remove-orphans
+
 if [ $# -eq 0 ]; then
   # Start infra detached first so their startup logs aren't cleared when apps begin streaming
   docker compose -f "$COMPOSE_FILE" up -d postgres redis soketi
-  exec docker compose -f "$COMPOSE_FILE" up api web-app
+  exec docker compose -f "$COMPOSE_FILE" up api web-app web-home-page
 else
   exec docker compose -f "$COMPOSE_FILE" up "$@"
 fi
