@@ -110,7 +110,7 @@
 
 #### Story HP-1.3: Page Shell & SEO
 - [x] **HP-008:** Create `/app/page.tsx` home page route that composes all section components
-- [ ] **HP-009:** Add `<head>` metadata — title `"Cura — AI-First Recruitment CRM"`, OG image (dark-themed card with tagline), Twitter card
+- [x] **HP-009:** Add `<head>` metadata — title `"Cura — AI-First Recruitment CRM"`, OG image (dark-themed card with tagline), Twitter card
 - [ ] **HP-010:** Add `robots.txt` and `sitemap.xml` for the marketing site
 
 ---

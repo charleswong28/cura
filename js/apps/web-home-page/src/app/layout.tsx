@@ -18,9 +18,28 @@ const instrumentSerif = Instrument_Serif({
   display: "swap",
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://cura.com";
+
 export const metadata: Metadata = {
   title: "Cura — AI-First Recruitment CRM",
-  description: "Stop Clicking. Start Connecting. The AI-first recruitment platform that moves the deal — from first signal to signed offer.",
+  description:
+    "Stop Clicking. Start Connecting. The AI-first recruitment platform that moves the deal — from first signal to signed offer.",
+  metadataBase: new URL(BASE_URL),
+  openGraph: {
+    type: "website",
+    siteName: "Cura",
+    title: "Cura — AI-First Recruitment CRM",
+    description:
+      "Stop Clicking. Start Connecting. The AI-first recruitment platform that moves the deal — from first signal to signed offer.",
+    url: BASE_URL,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cura — AI-First Recruitment CRM",
+    description:
+      "Stop Clicking. Start Connecting. The AI-first recruitment platform that moves the deal — from first signal to signed offer.",
+  },
 };
 
 export default function RootLayout({
