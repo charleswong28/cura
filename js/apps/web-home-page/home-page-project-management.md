@@ -106,7 +106,7 @@
 #### Story HP-1.2: Navigation
 - [x] **HP-005:** Build sticky `<NavBar>` — logo left, links centre (`Product`, `Why Cura`, `Pricing`), CTA button right (`Get Early Access` → scrolls to waitlist); transparent on top of hero, blurs to `bg-black/80 backdrop-blur` on scroll
 - [x] **HP-006:** Add mobile hamburger nav with slide-down drawer; all nav items accessible at ≤ 768 px
-- [ ] **HP-007:** Implement scroll-spy to highlight active nav section as user scrolls
+- [x] **HP-007:** Implement scroll-spy to highlight active nav section as user scrolls
 
 #### Story HP-1.3: Page Shell & SEO
 - [ ] **HP-008:** Create `/app/page.tsx` home page route that composes all section components
