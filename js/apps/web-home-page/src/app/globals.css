@@ -39,6 +39,19 @@ body {
   }
 }
 
+/* Gradient blob float animations */
+@keyframes blob-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(20px, -30px) scale(1.05); }
+  66%       { transform: translate(-15px, 20px) scale(0.97); }
+}
+
+@keyframes blob-float-alt {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(-25px, 20px) scale(1.03); }
+  66%       { transform: translate(20px, -25px) scale(0.98); }
+}
+
 /* Centred content container capped at max-w-6xl */
 @utility container-page {
   max-width: var(--container-max-width);

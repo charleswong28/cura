@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Instrument_Serif } from "next/font/google";
+import GradientBackground from "@/components/GradientBackground";
 import "./globals.css";
 
 const inter = Inter({
@@ -28,7 +29,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`dark ${inter.variable} ${instrumentSerif.variable}`}>
-      <body>{children}</body>
+      <body>
+        <GradientBackground />
+        {children}
+      </body>
     </html>
   );
 }
