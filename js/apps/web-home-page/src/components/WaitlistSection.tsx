@@ -5,11 +5,7 @@
  */
 export default function WaitlistSection() {
   return (
-    <section
-      id="waitlist"
-      className="section-padding"
-      style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%)" }}
-    >
+    <section id="waitlist" className="section-padding bg-waitlist">
       <div className="container-page">
         {/* HP-048 to HP-053 content goes here */}
       </div>

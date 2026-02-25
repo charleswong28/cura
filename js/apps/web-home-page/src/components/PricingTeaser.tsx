@@ -5,7 +5,7 @@
  */
 export default function PricingTeaser() {
   return (
-    <section id="pricing" className="section-padding" style={{ background: "#111111" }}>
+    <section id="pricing" className="section-padding bg-cura-surface-mid">
       <div className="container-page">
         {/* HP-054 to HP-056 content goes here */}
       </div>

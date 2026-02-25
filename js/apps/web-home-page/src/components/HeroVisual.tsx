@@ -4,47 +4,37 @@
  * Frosted-glass Kanban pipeline mockup rendered in the hero's right column.
  * A candidate card (Sam T.) auto-advances from Screened → Interviewing on a
  * 7-second loop:
- *   0 ms    idle   — Sam T. sits in Screened
- *   1 500ms highlight — card glows, "AI processing…" badge appears
- *   2 800ms moved  — Sam moves to Interviewing with "AI moved · just now" badge
- *   5 000ms tooltip fades out
- *   5 800ms reset to idle
- *   7 000ms loop restarts
+ *   phase 0 (0 ms)    idle      — Sam T. sits in Screened
+ *   phase 1 (1 500ms) highlight — card glows, "AI processing…" badge appears
+ *   phase 2 (2 800ms) moved     — Sam moves to Interviewing, tooltip visible
+ *   phase 3 (5 000ms) moved     — tooltip fades out
+ *   phase 4 (5 800ms) idle      — reset
+ *   phase 0 (7 000ms) loop restarts
  */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useAnimationPhases } from "@/hooks/useAnimationPhases";
 
 type Phase = "idle" | "highlight" | "moved";
 
+const TIMINGS = [0, 1500, 2800, 5000, 5800] as const;
+const LOOP_MS = 7000;
+
+const HERO_CANDIDATES = {
+  alex: { name: "Alex M.", role: "CFO" },
+  jordan: { name: "Jordan P.", role: "VP" },
+  sam: { name: "Sam T.", role: "CFO" },
+  drew: { name: "Drew L.", role: "VP Fin" },
+  riley: { name: "Riley K.", role: "Dir." },
+  casey: { name: "Casey L.", role: "CFO" },
+} as const;
+
 export default function HeroVisual() {
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [showTooltip, setShowTooltip] = useState(false);
+  const phaseIdx = useAnimationPhases(TIMINGS, LOOP_MS);
 
-  useEffect(() => {
-    const run = () => {
-      const t1 = setTimeout(() => setPhase("highlight"), 1500);
-      const t2 = setTimeout(() => {
-        setPhase("moved");
-        setShowTooltip(true);
-      }, 2800);
-      const t3 = setTimeout(() => setShowTooltip(false), 5000);
-      const t4 = setTimeout(() => setPhase("idle"), 5800);
-      return [t1, t2, t3, t4];
-    };
-
-    let timers = run();
-    const interval = setInterval(() => {
-      timers.forEach(clearTimeout);
-      timers = run();
-    }, 7000);
-
-    return () => {
-      timers.forEach(clearTimeout);
-      clearInterval(interval);
-    };
-  }, []);
-
+  const phase: Phase =
+    phaseIdx === 1 ? "highlight" : phaseIdx === 2 || phaseIdx === 3 ? "moved" : "idle";
+  const showTooltip = phaseIdx === 2;
   const isMoved = phase === "moved";
 
   return (
@@ -52,64 +42,31 @@ export default function HeroVisual() {
       {/* Ambient glow behind the card */}
       <div
         aria-hidden="true"
-        style={{
-          position: "absolute",
-          inset: "-48px",
-          background:
-            "radial-gradient(ellipse at center, rgba(99,102,241,0.14) 0%, transparent 68%)",
-          pointerEvents: "none",
-        }}
+        className="absolute inset-[-48px] pointer-events-none bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.14)_0%,transparent_68%)]"
       />
 
       {/* Frosted-glass pipeline card */}
-      <div
-        style={{
-          background: "rgba(255,255,255,0.03)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "16px",
-          backdropFilter: "blur(24px)",
-          padding: "20px",
-          boxShadow:
-            "0 32px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.08)",
-          position: "relative",
-        }}
-      >
+      <div className="frosted-card relative p-5 shadow-[0_32px_64px_rgba(0,0,0,0.55),0_0_0_1px_rgba(99,102,241,0.08)]">
         {/* Card header */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
-            <div
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#6366F1",
-              }}
-            />
-            <span
-              className="text-xs font-semibold tracking-widest uppercase"
-              style={{ color: "rgba(245,245,243,0.40)" }}
-            >
+            <div className="w-1.5 h-1.5 rounded-full bg-cura-accent" />
+            <span className="text-[9px] font-semibold tracking-widest uppercase text-cura-white/40">
               Pipeline
             </span>
           </div>
-          <span
-            className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-            style={{ background: "rgba(99,102,241,0.12)", color: "#818CF8" }}
-          >
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-cura-accent/12 text-cura-accent-soft">
             Live
           </span>
         </div>
 
-        {/* Kanban stage columns — 2 on mobile (Screened + Interview), 4 on desktop */}
+        {/* Kanban stage columns — 2 on mobile, 4 on desktop */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
           <div className="hidden md:block">
             <StageColumn
               label="Sourced"
               count={2}
-              cards={[
-                { name: "Alex M.", role: "CFO" },
-                { name: "Jordan P.", role: "VP" },
-              ]}
+              cards={[HERO_CANDIDATES.alex, HERO_CANDIDATES.jordan]}
             />
           </div>
 
@@ -118,14 +75,10 @@ export default function HeroVisual() {
             count={isMoved ? 1 : 2}
             cards={
               isMoved
-                ? [{ name: "Drew L.", role: "VP Fin" }]
+                ? [HERO_CANDIDATES.drew]
                 : [
-                    {
-                      name: "Sam T.",
-                      role: "CFO",
-                      highlight: phase === "highlight",
-                    },
-                    { name: "Drew L.", role: "VP Fin" },
+                    { ...HERO_CANDIDATES.sam, highlight: phase === "highlight" },
+                    HERO_CANDIDATES.drew,
                   ]
             }
           />
@@ -135,57 +88,27 @@ export default function HeroVisual() {
             count={isMoved ? 2 : 1}
             cards={
               isMoved
-                ? [
-                    { name: "Riley K.", role: "Dir." },
-                    { name: "Sam T.", role: "CFO", isNew: true },
-                  ]
-                : [{ name: "Riley K.", role: "Dir." }]
+                ? [HERO_CANDIDATES.riley, { ...HERO_CANDIDATES.sam, isNew: true }]
+                : [HERO_CANDIDATES.riley]
             }
           />
 
           <div className="hidden md:block">
-            <StageColumn
-              label="Offer"
-              count={1}
-              cards={[{ name: "Casey L.", role: "CFO" }]}
-            />
+            <StageColumn label="Offer" count={1} cards={[HERO_CANDIDATES.casey]} />
           </div>
         </div>
-
       </div>
 
-      {/* HP-020: Toast notification — appears below the board */}
+      {/* HP-020: Toast notification */}
       <div
+        className="mt-3 flex items-center gap-[10px] bg-[rgba(18,18,22,0.92)] border border-cura-accent/22 rounded-[10px] py-2.5 px-3.5 shadow-[0_4px_16px_rgba(0,0,0,0.4)] pointer-events-none [transition:opacity_0.4s_ease,transform_0.4s_ease]"
         style={{
-          marginTop: "12px",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          background: "rgba(18,18,22,0.92)",
-          border: "1px solid rgba(99,102,241,0.22)",
-          borderRadius: "10px",
-          padding: "10px 14px",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
-          pointerEvents: "none",
-          transition: "opacity 0.4s ease, transform 0.4s ease",
           opacity: showTooltip ? 1 : 0,
           transform: showTooltip ? "translateY(0)" : "translateY(6px)",
         }}
       >
-        {/* Indigo dot */}
-        <div
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: "#6366F1",
-            flexShrink: 0,
-          }}
-        />
-        <p
-          className="text-[11px] leading-snug"
-          style={{ color: "rgba(245,245,243,0.65)", margin: 0 }}
-        >
+        <div className="w-1.5 h-1.5 rounded-full bg-cura-accent shrink-0" />
+        <p className="text-[11px] leading-snug text-cura-white/65 m-0">
           Your Cura AI meeting notes are ready.
         </p>
       </div>
@@ -214,20 +137,11 @@ function StageColumn({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between mb-1">
-        <p
-          className="text-[9px] font-semibold uppercase tracking-wider truncate"
-          style={{ color: "rgba(245,245,243,0.28)", margin: 0 }}
-        >
+        <p className="text-[9px] font-semibold uppercase tracking-wider truncate text-cura-white/28 m-0">
           {label}
         </p>
-        <span
-          className="text-[9px] tabular-nums"
-          style={{ color: "rgba(245,245,243,0.18)" }}
-        >
-          {count}
-        </span>
+        <span className="text-[9px] tabular-nums text-cura-white/18">{count}</span>
       </div>
-
       {cards.map((card, i) => (
         <CandidateCard key={`${card.name}-${i}`} {...card} />
       ))}
@@ -241,105 +155,42 @@ function CandidateCard({ name, role, highlight, isNew }: CardData) {
     .map((p) => p[0])
     .join("");
 
+  const stateClass = highlight
+    ? "bg-cura-accent/14 border-cura-accent/55"
+    : isNew
+      ? "bg-cura-accent/8 border-cura-accent/22"
+      : "bg-white/3 border-white/[6%]";
+
   return (
     <div
-      style={{
-        background: highlight
-          ? "rgba(99,102,241,0.14)"
-          : isNew
-            ? "rgba(99,102,241,0.08)"
-            : "rgba(255,255,255,0.03)",
-        border: highlight
-          ? "1px solid rgba(99,102,241,0.55)"
-          : isNew
-            ? "1px solid rgba(99,102,241,0.22)"
-            : "1px solid rgba(255,255,255,0.06)",
-        borderRadius: "8px",
-        padding: "7px 8px",
-        transition: "background 0.4s ease, border-color 0.4s ease",
-      }}
+      className={`${stateClass} border rounded-lg py-[7px] px-2 [transition:background_0.4s_ease,border-color_0.4s_ease]`}
     >
       {/* Avatar + name row */}
       <div className="flex items-center gap-1.5">
-        <div
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: "50%",
-            background: "rgba(99,102,241,0.22)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <span
-            style={{ fontSize: 7, fontWeight: 700, color: "#818CF8" }}
-          >
-            {initials}
-          </span>
+        <div className="w-5 h-5 rounded-full bg-cura-accent/22 flex items-center justify-center shrink-0">
+          <span className="text-[7px] font-bold text-cura-accent-soft">{initials}</span>
         </div>
-        <div style={{ minWidth: 0 }}>
-          <p
-            className="truncate"
-            style={{
-              fontSize: 9,
-              fontWeight: 600,
-              color: "rgba(245,245,243,0.85)",
-              margin: 0,
-              lineHeight: 1.3,
-            }}
-          >
+        <div className="min-w-0">
+          <p className="truncate text-[9px] font-semibold text-cura-white/85 m-0 leading-[1.3]">
             {name}
           </p>
-          <p
-            className="truncate"
-            style={{
-              fontSize: 8,
-              color: "rgba(245,245,243,0.32)",
-              margin: 0,
-              lineHeight: 1.3,
-            }}
-          >
-            {role}
-          </p>
+          <p className="truncate text-[8px] text-cura-white/32 m-0 leading-[1.3]">{role}</p>
         </div>
       </div>
 
-      {/* HP-019: "AI moved · just now" badge on the newly advanced card */}
+      {/* HP-019: "AI moved · just now" badge */}
       {isNew && (
         <div className="flex items-center gap-1 mt-1.5">
-          <div
-            style={{
-              width: 4,
-              height: 4,
-              borderRadius: "50%",
-              background: "#6366F1",
-              flexShrink: 0,
-            }}
-          />
-          <span style={{ fontSize: 7.5, color: "#818CF8" }}>
-            AI moved · just now
-          </span>
+          <div className="w-1 h-1 rounded-full bg-cura-accent shrink-0" />
+          <span className="text-[7.5px] text-cura-accent-soft">AI moved · just now</span>
         </div>
       )}
 
-      {/* "AI processing…" indicator while card is highlighted */}
+      {/* "AI processing…" indicator */}
       {highlight && (
         <div className="flex items-center gap-1 mt-1.5">
-          <div
-            className="animate-pulse"
-            style={{
-              width: 4,
-              height: 4,
-              borderRadius: "50%",
-              background: "#6366F1",
-              flexShrink: 0,
-            }}
-          />
-          <span style={{ fontSize: 7.5, color: "#818CF8" }}>
-            AI processing…
-          </span>
+          <div className="w-1 h-1 rounded-full bg-cura-accent shrink-0 animate-pulse" />
+          <span className="text-[7.5px] text-cura-accent-soft">AI processing…</span>
         </div>
       )}
     </div>

@@ -5,7 +5,7 @@
  */
 export default function ReplaceStackSection() {
   return (
-    <section className="section-padding" style={{ background: "#111111" }}>
+    <section className="section-padding bg-cura-surface-mid">
       <div className="container-page">
         {/* HP-060 to HP-063 content goes here */}
       </div>

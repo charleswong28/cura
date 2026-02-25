@@ -5,7 +5,7 @@
  */
 export default function ComparisonSection() {
   return (
-    <section className="section-padding" style={{ background: "#111111" }}>
+    <section className="section-padding bg-cura-surface-mid">
       <div className="container-page">
         {/* HP-038 to HP-043 content goes here */}
       </div>

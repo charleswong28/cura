@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useScrollSpy } from "@/hooks/useScrollSpy";
+import { useClickOutside } from "@/hooks/useClickOutside";
 
 const NAV_LINKS = [
   { label: "Why Cura", href: "#why-cura" },
@@ -8,70 +10,31 @@ const NAV_LINKS = [
   { label: "Pricing", href: "#pricing" },
 ];
 
+const NAV_IDS = NAV_LINKS.map((l) => l.href.slice(1));
+
 export default function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<string>("");
   const headerRef = useRef<HTMLElement>(null);
 
+  // Scroll-state detection — simple, stays inline
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    const handler = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handler, { passive: true });
+    return () => window.removeEventListener("scroll", handler);
   }, []);
 
-  // Scroll-spy: highlight the nav link whose section is nearest the top of the viewport
-  useEffect(() => {
-    const sectionIds = NAV_LINKS.map(({ href }) => href.slice(1));
-    const elements = sectionIds
-      .map((id) => document.getElementById(id))
-      .filter(Boolean) as HTMLElement[];
-
-    if (elements.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Find the topmost intersecting section
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length > 0) {
-          setActiveSection(visible[0].target.id);
-        }
-      },
-      {
-        // Trigger when the section top enters the upper 25% of the viewport
-        rootMargin: "-10% 0px -75% 0px",
-        threshold: 0,
-      }
-    );
-
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, []);
-
-  // Close drawer when clicking outside the header
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
-        setDrawerOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [drawerOpen]);
+  const activeSection = useScrollSpy(NAV_IDS);
+  useClickOutside(headerRef, () => setDrawerOpen(false), drawerOpen);
 
   const closeDrawer = () => setDrawerOpen(false);
 
   return (
     <header
       ref={headerRef}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled || drawerOpen
-          ? "bg-black/80 backdrop-blur-md border-b border-white/5"
+          ? "bg-black/85 backdrop-blur-xl shadow-[0_1px_0_rgba(255,255,255,0.06),0_8px_32px_rgba(0,0,0,0.5)]"
           : "bg-transparent"
       }`}
     >
@@ -80,7 +43,7 @@ export default function NavBar() {
           className="flex items-center justify-between h-16"
           aria-label="Main navigation"
         >
-          {/* Logo — node mark + Inter wordmark, Superhuman-style */}
+          {/* Logo */}
           <a
             href="/"
             className="flex items-center gap-2 select-none"
@@ -113,7 +76,9 @@ export default function NavBar() {
                     className={`text-sm transition-colors duration-200 ${
                       isActive
                         ? "text-cura-white"
-                        : "text-cura-muted hover:text-cura-white"
+                        : scrolled
+                          ? "text-white/60 hover:text-cura-white"
+                          : "text-cura-muted hover:text-cura-white"
                     }`}
                   >
                     {label}

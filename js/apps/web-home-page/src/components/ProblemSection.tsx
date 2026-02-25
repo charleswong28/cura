@@ -2,13 +2,13 @@
  * ProblemSection — HP-021 through HP-024
  * EPIC-HP-003: The Problem Section
  *
- * HP-021: Section container with #111111 dark grey background
- * HP-022: Centred serif headline — "Your competitors close deals..."
+ * HP-021: Section container with cream background
+ * HP-022: Centred headline — "Your competitors close deals..."
  * HP-023: Four pain-point cards (icon · bold label · one-sentence description)
  * HP-024: Italic pull-quote — "Your instinct is your edge. But admin is eating it alive."
  */
 
-const painCards = [
+const PAIN_CARDS = [
   {
     icon: "⚡",
     label: "The Endless Click",
@@ -36,48 +36,35 @@ const painCards = [
 
 export default function ProblemSection() {
   return (
-    <section id="why-cura" className="section-padding" style={{ background: "#FAFAF8" }}>
+    <section id="why-cura" className="section-padding bg-cura-cream">
       <div className="container-page">
         {/* HP-022: Centred headline */}
-        <h2
-          className="font-sans font-semibold text-center leading-tight mx-auto mb-16 lg:mb-20 max-w-3xl"
-          style={{ fontSize: "clamp(2rem, 4vw, 3.25rem)", color: "#0D0B1E" }}
-        >
+        <h2 className="font-sans font-semibold text-section-lg text-cura-black text-center leading-tight mx-auto mb-16 lg:mb-20 max-w-3xl">
           Your competitors close deals while you&apos;re updating spreadsheets.
         </h2>
 
         {/* HP-023: Pain-point grid — 1 col → 2 col → 4 col */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-20 lg:mb-28">
-          {painCards.map((card) => (
+          {PAIN_CARDS.map((card) => (
             <div
               key={card.label}
-              className="rounded-xl p-6 flex flex-col gap-4"
-              style={{ background: "#FFFFFF", border: "1px solid #E8E8E4" }}
+              className="rounded-xl p-6 flex flex-col gap-4 bg-white border border-cura-border-light"
             >
               <span className="text-3xl leading-none" aria-hidden="true">
                 {card.icon}
               </span>
-              <h3
-                className="font-semibold text-base leading-snug"
-                style={{ color: "#0D0B1E" }}
-              >
+              <h3 className="font-semibold text-base leading-snug text-cura-black">
                 {card.label}
               </h3>
-              <p className="text-sm leading-relaxed" style={{ color: "#6B7280" }}>
+              <p className="text-sm leading-relaxed text-cura-muted">
                 {card.description}
               </p>
             </div>
           ))}
         </div>
 
-        {/* HP-024: Pull-quote — large, low-opacity, italic, centred */}
-        <p
-          className="font-sans text-center italic mx-auto"
-          style={{
-            fontSize: "clamp(1.5rem, 2.5vw, 2.25rem)",
-            color: "rgba(13, 11, 30, 0.35)",
-          }}
-        >
+        {/* HP-024: Pull-quote */}
+        <p className="font-sans text-pull-quote text-cura-black/35 text-center italic mx-auto">
           &ldquo;Your instinct is your edge. But admin is eating it alive.&rdquo;
         </p>
       </div>

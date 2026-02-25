@@ -6,6 +6,46 @@
   --color-cura-accent: #6366F1;
   --color-cura-muted: #6B7280;
 
+  /*
+   * Extended palette — why each colour lives in the theme:
+   *
+   * cura-base        Deepest true-black used for the page body, footer, and avatar ring
+   *                  shadows. Separate from cura-black so we never confuse the branded
+   *                  near-black (#0D0B1E) with the pure-black surface (#0A0A0A).
+   *
+   * cura-surface     Elevated dark panel bg used in every value-prop mockup card.
+   *                  Lighter than cura-base to create visual hierarchy on dark bg.
+   *
+   * cura-surface-mid Mid-dark placeholder-section bg (#111111). Used by sections not
+   *                  yet designed; gives them a visually distinct dark tone.
+   *
+   * cura-cream       Light off-white used for the problem section and value-prop rows.
+   *                  Alternates with the dark hero to create Superhuman-style rhythm.
+   *
+   * cura-border-light Subtle warm-grey border for cards on the cream/white background.
+   *
+   * cura-accent-soft  Lighter indigo (≈ indigo-400) used for badge text, AI-status
+   *                  indicators, and subtle accent copy. Paired with cura-accent.
+   *
+   * cura-violet      Violet-500 — the end stop of the brand gradient. Defined here so
+   *                  the gradient utility uses semantic tokens, not raw hex.
+   *
+   * cura-indigo-deep / cura-indigo-mid / cura-purple-deep
+   *                  Three gradient stops shared by the SpeedBanner and WaitlistSection
+   *                  deep-indigo/purple backgrounds. Naming them in the theme makes the
+   *                  intent clear and lets future sections reuse the same palette.
+   */
+  --color-cura-base: #0A0A0A;
+  --color-cura-surface: #16131f;
+  --color-cura-surface-mid: #111111;
+  --color-cura-cream: #FAFAF8;
+  --color-cura-border-light: #E8E8E4;
+  --color-cura-accent-soft: #818CF8;
+  --color-cura-violet: #8B5CF6;
+  --color-cura-indigo-deep: #1e1b4b;
+  --color-cura-indigo-mid: #312e81;
+  --color-cura-purple-deep: #2e1065;
+
   --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-display), ui-serif, Georgia, serif;
 
@@ -15,9 +55,51 @@
   --container-max-width: 72rem;       /* max-w-6xl = 1152px */
   --container-px-mobile: 1.5rem;      /* 24px — mobile side gutter */
   --container-px-desktop: 2rem;       /* 32px — desktop side gutter */
+
+  /*
+   * Fluid typography — clamp-based responsive sizes.
+   * Defined here rather than as inline styles so any component can use them as
+   * semantic class names (text-hero, text-section-lg, …) without repeating the
+   * clamp formula. Each size has a clear semantic role.
+   */
+  --text-hero: clamp(2.25rem, 4.5vw, 3.75rem);
+  --text-section-lg: clamp(2rem, 4vw, 3.25rem);
+  --text-pillar: clamp(2rem, 2vw, 2.5rem);
+  --text-pull-quote: clamp(1.5rem, 2.5vw, 2.25rem);
+  --text-speed-counter: clamp(4rem, 9vw, 7rem);
+  --text-speed-unit: clamp(1.75rem, 3.5vw, 2.75rem);
+  --text-body-fluid: clamp(1rem, 1.4vw, 1.15rem);
+  --text-body-fluid-lg: clamp(1.05rem, 1.8vw, 1.3rem);
+
+  /*
+   * Mock-UI text scale — intentionally sub-12px.
+   * These components render miniature app mockups at roughly 50 % scale.
+   * The tiny type is deliberate and purposeful, not a bug. Defining them in the
+   * theme gives them names, making the intent clear vs. arbitrary px overrides.
+   */
+  --text-mock-2xs: 0.55rem;   /* ~9px — AI badge labels */
+  --text-mock-xs: 0.6rem;     /* ~10px — timestamps, secondary labels */
+  --text-mock-sm: 0.62rem;    /* ~10px — column headers, "To:" lines */
+  --text-mock-md: 0.68rem;    /* ~11px — detail copy in mock UI */
+  --text-mock-base: 0.7rem;   /* ~11px — primary mock UI text */
+  --text-mock-lg: 0.72rem;    /* ~12px — emphasized mock text */
+  --text-mock-xl: 0.75rem;    /* ~12px — button labels in mock UI */
+  --text-mock-2xl: 0.82rem;   /* ~13px — modal sub-titles */
+  --text-mock-3xl: 0.85rem;   /* ~14px — modal primary text */
+
+  /*
+   * Named animation shorthands for the gradient-background blobs.
+   * Each blob runs the same keyframe but at a different duration and
+   * optionally a different delay — defining them here lets us write
+   * animate-blob / animate-blob-alt / animate-blob-slow as class names.
+   */
+  --animate-blob: blob-float 18s ease-in-out infinite;
+  --animate-blob-alt: blob-float-alt 22s ease-in-out infinite;
+  --animate-blob-slow: blob-float 26s ease-in-out infinite;
 }
 
 html {
+  overflow-x: hidden; /* prevent horizontal scroll from decorative bleed elements (blobs, glows) */
   scroll-behavior: smooth;
   scroll-padding-top: 4rem; /* offset for the fixed 64px navbar */
 }
@@ -28,7 +110,7 @@ html {
 
 body {
   margin: 0;
-  background-color: var(--color-cura-black);
+  background-color: var(--color-cura-base);
   color: var(--color-cura-white);
   font-family: var(--font-sans);
 }
@@ -40,6 +122,20 @@ body {
 
   @media (min-width: 1024px) {
     padding-top: var(--section-padding-y-desktop);
+    padding-bottom: var(--section-padding-y-desktop);
+  }
+}
+
+/*
+ * Hero section adds an extra 4 rem (navbar height) to the top padding so the
+ * content isn't hidden under the fixed bar. Separate utility keeps HeroSection
+ * from hardcoding the calc() inline.
+ */
+@utility section-padding-hero {
+  padding-top: calc(4rem + var(--section-padding-y-mobile));
+  padding-bottom: var(--section-padding-y-mobile);
+
+  @media (min-width: 1024px) {
     padding-bottom: var(--section-padding-y-desktop);
   }
 }
@@ -74,4 +170,60 @@ body {
     padding-left: var(--container-px-desktop);
     padding-right: var(--container-px-desktop);
   }
+}
+
+/*
+ * Frosted-glass card — semi-transparent white panel with backdrop blur.
+ * Extracted from HeroVisual into a utility so any future card-style component
+ * can use it without repeating the exact rgba values.
+ */
+@utility frosted-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  backdrop-filter: blur(24px);
+}
+
+/*
+ * Dark panel — solid near-black surface for value-prop visual mockups.
+ * All three pillar visuals (Pipeline, Timeline, Approval) share this base.
+ */
+@utility dark-panel {
+  background: var(--color-cura-surface);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1rem;
+  padding: 1.5rem;
+}
+
+/*
+ * Gradient text — brand indigo → violet gradient applied as text fill.
+ * Used for the hero headline accent and any future gradient copy.
+ */
+@utility text-gradient-accent {
+  background: linear-gradient(135deg, var(--color-cura-accent) 0%, var(--color-cura-violet) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/*
+ * Section gradient backgrounds — named utilities instead of raw inline gradients.
+ * bg-speed-banner: deep indigo → mid-indigo → purple (SpeedBanner section).
+ * bg-waitlist: deep indigo → deep purple (WaitlistSection).
+ */
+@utility bg-speed-banner {
+  background: linear-gradient(
+    135deg,
+    var(--color-cura-indigo-deep) 0%,
+    var(--color-cura-indigo-mid) 40%,
+    var(--color-cura-purple-deep) 100%
+  );
+}
+
+@utility bg-waitlist {
+  background: linear-gradient(
+    135deg,
+    var(--color-cura-indigo-deep) 0%,
+    var(--color-cura-purple-deep) 100%
+  );
 }
