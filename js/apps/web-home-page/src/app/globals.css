@@ -158,6 +158,18 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Sweeping shimmer across the arrow line in ReplaceStackSection (HP-061) */
+@keyframes arrow-sweep {
+  from { transform: translateX(-40px); }
+  to   { transform: translateX(120px); }
+}
+
+/* Terminal cursor blink in ReplaceStackSection NLP demo (HP-063) */
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
 /* Centred content container capped at max-w-6xl */
 @utility container-page {
   max-width: var(--container-max-width);

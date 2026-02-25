@@ -48,7 +48,7 @@ export function SpeedBanner() {
           {count}{" "}
           <span className="text-speed-unit text-cura-white/65">hrs</span>
         </div>
-        <p className="text-body-fluid-lg text-cura-white/75 mt-5 max-w-[520px] mx-auto leading-[1.6]">
+        <p className="text-body-fluid-lg text-cura-white/75 mt-5 mx-auto leading-[1.6]">
           Recruiters using Cura reclaim an average of{" "}
           <strong className="text-cura-white">3 hours per day.</strong>
         </p>

@@ -167,10 +167,10 @@
 ### EPIC-HP-004B: 🗂️ Replace Your Stack Section
 
 #### Story HP-4B.1: Stack Replacement Visual
-- [ ] **HP-060:** Build `<ReplaceStackSection>` — headline `"One brain. Not five tools."` (serif, centred); subline: `"Cura replaces your entire patchwork of ATS, outreach tool, enrichment API, and calendar sync — and adds an AI layer that actually acts on what it learns."`
-- [ ] **HP-061:** Create a visual "old stack vs Cura" comparison — left side shows 5 greyed-out tool-pill logos (generic: `ATS`, `LinkedIn Recruiter`, `Email Sequencer`, `Enrichment API`, `Calendar Sync`) with a red "×" strike; right side shows a single Cura logo with a glowing indigo halo; an animated arrow sweeps left → right
-- [ ] **HP-062:** Add cost implication subtext beneath the visual: `"Five subscriptions. Five logins. Five sources of truth. Or one."` — muted, italic; aligns with anti-$169/seat-Loxo sentiment without naming names
-- [ ] **HP-063:** Add natural language search callout chip within this section: `"Ask Cura anything: 'Show me CFO candidates in London who interviewed in the last 90 days'"` — styled as a terminal / command input with a blinking cursor; demonstrates NLP search is standard, not a $169/month add-on
+- [x] **HP-060:** Build `<ReplaceStackSection>` — headline `"One brain. Not five tools."` (serif, centred); subline: `"Cura replaces your entire patchwork of ATS, outreach tool, enrichment API, and calendar sync — and adds an AI layer that actually acts on what it learns."`
+- [x] **HP-061:** Create a visual "old stack vs Cura" comparison — left side shows 5 greyed-out tool-pill logos (generic: `ATS`, `LinkedIn Recruiter`, `Email Sequencer`, `Enrichment API`, `Calendar Sync`) with a red "×" strike; right side shows a single Cura logo with a glowing indigo halo; an animated arrow sweeps left → right
+- [x] **HP-062:** Add cost implication subtext beneath the visual: `"Five subscriptions. Five logins. Five sources of truth. Or one."` — muted, italic; aligns with anti-$169/seat-Loxo sentiment without naming names
+- [x] **HP-063:** Add natural language search callout chip within this section: `"Ask Cura anything: 'Show me CFO candidates in London who interviewed in the last 90 days'"` — styled as a terminal / command input with a blinking cursor; demonstrates NLP search is standard, not a $169/month add-on
 
 ---
 
