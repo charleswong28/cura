@@ -37,7 +37,7 @@ fi
 if [ $# -eq 0 ]; then
   # Start infra detached first so their startup logs aren't cleared when apps begin streaming
   docker compose -f "$COMPOSE_FILE" up -d postgres redis soketi
-  exec docker compose -f "$COMPOSE_FILE" up api web
+  exec docker compose -f "$COMPOSE_FILE" up api web-app
 else
   exec docker compose -f "$COMPOSE_FILE" up "$@"
 fi

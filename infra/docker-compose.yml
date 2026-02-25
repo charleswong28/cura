@@ -48,10 +48,10 @@ services:
       timeout: 5s
       retries: 5
 
-  web:
+  web-app:
     build:
       context: ../js
-      dockerfile: apps/web/Dockerfile.dev
+      dockerfile: apps/web-app/Dockerfile.dev
     restart: unless-stopped
     environment:
       NODE_ENV: development
@@ -60,7 +60,21 @@ services:
     ports:
       - "${WEB_PORT:-3000}:3000"
     volumes:
-      - ../js/apps/web/src:/app/apps/web/src
+      - ../js/apps/web-app/src:/app/apps/web-app/src
+
+  web-home-page:
+    build:
+      context: ../js
+      dockerfile: apps/web-home-page/Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "${HOME_PORT:-3002}:3002"
+    volumes:
+      - ../js/apps/web-home-page/src:/app/apps/web-home-page/src
 
   api:
     build:

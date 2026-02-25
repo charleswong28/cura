@@ -1,0 +1,25 @@
+FROM node:20-alpine
+
+RUN npm install -g pnpm@9
+
+WORKDIR /app
+
+# Copy workspace manifests so pnpm can resolve the workspace
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY tsconfig.base.json ./
+COPY apps/web-app/package.json ./apps/web-app/package.json
+
+# Install Linux-native node_modules inside the container
+RUN pnpm install --frozen-lockfile
+
+# Copy build config (not source — source is bind-mounted for hot reload)
+COPY apps/web-app/tsconfig.json apps/web-app/next.config.ts apps/web-app/postcss.config.mjs ./apps/web-app/
+
+# Fallback source copy (overridden by volume mount in dev)
+COPY apps/web-app/src ./apps/web-app/src
+
+WORKDIR /app/apps/web-app
+
+EXPOSE 3000
+
+CMD ["pnpm", "run", "dev"]
