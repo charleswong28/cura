@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 const NAV_LINKS = [
-  { label: "Product", href: "#product" },
   { label: "Why Cura", href: "#why-cura" },
+  { label: "Product", href: "#product" },
   { label: "Pricing", href: "#pricing" },
 ];
 
