@@ -42,7 +42,7 @@
 
 | Principle | Implementation |
 |-----------|---------------|
-| **Dark by default** | Near-black `#0A0A0A` background, off-white `#F5F5F3` text — feels fast and premium |
+| **Dark hero, light content** | Hero section stays near-black for impact; content sections (`#FAFAF8` / white) alternate to light backgrounds following Superhuman's rhythm — dark opener, bright content, dark closer |
 | **Bold, sparse typography** | Large display serif/sans mix (inspired by Superhuman's Super Serif); every section has one headline, one subline |
 | **Motion with purpose** | Subtle entrance animations (fade-up), no decorative spinners; speed is felt, not performed |
 | **Conversion at every scroll** | Primary CTA ("Get Early Access") persists in nav and recurs at section boundaries |
@@ -138,14 +138,14 @@
 ### EPIC-HP-003: 😤 The Problem Section
 
 #### Story HP-3.1: Pain-Point Narrative
-- [ ] **HP-021:** Build `<ProblemSection>` with dark grey background (`#111111`) — differentiated from hero but still dark
-- [ ] **HP-022:** Section headline: `"Your competitors close deals while you're updating spreadsheets."` — large serif, centred
-- [ ] **HP-023:** Four-column pain cards, each with an icon, bold label, and one-sentence description:
+- [x] **HP-021:** Build `<ProblemSection>` with light background (`#FAFAF8`) — Superhuman-style contrast after the dark hero
+- [x] **HP-022:** Section headline: `"Your competitors close deals while you're updating spreadsheets."` — large serif, centred
+- [x] **HP-023:** Four-column pain cards, each with an icon, bold label, and one-sentence description:
   - **"The Endless Click"** — `"11 clicks to move a candidate in most ATS tools. We counted."` (⚡)
   - **"Context Amnesia"** — `"You switch between email, LinkedIn, and CRM and lose the thread every single time."` (🧠)
   - **"Slow = Lost"** — `"The recruiter who replies in minutes places the candidate. You're still searching the inbox."` (⏱)
   - **"The Tool Tax"** — `"ATS. Outreach tool. Enrichment API. LinkedIn Recruiter. You're paying for four tools and managing five context switches — daily."` (💸) — directly counters Loxo's "Headache Tax" framing with our own sharper version
-- [ ] **HP-024:** Below the cards: italic pull-quote `"Your instinct is your edge. But admin is eating it alive."` — large, low-opacity white, centred
+- [x] **HP-024:** Below the cards: italic pull-quote `"Your instinct is your edge. But admin is eating it alive."` — large, low-opacity white, centred
 
 ---
 
