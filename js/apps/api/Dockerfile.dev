@@ -20,6 +20,6 @@ COPY apps/api/src ./apps/api/src
 
 WORKDIR /app/apps/api
 
-EXPOSE 3001
+EXPOSE 8000
 
 CMD ["pnpm", "run", "dev"]

@@ -58,7 +58,7 @@ services:
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "${WEB_PORT:-3001}:3001"
     volumes:
       - ../js/apps/web-app/src:/app/apps/web-app/src
 
@@ -72,7 +72,7 @@ services:
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
     ports:
-      - "${HOME_PORT:-3002}:3002"
+      - "${HOME_PORT:-3000}:3000"
     volumes:
       - ../js/apps/web-home-page/src:/app/apps/web-home-page/src
 
@@ -87,7 +87,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-cura}@redis:6379
       CHOKIDAR_USEPOLLING: "true"
     ports:
-      - "${API_PORT:-3001}:3001"
+      - "${API_PORT:-8000}:8000"
     volumes:
       - ../js/apps/api/src:/app/apps/api/src
     depends_on:

@@ -20,6 +20,6 @@ COPY apps/web-home-page/src ./apps/web-home-page/src
 
 WORKDIR /app/apps/web-home-page
 
-EXPOSE 3002
+EXPOSE 3000
 
 CMD ["pnpm", "run", "dev"]
