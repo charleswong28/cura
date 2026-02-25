@@ -8,6 +8,13 @@
 
   --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-display), ui-serif, Georgia, serif;
+
+  /* Spacing scale */
+  --section-padding-y-mobile: 5rem;   /* 80px — mobile section padding */
+  --section-padding-y-desktop: 8rem;  /* 128px — desktop section padding */
+  --container-max-width: 72rem;       /* max-w-6xl = 1152px */
+  --container-px-mobile: 1.5rem;      /* 24px — mobile side gutter */
+  --container-px-desktop: 2rem;       /* 32px — desktop side gutter */
 }
 
 *, *::before, *::after {
@@ -19,4 +26,29 @@ body {
   background-color: var(--color-cura-black);
   color: var(--color-cura-white);
   font-family: var(--font-sans);
+}
+
+/* Section vertical padding — applied to every top-level page section */
+@utility section-padding {
+  padding-top: var(--section-padding-y-mobile);
+  padding-bottom: var(--section-padding-y-mobile);
+
+  @media (min-width: 1024px) {
+    padding-top: var(--section-padding-y-desktop);
+    padding-bottom: var(--section-padding-y-desktop);
+  }
+}
+
+/* Centred content container capped at max-w-6xl */
+@utility container-page {
+  max-width: var(--container-max-width);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--container-px-mobile);
+  padding-right: var(--container-px-mobile);
+
+  @media (min-width: 1024px) {
+    padding-left: var(--container-px-desktop);
+    padding-right: var(--container-px-desktop);
+  }
 }

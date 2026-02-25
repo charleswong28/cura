@@ -100,7 +100,7 @@
 #### Story HP-1.1: Design Tokens & Global Styles
 - [x] **HP-001:** Define color palette — `--cura-black: #0A0A0A`, `--cura-white: #F5F5F3`, `--cura-accent: #6366F1` (electric indigo), `--cura-muted: #3F3F46` as Tailwind CSS variables in `globals.css`
 - [x] **HP-002:** Configure custom fonts — load `Inter` (body) + `Playfair Display` or `Instrument Serif` (display headlines) via `next/font`; mirror the Superhuman serif/sans pairing
-- [ ] **HP-003:** Set up base spacing scale, max-width container (`max-w-6xl`), and section padding utilities (`section-padding` class)
+- [x] **HP-003:** Set up base spacing scale, max-width container (`max-w-6xl`), and section padding utilities (`section-padding` class)
 - [ ] **HP-004:** Create `<GradientBackground>` component — radial gradient blobs (indigo/violet, low opacity) layered over `#0A0A0A`; subtle CSS `@keyframes` float animation
 
 #### Story HP-1.2: Navigation
