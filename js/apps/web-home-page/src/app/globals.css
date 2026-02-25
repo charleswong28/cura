@@ -1,12 +1,19 @@
 @import "tailwindcss";
 
+@theme {
+  --color-cura-black: #0A0A0A;
+  --color-cura-white: #F5F5F3;
+  --color-cura-accent: #6366F1;
+  --color-cura-muted: #3F3F46;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background-color: #0A0A0A;
-  color: #F5F5F3;
+  background-color: var(--color-cura-black);
+  color: var(--color-cura-white);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
