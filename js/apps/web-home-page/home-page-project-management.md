@@ -104,7 +104,7 @@
 - [x] **HP-004:** Create `<GradientBackground>` component — radial gradient blobs (indigo/violet, low opacity) layered over `#0A0A0A`; subtle CSS `@keyframes` float animation
 
 #### Story HP-1.2: Navigation
-- [ ] **HP-005:** Build sticky `<NavBar>` — logo left, links centre (`Product`, `Why Cura`, `Pricing`), CTA button right (`Get Early Access` → scrolls to waitlist); transparent on top of hero, blurs to `bg-black/80 backdrop-blur` on scroll
+- [x] **HP-005:** Build sticky `<NavBar>` — logo left, links centre (`Product`, `Why Cura`, `Pricing`), CTA button right (`Get Early Access` → scrolls to waitlist); transparent on top of hero, blurs to `bg-black/80 backdrop-blur` on scroll
 - [ ] **HP-006:** Add mobile hamburger nav with slide-down drawer; all nav items accessible at ≤ 768 px
 - [ ] **HP-007:** Implement scroll-spy to highlight active nav section as user scrolls
 
