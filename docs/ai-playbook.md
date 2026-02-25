@@ -37,13 +37,16 @@ After making any frontend or backend change, the AI **must** verify the result i
 ### Steps
 
 1. **Identify which service(s) were changed** — determine which of the three services above is affected by the change.
-2. **Start the server** — run `bin/start_cura` in the background if not already running:
+2. **Check if the server is already running** — only start it if not already up:
    ```bash
-   bin/start_cura &
+   curl -sf http://localhost:<PORT>/ > /dev/null 2>&1 || bin/start_cura &
    ```
+   Skipping an unnecessary restart saves significant startup time.
 3. **Wait for readiness** — poll the relevant service URL until it returns HTTP 200 (retry every 3 s, timeout after 60 s). Example for the home page:
    ```bash
    until curl -sf http://localhost:3000/ > /dev/null; do sleep 3; done
    ```
-4. **Verify the change** — use `curl` or `WebFetch` to confirm the expected content/behaviour is present at the relevant URL.
+4. **Verify the change:**
+   - **Frontend services** (`web-home-page`, `web-app`): use the **Playwright skill** to screenshot the relevant URL and visually confirm the change is rendered correctly.
+   - **API / backend**: use `curl` or `WebFetch` to confirm the expected response at the relevant endpoint.
 5. **Do not respond to the user** until step 4 passes. If verification fails after the timeout, report the failure with the actual error rather than claiming success.
