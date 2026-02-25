@@ -99,7 +99,7 @@ export default function OGImage() {
             fontWeight: 400,
           }}
         >
-          The AI-first recruitment platform that moves the deal — from first signal to signed offer.
+          AI handles the administrative heavy lifting — so recruiters can focus on what AI can't replicate: human connection.
         </div>
 
         {/* Bottom accent rule */}

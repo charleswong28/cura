@@ -45,9 +45,9 @@ export default function HeroSection() {
             className="text-lg xl:text-xl leading-relaxed mb-10 max-w-[520px]"
             style={{ color: "rgba(245,245,243,0.65)" }}
           >
-            The AI-first recruitment platform that moves the deal — from{" "}
-            <em>first signal to signed offer</em> — so you can focus on the
-            relationships only you can build.
+            Let the AI recruitment CRM handle the admin work
+            so you can focus on what AI can&apos;t replicate -
+            <em>human connection.</em>
           </p>
 
           {/* HP-014: Stat bar — four micro-stats */}
@@ -89,13 +89,32 @@ export default function HeroSection() {
             <WatchDemoButton />
           </div>
 
-          {/* HP-017: Social-proof micro-copy */}
-          <p
-            className="text-xs tracking-wide"
-            style={{ color: "rgba(245,245,243,0.30)" }}
-          >
-            Trusted by 40+ recruitment agencies in beta
-          </p>
+          {/* HP-017: Social-proof micro-copy with avatar circles */}
+          <div className="flex items-center gap-3">
+            {/* Three overlapping placeholder avatars */}
+            <div className="flex -space-x-2">
+              {[
+                { initials: "SK", bg: "#4F46E5" },
+                { initials: "MR", bg: "#7C3AED" },
+                { initials: "JP", bg: "#6366F1" },
+              ].map(({ initials, bg }) => (
+                <div
+                  key={initials}
+                  aria-hidden="true"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold text-white ring-2"
+                  style={{ background: bg, ringColor: "#0A0A0A" as never, boxShadow: "0 0 0 2px #0A0A0A" }}
+                >
+                  {initials}
+                </div>
+              ))}
+            </div>
+            <p
+              className="text-xs tracking-wide"
+              style={{ color: "rgba(245,245,243,0.40)" }}
+            >
+              Trusted by 40+ recruitment agencies in beta
+            </p>
+          </div>
         </div>
 
         {/* HP-011: Visual panel — stacks below CTAs on mobile, side-by-side on desktop */}

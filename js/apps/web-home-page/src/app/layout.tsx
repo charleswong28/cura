@@ -23,14 +23,14 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://cura.com";
 export const metadata: Metadata = {
   title: "Cura — AI-First Recruitment CRM",
   description:
-    "Stop Clicking. Start Connecting. The AI-first recruitment platform that moves the deal — from first signal to signed offer.",
+    "Stop Clicking. Start Connecting. AI handles the administrative heavy lifting — so recruiters can focus on what AI can't replicate: human connection.",
   metadataBase: new URL(BASE_URL),
   openGraph: {
     type: "website",
     siteName: "Cura",
     title: "Cura — AI-First Recruitment CRM",
     description:
-      "Stop Clicking. Start Connecting. The AI-first recruitment platform that moves the deal — from first signal to signed offer.",
+      "Stop Clicking. Start Connecting. AI handles the administrative heavy lifting — so recruiters can focus on what AI can't replicate: human connection.",
     url: BASE_URL,
     locale: "en_US",
   },
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Cura — AI-First Recruitment CRM",
     description:
-      "Stop Clicking. Start Connecting. The AI-first recruitment platform that moves the deal — from first signal to signed offer.",
+      "Stop Clicking. Start Connecting. AI handles the administrative heavy lifting — so recruiters can focus on what AI can't replicate: human connection.",
   },
 };
 
