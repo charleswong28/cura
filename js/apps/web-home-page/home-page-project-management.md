@@ -118,7 +118,7 @@
 ### EPIC-HP-002: 🦸 Hero Section
 
 #### Story HP-2.1: Hero Copy & Layout
-- [ ] **HP-011:** Build `<HeroSection>` full-viewport (`min-h-screen`) layout — vertically centred, left-aligned text column, right-side animated visual panel
+- [x] **HP-011:** Build `<HeroSection>` full-viewport (`min-h-screen`) layout — vertically centred, left-aligned text column, right-side animated visual panel
 - [ ] **HP-012:** Implement headline: `"Stop Clicking."` (display serif, white, ~96 px) / `"Start Connecting."` (display serif, indigo gradient, ~96 px) — two lines, separate color treatment
 - [ ] **HP-013:** Add subheadline: `"The AI-first recruitment platform that moves the deal — from first signal to signed offer — so you can focus on the relationships only you can build."` (~20 px, muted white, max-width 520 px); `"from first signal to signed offer"` counters RecruitCRM's "sourcing to placements" full-lifecycle claim
 - [ ] **HP-014:** Add supporting stat bar below subheadline: four micro-stats with dividers — `"3 hrs saved/day"` · `"5 tools replaced"` · `"Zero lost context"` · `"Human always in control"`; each stat in indigo, label in muted white; `"5 tools replaced"` is the stack-consolidation hook
@@ -129,9 +129,9 @@
 - [ ] **HP-017:** Add social-proof micro-copy beneath CTAs: `"Trusted by 40+ recruitment agencies in beta"` with three avatar circles (placeholder)
 
 #### Story HP-2.3: Hero Visual
-- [ ] **HP-018:** Build `<HeroVisual>` right panel — dark frosted-glass card mockup of the Cura pipeline Kanban; populate with placeholder candidate cards with stage labels (`Sourced`, `Screened`, `Interviewing`, `Offer`)
-- [ ] **HP-019:** Animate a candidate card auto-advancing from `Screened → Interviewing` with a subtle AI badge ("AI moved · just now") — CSS keyframe loop, 4 s interval
-- [ ] **HP-020:** Add floating tooltip over the moving card: `"Cura detected calendar invite. Briefing note drafted."` — appears and fades after 2 s
+- [x] **HP-018:** Build `<HeroVisual>` right panel — dark frosted-glass card mockup of the Cura pipeline Kanban; populate with placeholder candidate cards with stage labels (`Sourced`, `Screened`, `Interviewing`, `Offer`)
+- [x] **HP-019:** Animate a candidate card auto-advancing from `Screened → Interviewing` with a subtle AI badge ("AI moved · just now") — CSS keyframe loop, 4 s interval
+- [x] **HP-020:** Add floating tooltip over the moving card: `"Cura detected calendar invite. Briefing note drafted."` — appears and fades after 2 s
 
 ---
 

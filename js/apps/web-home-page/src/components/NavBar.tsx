@@ -80,13 +80,25 @@ export default function NavBar() {
           className="flex items-center justify-between h-16"
           aria-label="Main navigation"
         >
-          {/* Logo */}
+          {/* Logo — node mark + Inter wordmark, Superhuman-style */}
           <a
             href="/"
-            className="font-display text-xl text-cura-white tracking-tight leading-none"
+            className="flex items-center gap-2 select-none"
             aria-label="Cura home"
           >
-            Cura
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle cx="10" cy="10" r="10" fill="#6366F1" />
+              <circle cx="10" cy="10" r="4" fill="#F5F5F3" />
+            </svg>
+            <span className="font-sans font-medium text-[15px] text-cura-white tracking-[-0.01em] leading-none">
+              Cura
+            </span>
           </a>
 
           {/* Centre links — desktop only */}

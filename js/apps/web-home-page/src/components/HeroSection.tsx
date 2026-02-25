@@ -2,11 +2,12 @@
  * HeroSection — HP-011 through HP-017
  *
  * Full-viewport opening section. Vertically centred within the space below
- * the fixed NavBar. Left-aligned text column with headline, subheadline,
- * stat bar, CTA buttons, and social proof micro-copy.
- *
- * Right-side visual panel (HP-018–020) will be added in a follow-up task.
+ * the fixed NavBar. Two-column layout on desktop:
+ *   Left  — text column (headline, subheadline, stat bar, CTAs, social proof)
+ *   Right — <HeroVisual> animated pipeline Kanban (stacks below CTAs on mobile)
  */
+import HeroVisual from "@/components/HeroVisual";
+
 export default function HeroSection() {
   return (
     <section
@@ -14,12 +15,14 @@ export default function HeroSection() {
       style={{ paddingTop: "calc(4rem + var(--section-padding-y-mobile))" }}
     >
       <div className="container-page">
-        {/* Text column — max-width keeps copy tight and scannable */}
-        <div className="max-w-[600px]">
+        {/* HP-011: Two-column grid — text left, visual right */}
+        <div className="grid lg:grid-cols-2 gap-12 xl:gap-20 items-center">
+        {/* Text column */}
+        <div className="max-w-[560px]">
           {/* HP-012: Two-line display headline, serif, ~96 px */}
           <h1
-            className="font-display leading-[0.92] tracking-tight mb-8"
-            style={{ fontSize: "clamp(3.5rem, 7vw, 6rem)" }}
+            className="font-sans font-semibold leading-[1.1] tracking-tight mb-8"
+            style={{ fontSize: "clamp(2.25rem, 4.5vw, 3.75rem)" }}
           >
             <span className="block text-cura-white">Stop Clicking.</span>
             <span
@@ -99,6 +102,12 @@ export default function HeroSection() {
           >
             Trusted by 40+ recruitment agencies in beta
           </p>
+        </div>
+
+        {/* HP-011: Visual panel — stacks below CTAs on mobile, side-by-side on desktop */}
+        <div className="flex items-center justify-center lg:justify-end mt-4 lg:mt-0">
+          <HeroVisual />
+        </div>
         </div>
       </div>
     </section>

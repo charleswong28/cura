@@ -49,7 +49,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`dark ${inter.variable} ${instrumentSerif.variable}`}>
-      <body>
+      <body suppressHydrationWarning>
         <GradientBackground />
         <NavBar />
         {children}
