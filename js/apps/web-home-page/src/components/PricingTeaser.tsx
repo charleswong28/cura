@@ -19,6 +19,7 @@ const PLANS = [
     credits: "500 AI credits / mo",
     features: ["1 seat", "50 candidates", "1 active job", "AI match scoring", "Cura branding"],
     note: "No credit card required.",
+    featured: false,
   },
   {
     tier: "Starter",
@@ -37,6 +38,7 @@ const PLANS = [
       "Keyboard-first UI",
     ],
     note: "3,000 credits included — top up at £10/1,000.",
+    featured: false,
   },
   {
     tier: "Pro",
@@ -74,6 +76,7 @@ const PLANS = [
       "Volume discounts",
     ],
     note: "Enterprise buyers expect custom pricing.",
+    featured: false,
   },
 ] as const;
 
