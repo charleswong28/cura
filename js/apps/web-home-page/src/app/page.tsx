@@ -2,7 +2,7 @@
  * Home page — HP-008
  *
  * Scroll order (matches Section Map in home-page-project-management.md):
- *  1. HeroSection          — "Stop Clicking. Start Connecting."
+ *  1. HeroSection          — "AI Runs the ATS. You Close the Deal."
  *  2. ProblemSection       — "Your competitors close deals…"          #why-cura
  *  3. ValuePropsSection    — Three-pillar AI features + speed banner  #product
  *  4. ReplaceStackSection  — "One brain. Not five tools."

@@ -21,24 +21,24 @@ const instrumentSerif = Instrument_Serif({
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://cura.com";
 
 export const metadata: Metadata = {
-  title: "Cura — AI-First Recruitment CRM",
+  title: "Cura — AI Runs the ATS. You Close the Deal.",
   description:
-    "Stop Clicking. Start Connecting. Cura handles the heavy lifting admin work so you can focus on the only thing that closes deals: human connection.",
+    "The AI-first recruitment platform that runs your pipeline autonomously. Advance candidates, draft outreach, and surface context — with humans always in control.",
   metadataBase: new URL(BASE_URL),
   openGraph: {
     type: "website",
     siteName: "Cura",
-    title: "Cura — AI-First Recruitment CRM",
+    title: "Cura — AI Runs the ATS. You Close the Deal.",
     description:
-      "Stop Clicking. Start Connecting. Cura handles the heavy lifting admin work so you can focus on the only thing that closes deals: human connection.",
+      "The AI-first recruitment platform that runs your pipeline autonomously. Advance candidates, draft outreach, and surface context — with humans always in control.",
     url: BASE_URL,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Cura — AI-First Recruitment CRM",
+    title: "Cura — AI Runs the ATS. You Close the Deal.",
     description:
-      "Stop Clicking. Start Connecting. Cura handles the heavy lifting admin work so you can focus on the only thing that closes deals: human connection.",
+      "The AI-first recruitment platform that runs your pipeline autonomously. Advance candidates, draft outreach, and surface context — with humans always in control.",
   },
 };
 
