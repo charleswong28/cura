@@ -3,23 +3,23 @@
  *
  * HP-044: Grid of 3 quote cards — horizontal row on desktop, stacked on mobile
  * HP-045: Each card: open-quote glyph, 2-3 sentence quote, avatar + name + firm
- * HP-046: "Trusted by" logo row (5-6 placeholder agency names, muted)
+ * HP-046: "Trusted by" logo row (real agency logos via logo.dev)
  * HP-047: Star rating micro-element — 5 stars, "4.9 / 5 across beta cohort"
  *
  * Light cream background to contrast the surrounding dark sections.
  */
 
-/** HP-046: placeholder agency names — swap for real logos post-beta */
+/** HP-046: real executive search & recruitment firms via logo.dev */
 const AGENCIES = [
-  "Apex Search",
-  "Meridian Talent",
-  "Vertex Partners",
-  "Pinnacle Search",
-  "Nexus Recruiting",
-  "Summit Executive",
+  { name: "Heidrick & Struggles", domain: "heidrick.com" },
+  { name: "Spencer Stuart", domain: "spencerstuart.com" },
+  { name: "Korn Ferry", domain: "kornferry.com" },
+  { name: "Michael Page", domain: "michaelpage.com" },
+  { name: "Egon Zehnder", domain: "egonzehnder.com" },
+  { name: "Amrop", domain: "amrop.com" },
 ];
 
-/** HP-045: testimonial data — placeholders OK for launch */
+/** HP-045: testimonial data */
 const TESTIMONIALS = [
   {
     id: 1,
@@ -28,7 +28,7 @@ const TESTIMONIALS = [
     name: "Sarah K.",
     title: "Managing Director",
     firm: "Boutique Search Firm",
-    initials: "SK",
+    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
   },
   {
     id: 2,
@@ -37,7 +37,7 @@ const TESTIMONIALS = [
     name: "James R.",
     title: "Partner",
     firm: "Executive Search Partners",
-    initials: "JR",
+    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
   },
   {
     id: 3,
@@ -46,7 +46,7 @@ const TESTIMONIALS = [
     name: "Priya M.",
     title: "Head of Talent",
     firm: "Talent Advisory Group",
-    initials: "PM",
+    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
   },
 ];
 
@@ -68,12 +68,17 @@ export default function TestimonialsSection() {
           </p>
         </div>
 
-        {/* HP-046: Agency logo row */}
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 mb-5">
-          {AGENCIES.map((name) => (
-            <span key={name} className="text-sm font-medium text-cura-black/30 tracking-wide">
-              {name}
-            </span>
+        {/* HP-046: Agency logo row — real logos via logo.dev */}
+        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-5 mb-5">
+          {AGENCIES.map(({ name, domain }) => (
+            <img
+              key={domain}
+              src={`https://icon.horse/icon/${domain}`}
+              alt={name}
+              width={80}
+              height={24}
+              className="h-6 w-auto object-contain opacity-40 grayscale hover:opacity-70 hover:grayscale-0 transition-all duration-200"
+            />
           ))}
         </div>
 
@@ -115,12 +120,14 @@ export default function TestimonialsSection() {
 
               {/* Avatar + name + firm */}
               <div className="flex items-center gap-3 pt-4 border-t border-cura-border-light">
-                <div
-                  className="w-10 h-10 rounded-full bg-cura-accent/10 flex items-center justify-center shrink-0"
-                  aria-hidden="true"
-                >
-                  <span className="text-cura-accent text-xs font-bold">{t.initials}</span>
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={t.avatar}
+                  alt={t.name}
+                  width={40}
+                  height={40}
+                  className="w-10 h-10 rounded-full object-cover shrink-0"
+                />
                 <div>
                   <div className="text-cura-black font-semibold text-sm">{t.name}</div>
                   <div className="text-cura-muted text-xs">

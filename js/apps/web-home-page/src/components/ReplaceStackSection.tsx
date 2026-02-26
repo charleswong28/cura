@@ -14,29 +14,38 @@ import { useEffect, useRef, useState } from "react";
 // ─── Data ────────────────────────────────────────────────────────────────────
 
 const OLD_TOOLS = [
-  { label: "ATS", icon: "📁" },
-  { label: "LinkedIn Recruiter", icon: "🔗" },
-  { label: "Email Sequencer", icon: "✉️" },
-  { label: "Enrichment API", icon: "🔬" },
-  { label: "Calendar Sync", icon: "📅" },
+  { label: "Greenhouse ATS", domain: "greenhouse.io" },
+  { label: "LinkedIn Recruiter", domain: "linkedin.com" },
+  { label: "Outreach", domain: "outreach.io" },
+  { label: "Apollo.io", domain: "apollo.io" },
+  { label: "Calendly", domain: "calendly.com" },
 ] as const;
 
-const NLP_QUERY =
-  "Show me CFO candidates in London who interviewed in the last 90 days";
+const NLP_QUERY = "Show me CFO candidates in London who interviewed in the last 90 days";
 
 // ─── Old stack (HP-061 left side) ────────────────────────────────────────────
 
 function OldStack() {
   return (
     <div className="flex flex-col gap-2.5 w-full max-w-60 mx-auto lg:mx-0">
-      {OLD_TOOLS.map(({ label, icon }) => (
+      {OLD_TOOLS.map(({ label, domain }) => (
         <div
           key={label}
           className="relative flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-white/4 border border-white/[0.07]"
         >
           {/* Strikethrough line */}
           <div className="absolute inset-x-3 top-1/2 h-px bg-red-400/35 -translate-y-1/2 pointer-events-none" />
-          <span className="text-base opacity-20">{icon}</span>
+          {/* Company logo on a white pill so it's visible on dark bg */}
+          <div className="shrink-0 w-5 h-5 rounded bg-white flex items-center justify-center overflow-hidden opacity-40">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://icon.horse/icon/${domain}`}
+              alt={label}
+              width={20}
+              height={20}
+              className="w-full h-full object-contain"
+            />
+          </div>
           <span className="text-sm font-medium text-cura-white/25">{label}</span>
         </div>
       ))}
@@ -81,16 +90,13 @@ function SweepArrow() {
 function CuraCard() {
   return (
     <div
-      className="flex flex-col items-center justify-center gap-4 px-8 py-8 rounded-2xl border border-cura-accent/25 bg-cura-accent/[0.06] w-full max-w-[240px] mx-auto lg:mx-0"
+      className="flex flex-col items-center justify-center gap-4 px-8 py-8 rounded-2xl border border-cura-accent/25 bg-cura-accent/6 w-full max-w-60 mx-auto lg:mx-0"
       style={{
-        boxShadow:
-          "0 0 48px 0 rgba(99, 102, 241, 0.20), 0 0 100px 0 rgba(139, 92, 246, 0.08)",
+        boxShadow: "0 0 48px 0 rgba(99, 102, 241, 0.20), 0 0 100px 0 rgba(139, 92, 246, 0.08)",
       }}
     >
       <div className="text-center">
-        <div className="text-cura-white font-semibold text-base tracking-tight">
-          Cura
-        </div>
+        <div className="text-cura-white font-semibold text-base tracking-tight">Cura</div>
         <div className="text-cura-accent-soft text-sm mt-0.5">One platform</div>
       </div>
 
@@ -112,9 +118,33 @@ function CuraCard() {
 // ─── NLP search web UI (HP-063) ──────────────────────────────────────────────
 
 const MOCK_RESULTS = [
-  { name: "Sarah Chen", title: "CFO", company: "Meridian Capital", location: "London", interviewed: "3 days ago", score: 94 },
-  { name: "James Okafor", title: "CFO", company: "Finsbury Growth", location: "London", interviewed: "11 days ago", score: 88 },
-  { name: "Priya Mehta", title: "CFO", company: "Apex Ventures", location: "London", interviewed: "28 days ago", score: 81 },
+  {
+    name: "Sarah Chen",
+    title: "CFO",
+    company: "Meridian Capital",
+    location: "London",
+    interviewed: "3 days ago",
+    score: 94,
+    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+  },
+  {
+    name: "James Okafor",
+    title: "CFO",
+    company: "Finsbury Growth",
+    location: "London",
+    interviewed: "11 days ago",
+    score: 88,
+    avatar: "https://randomuser.me/api/portraits/men/22.jpg",
+  },
+  {
+    name: "Priya Mehta",
+    title: "CFO",
+    company: "Apex Ventures",
+    location: "London",
+    interviewed: "28 days ago",
+    score: 81,
+    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
+  },
 ] as const;
 
 function NLPSearch() {
@@ -154,7 +184,13 @@ function NLPSearch() {
       {/* Search input */}
       <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/12 bg-cura-surface">
         {/* Search icon */}
-        <svg className="w-4 h-4 text-cura-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <svg
+          className="w-4 h-4 text-cura-accent shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}
+        >
           <circle cx="11" cy="11" r="7" />
           <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
         </svg>
@@ -164,7 +200,10 @@ function NLPSearch() {
           {displayed}
           <span
             className="inline-block w-0.5 h-[0.85em] bg-cura-accent ml-0.5 align-middle rounded-sm"
-            style={{ animation: showResults ? "none" : "blink-cursor 1s step-end infinite", opacity: showResults ? 0 : 1 }}
+            style={{
+              animation: showResults ? "none" : "blink-cursor 1s step-end infinite",
+              opacity: showResults ? 0 : 1,
+            }}
           />
         </div>
 
@@ -188,16 +227,26 @@ function NLPSearch() {
 
           {/* Candidate rows */}
           {MOCK_RESULTS.map((r) => (
-            <div key={r.name} className="flex items-center gap-4 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors">
+            <div
+              key={r.name}
+              className="flex items-center gap-4 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors"
+            >
               {/* Avatar */}
-              <div className="w-8 h-8 rounded-full bg-cura-accent/20 flex items-center justify-center text-cura-accent-soft text-xs font-semibold shrink-0">
-                {r.name.split(" ").map((n) => n[0]).join("")}
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={r.avatar}
+                alt={r.name}
+                width={32}
+                height={32}
+                className="w-8 h-8 rounded-full object-cover shrink-0"
+              />
 
               {/* Name + role */}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-cura-white/85 leading-tight">{r.name}</div>
-                <div className="text-xs text-cura-white/40 mt-0.5">{r.title} · {r.company} · {r.location}</div>
+                <div className="text-xs text-cura-white/40 mt-0.5">
+                  {r.title} · {r.company} · {r.location}
+                </div>
               </div>
 
               {/* Interviewed */}
@@ -233,7 +282,6 @@ export default function ReplaceStackSection() {
   return (
     <section className="section-padding bg-cura-base">
       <div className="container-page">
-
         {/* HP-060 — headline + subline */}
         <div className="text-center mb-14">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cura-accent/10 border border-cura-accent/20 text-cura-accent-soft text-xs font-semibold uppercase tracking-widest mb-6">
@@ -244,9 +292,9 @@ export default function ReplaceStackSection() {
             One brain. Not five tools.
           </h2>
           <p className="text-body-fluid text-cura-white/50 max-w-xl mx-auto leading-[1.8]">
-            Fragmented tools mean fragmented AI. Cura connects every email, call, and
-            LinkedIn signal into one system so your AI has full context, and
-            your firm becomes truly AI-native.
+            Fragmented tools mean fragmented AI. Cura connects every email, call, and LinkedIn
+            signal into one system so your AI has full context, and your firm becomes truly
+            AI-native.
           </p>
         </div>
 
@@ -259,12 +307,12 @@ export default function ReplaceStackSection() {
 
         {/* HP-062 — cost implication subtext */}
         <p className="text-center text-cura-white/35 italic text-body-fluid mb-12">
-          No manual syncs. No context gaps between tools. This is what being truly AI-native looks like.
+          No manual syncs. No context gaps between tools. This is what being truly AI-native looks
+          like.
         </p>
 
         {/* HP-063 — NLP search web UI */}
         <NLPSearch />
-
       </div>
     </section>
   );
