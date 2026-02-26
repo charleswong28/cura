@@ -28,20 +28,16 @@ const NLP_QUERY =
 
 function OldStack() {
   return (
-    <div className="flex flex-col gap-2.5 w-full max-w-[240px] mx-auto lg:mx-0">
+    <div className="flex flex-col gap-2.5 w-full max-w-60 mx-auto lg:mx-0">
       {OLD_TOOLS.map(({ label, icon }) => (
         <div
           key={label}
-          className="relative flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.07]"
+          className="relative flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-white/4 border border-white/[0.07]"
         >
           {/* Strikethrough line */}
           <div className="absolute inset-x-3 top-1/2 h-px bg-red-400/35 -translate-y-1/2 pointer-events-none" />
           <span className="text-base opacity-20">{icon}</span>
           <span className="text-sm font-medium text-cura-white/25">{label}</span>
-          {/* × dismiss badge */}
-          <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500/75 flex items-center justify-center text-white text-[11px] font-bold leading-none select-none">
-            ×
-          </span>
         </div>
       ))}
     </div>
@@ -52,18 +48,18 @@ function OldStack() {
 
 function SweepArrow() {
   return (
-    <div className="flex flex-col items-center gap-2.5 py-6 lg:py-0 flex-shrink-0">
+    <div className="flex flex-col items-center gap-2.5 py-6 lg:py-0 shrink-0">
       {/* Line with moving shimmer + CSS arrowhead */}
       <div className="flex items-center">
         <div className="relative w-16 h-0.5 bg-cura-accent/20 overflow-hidden rounded-full">
           <div
-            className="absolute inset-y-0 w-8 bg-gradient-to-r from-transparent via-cura-accent to-transparent"
+            className="absolute inset-y-0 w-8 bg-linear-to-r from-transparent via-cura-accent to-transparent"
             style={{ animation: "arrow-sweep 1.6s ease-in-out infinite" }}
           />
         </div>
         {/* Arrowhead — inline style avoids needing a Tailwind arbitrary border-color */}
         <div
-          className="flex-shrink-0"
+          className="shrink-0"
           style={{
             width: 0,
             height: 0,
@@ -156,24 +152,24 @@ function NLPSearch() {
   return (
     <div ref={ref} className="mx-auto max-w-2xl">
       {/* Search input */}
-      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/[0.12] bg-cura-surface">
+      <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl border border-white/12 bg-cura-surface">
         {/* Search icon */}
-        <svg className="w-4 h-4 text-cura-accent flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <svg className="w-4 h-4 text-cura-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <circle cx="11" cy="11" r="7" />
           <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
         </svg>
 
         {/* Typewriter query */}
-        <div className="flex-1 text-sm text-cura-white/80 min-h-[1.25rem]">
+        <div className="flex-1 text-sm text-cura-white/80 min-h-5">
           {displayed}
           <span
-            className="inline-block w-[2px] h-[0.85em] bg-cura-accent ml-0.5 align-middle rounded-sm"
+            className="inline-block w-0.5 h-[0.85em] bg-cura-accent ml-0.5 align-middle rounded-sm"
             style={{ animation: showResults ? "none" : "blink-cursor 1s step-end infinite", opacity: showResults ? 0 : 1 }}
           />
         </div>
 
         {/* Enter / search hint */}
-        <kbd className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/[0.10] text-cura-white/30 text-xs font-sans">
+        <kbd className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/6 border border-white/10 text-cura-white/30 text-xs font-sans">
           ↵
         </kbd>
       </div>
@@ -181,7 +177,7 @@ function NLPSearch() {
       {/* Results — only mounted once typing finishes, animates in */}
       {showResults && (
         <div
-          className="mt-2 rounded-xl border border-white/[0.09] bg-cura-surface overflow-hidden"
+          className="mt-2 rounded-xl border border-white/9 bg-cura-surface overflow-hidden"
           style={{ animation: "fade-in-up 0.4s ease both" }}
         >
           {/* Results header */}
@@ -192,9 +188,9 @@ function NLPSearch() {
 
           {/* Candidate rows */}
           {MOCK_RESULTS.map((r) => (
-            <div key={r.name} className="flex items-center gap-4 px-4 py-3 border-b border-white/[0.05] last:border-0 hover:bg-white/[0.03] transition-colors">
+            <div key={r.name} className="flex items-center gap-4 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors">
               {/* Avatar */}
-              <div className="w-8 h-8 rounded-full bg-cura-accent/20 flex items-center justify-center text-cura-accent-soft text-xs font-semibold flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-cura-accent/20 flex items-center justify-center text-cura-accent-soft text-xs font-semibold shrink-0">
                 {r.name.split(" ").map((n) => n[0]).join("")}
               </div>
 
@@ -205,13 +201,13 @@ function NLPSearch() {
               </div>
 
               {/* Interviewed */}
-              <div className="hidden sm:block text-xs text-cura-white/30 flex-shrink-0">
+              <div className="hidden sm:block text-xs text-cura-white/30 shrink-0">
                 Interviewed {r.interviewed}
               </div>
 
               {/* Fit score */}
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <div className="w-16 h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="w-16 h-1.5 rounded-full bg-white/8 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-cura-accent"
                     style={{ width: `${r.score}%` }}

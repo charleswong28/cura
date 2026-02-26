@@ -62,7 +62,7 @@
    * semantic class names (text-hero, text-section-lg, …) without repeating the
    * clamp formula. Each size has a clear semantic role.
    */
-  --text-hero: clamp(2.25rem, 4.5vw, 3.75rem);
+  --text-hero: clamp(1.8rem, 4vw, 3.5rem);
   --text-section-lg: clamp(2rem, 4vw, 3.25rem);
   --text-pillar: clamp(2rem, 2vw, 2.5rem);
   --text-pull-quote: clamp(1.5rem, 2.5vw, 2.25rem);

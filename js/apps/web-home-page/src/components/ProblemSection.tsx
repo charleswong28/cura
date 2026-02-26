@@ -39,8 +39,8 @@ export default function ProblemSection() {
     <section id="why-cura" className="section-padding bg-cura-cream">
       <div className="container-page">
         {/* HP-022: Centred headline */}
-        <h2 className="font-sans font-semibold text-section-lg text-cura-black text-center leading-tight mx-auto mb-16 lg:mb-20 max-w-3xl">
-          Your competitors close deals while you&apos;re updating spreadsheets.
+        <h2 className="font-sans font-semibold text-section-lg text-cura-black text-center leading-tight mx-auto mb-16 lg:mb-20">
+          Your competitors close deals <br />while you&apos;re updating spreadsheets.
         </h2>
 
         {/* HP-023: Pain-point grid — 1 col → 2 col → 4 col */}

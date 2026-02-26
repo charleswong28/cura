@@ -23,11 +23,11 @@ export default function HeroSection() {
         {/* HP-011: Two-column grid — text left, visual right */}
         <div className="grid lg:grid-cols-2 gap-12 xl:gap-20 items-center">
         {/* Text column */}
-        <div className="max-w-[560px]">
+        <div className="max-w-140">
           {/* HP-012: Two-line display headline */}
-          <h1 className="font-sans font-semibold text-hero leading-[1.1] tracking-tight mb-8">
-            <span className="block text-cura-white">Stop Clicking.</span>
-            <span className="block text-gradient-accent">Start Connecting.</span>
+          <h1 className="font-sans font-semibold leading-[1.1] tracking-tight mb-8 text-hero">
+            <span className="block text-cura-white">AI Runs the ATS.</span>
+            <span className="block text-gradient-accent">You Close the Deal.</span>
           </h1>
 
           {/* HP-013: Subheadline */}
