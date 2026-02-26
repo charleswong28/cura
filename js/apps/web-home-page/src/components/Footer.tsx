@@ -24,9 +24,9 @@ const LINKS = {
     { label: "Early Access", href: "#waitlist" },
   ],
   Legal: [
-    { label: "Privacy Policy", href: "#" },
-    { label: "Terms of Service", href: "#" },
-    { label: "Cookie Policy", href: "#" },
+    { label: "Privacy Policy", href: "/privacy" },
+    { label: "Terms of Service", href: "/terms" },
+    { label: "Cookie Policy", href: "/cookies" },
   ],
 } as const;
 
@@ -53,7 +53,10 @@ function GdprBanner({ onAccept, onDecline }: { onAccept: () => void; onDecline: 
         <p className="text-sm text-white/70 max-w-xl">
           We use analytics cookies to understand how visitors interact with our site. No personal
           data is sold. See our{" "}
-          <a href="#" className="underline underline-offset-2 hover:text-white transition-colors">
+          <a
+            href="/cookies"
+            className="underline underline-offset-2 hover:text-white transition-colors"
+          >
             Cookie Policy
           </a>{" "}
           for details.
