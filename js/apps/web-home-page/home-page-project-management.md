@@ -249,11 +249,11 @@
 
 #### Story HP-7.1: Testimonials
 
-- [ ] **HP-044:** Build `<TestimonialsSection>` — horizontal scroll of 3–4 quote cards on desktop, stacked on mobile
-- [ ] **HP-045:** Each card: large open-quote glyph (indigo), 2–3 sentence quote, avatar circle + name + firm (placeholders OK for launch)
+- [x] **HP-044:** Build `<TestimonialsSection>` — horizontal scroll of 3–4 quote cards on desktop, stacked on mobile
+- [x] **HP-045:** Each card: large open-quote glyph (indigo), 2–3 sentence quote, avatar circle + name + firm (placeholders OK for launch)
   - Example: `"We moved 40% more candidates to second interview in month one. Cura found the context I always lost between meetings."` — _Sarah K., MD, boutique search firm_
-- [ ] **HP-046:** Add `"Trusted by"` logo row above testimonials — 5–6 placeholder agency names in muted white; update with real logos post-beta
-- [ ] **HP-047:** Add star rating micro-element (5 stars, `"4.9 / 5 across beta cohort"`) beneath logo row
+- [x] **HP-046:** Add `"Trusted by"` logo row above testimonials — 5–6 placeholder agency names in muted white; update with real logos post-beta
+- [x] **HP-047:** Add star rating micro-element (5 stars, `"4.9 / 5 across beta cohort"`) beneath logo row
 
 ---
 
