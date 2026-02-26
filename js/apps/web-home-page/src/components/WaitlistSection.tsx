@@ -7,12 +7,13 @@
  * HP-048: full-width bg-waitlist gradient (indigo-to-violet)
  * HP-049: headline + subline
  * HP-050: email input, submit, success state with checkmark
- * HP-051: posts to /api/waitlist (Next.js route → NestJS /waitlist)
+ * HP-051: inserts directly into Supabase early_access table (client-side)
  * HP-052: email validation + 5-second button cooldown after submit
  * HP-053: social-proof copy beneath the form
  */
 
 import { useState, useRef } from "react";
+import { supabase } from "@/lib/supabase";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -51,24 +52,13 @@ export default function WaitlistSection() {
     setServerError("");
     startCooldown();
 
-    try {
-      const res = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
-      });
+    const { error } = await supabase.from("early_access").insert({ email: email.trim() });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error ?? "Something went wrong.");
-      }
-
-      setStatus("success");
-    } catch (err: unknown) {
+    if (error) {
       setStatus("error");
-      setServerError(
-        err instanceof Error ? err.message : "Something went wrong. Please try again."
-      );
+      setServerError("Could not save your email. Please try again.");
+    } else {
+      setStatus("success");
     }
   };
 

@@ -10,6 +10,7 @@
     "clean": "rm -rf .next"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
     "@tailwindcss/postcss": "^4.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
