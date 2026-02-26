@@ -1,6 +1,6 @@
 # Cura — Marketing Home Page: Project Management
 
-## Project Status: 📋 Planning
+## Project Status: ✅ Complete (all 63 tasks shipped)
 
 **Goal:** Ship a Superhuman-inspired marketing landing page that converts recruitment agency leaders into early-access sign-ups. Dark, fast, keyboard-forward, AI-futuristic aesthetic. Every word earns its place.
 
@@ -261,26 +261,26 @@
 
 #### Story HP-8.1: Early Access Waitlist
 
-- [ ] **HP-048:** Build `<WaitlistSection id="waitlist">` — full-width, indigo-to-violet gradient background (`from-indigo-900 to-violet-950`)
-- [ ] **HP-049:** Headline: `"Your pipeline won't move itself."` (serif, white, 64 px) / subline: `"Join the waitlist. Be first when we open the doors."` (muted white, 18 px)
-- [ ] **HP-050:** Email capture form: single input (`"Your work email"`) + submit button (`"Request Early Access"`); success state shows `"You're on the list. We'll be in touch."` with a checkmark animation
-- [ ] **HP-051:** Connect form to a backend endpoint `POST /api/waitlist` that persists email + timestamp to DB (or a simple table; can use Prisma `WaitlistEntry` model)
-- [ ] **HP-052:** Add form validation: email format, required; rate-limit client-side (disable button for 5 s after submit)
-- [ ] **HP-053:** Show social-proof beneath form: `"Join 200+ agency leaders already on the list"` — update number manually as list grows
+- [x] **HP-048:** Build `<WaitlistSection id="waitlist">` — full-width, indigo-to-violet gradient background (`from-indigo-900 to-violet-950`)
+- [x] **HP-049:** Headline: `"Your pipeline won't move itself."` (serif, white, 64 px) / subline: `"Join the waitlist. Be first when we open the doors."` (muted white, 18 px)
+- [x] **HP-050:** Email capture form: single input (`"Your work email"`) + submit button (`"Request Early Access"`); success state shows `"You're on the list. We'll be in touch."` with a checkmark animation
+- [x] **HP-051:** Connect form to a backend endpoint `POST /api/waitlist` that persists email + timestamp to DB (or a simple table; can use Prisma `WaitlistEntry` model)
+- [x] **HP-052:** Add form validation: email format, required; rate-limit client-side (disable button for 5 s after submit)
+- [x] **HP-053:** Show social-proof beneath form: `"Join 200+ agency leaders already on the list"` — update number manually as list grows
 
 #### Story HP-8.2: Pricing Teaser
 
-- [ ] **HP-054:** Build `<PricingTeaser>` — simple two-column card layout above the waitlist:
+- [x] **HP-054:** Build `<PricingTeaser>` — simple two-column card layout above the waitlist:
   - **Boutique** (`"For teams of 1–5"`) — price TBD, key features list
   - **Agency** (`"For growing firms"`) — price TBD, key features list
-- [ ] **HP-055:** Both cards show `"Pricing announced at launch"` placeholder with an email-notify CTA linking to the waitlist
-- [ ] **HP-056:** Add `"No contracts. No per-seat traps."` subline beneath pricing cards — direct shot at Gem's `$4,000/seat` positioning
+- [x] **HP-055:** Both cards show `"Pricing announced at launch"` placeholder with an email-notify CTA linking to the waitlist
+- [x] **HP-056:** Add `"No contracts. No per-seat traps."` subline beneath pricing cards — direct shot at Gem's `$4,000/seat` positioning
 
 #### Story HP-8.3: Footer
 
-- [ ] **HP-057:** Build `<Footer>` — dark `#0A0A0A`, three-column: brand (logo + tagline), links (Product, Company, Legal), social icons (LinkedIn, X/Twitter)
-- [ ] **HP-058:** Add `"© 2026 Cura. Built for the humans who build careers."` copyright line — small, muted
-- [ ] **HP-059:** Add GDPR cookie-consent banner component (minimal, bottom-bar, dark-styled); consent state stored in `localStorage`
+- [x] **HP-057:** Build `<Footer>` — dark `#0A0A0A`, three-column: brand (logo + tagline), links (Product, Company, Legal), social icons (LinkedIn, X/Twitter)
+- [x] **HP-058:** Add `"© 2026 Cura. Built for the humans who build careers."` copyright line — small, muted
+- [x] **HP-059:** Add GDPR cookie-consent banner component (minimal, bottom-bar, dark-styled); consent state stored in `localStorage`
 
 ---
 

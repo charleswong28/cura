@@ -56,6 +56,40 @@ Cura uses AI to draft personalized messages that adapt to the recruiter's unique
 
 ---
 
+**4\. Pricing Strategy (Freemium + AI Credits + Seat Tiers)**
+
+### Model: Freemium → PLG → Seat expansion
+
+Agencies test tools before switching; no dominant freemium model exists in the recruitment CRM space; AI cost structure must be throttled. This model enables product-led growth while keeping unit economics safe.
+
+| Tier | Price | Target | AI Credits/mo | Key Limits |
+| :--- | :--- | :--- | :--- | :--- |
+| **Free** ("Solo Recruiter") | £0 | Individual recruiters, adoption | ~200 | 1 seat, 50 candidates, 1 active job, Cura branding |
+| **Starter** | £39–£59 /user/mo | Boutique agencies | 2,000 | Unlimited jobs, email & LinkedIn sync, basic automations |
+| **Pro** | £99–£129 /user/mo | Scaling agencies | 10,000 | Autonomous pipeline agents, zero-loss memory, voice & meeting summaries |
+| **Enterprise** | Custom | Large staffing firms | Unlimited (fair use) | EU AI Act audit trails, dedicated infra, SLA |
+
+### AI Credit Model
+- Cost per AI action is visible to the user (builds trust, mirrors OpenAI usage billing)
+- Credits roll over (encourages retention)
+- Top-ups available: £10 per 1,000 credits
+- Background tasks use cheaper models; foreground actions use full models — avoids runaway cost
+
+### Positioning Advantages
+- **Competitors**: Loxo Basic £169/seat/mo, Recruit CRM ~$85 entry, Gem up to $4,000/seat/yr — none are truly free
+- Freemium enables bottom-up viral adoption; agencies share tools laterally
+- Credit model makes AI value measurable ("X credits consumed = Y hours saved") — builds trust before upsell
+- Recruiter behavior: test on side, resist long sales cycles, value immediate ROI → PLG fits perfectly
+
+### Risk Mitigations
+| Risk | Mitigation |
+| :--- | :--- |
+| AI cost explosion on Free | Hard credit cap, async batch processing, cheaper models for background tasks |
+| Undervaluing AI | ROI dashboards; "credits consumed vs hours saved" UI |
+| Free tier abuse | Candidate/job limits; Cura branding removes margin for white-labelling |
+
+---
+
 **Positioning Hook:** "Stop Clicking. Start Connecting."
 
 **The Narrative:** Cura doesn't just track candidates; it moves the deal. AI does the administrative heavy lifting so the human recruiter can focus on the one thing AI cannot replicate: **the human connection.**
