@@ -134,6 +134,15 @@ model Client {
   @@map("clients")
 }
 
+/// Marketing waitlist — email sign-ups captured from the home page.
+model WaitlistEntry {
+  id        String   @id
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("waitlist_entries")
+}
+
 /// An open position linked to a client company.
 model Job {
   id           String      @id
