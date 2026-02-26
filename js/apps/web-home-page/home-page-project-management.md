@@ -177,17 +177,17 @@
 ### EPIC-HP-005: 🤖 AI Intelligence Showcase
 
 #### Story HP-5.1: Live Demo Preview
-- [ ] **HP-032:** Build `<AIShowcase>` section — headline `"Intelligence that compounds."` — dark background, centred
-- [ ] **HP-033:** Create tabbed showcase with three tabs (`📋 Match`, `✉️ Draft`, `📅 Brief`) — clicking each swaps the displayed mock UI panel:
+- [x] **HP-032:** Build `<AIShowcase>` section — headline `"Intelligence that compounds."` — dark background, centred
+- [x] **HP-033:** Create tabbed showcase with three tabs (`📋 Match`, `✉️ Draft`, `📅 Brief`) — clicking each swaps the displayed mock UI panel:
   - **Match tab:** Candidate match score card (87% fit, skill chips, "Why this match" explainer)
   - **Draft tab:** AI-generated outreach email draft in a text editor chrome; cursor blinking at end
   - **Brief tab:** Auto-generated candidate briefing note with sections (Background, Salary, Availability, Next Step)
-- [ ] **HP-034:** Animate the Draft tab typewriter effect — text types in at ~40 chars/sec on first enter-viewport; only plays once
-- [ ] **HP-035:** Add caption beneath showcase: `"AI does the thinking. You make the call."` — muted, italic
+- [x] **HP-034:** Animate the Draft tab typewriter effect — text types in at ~40 chars/sec on first enter-viewport; only plays once
+- [x] **HP-035:** Add caption beneath showcase: `"AI does the thinking. You make the call."` — muted, italic
 
 #### Story HP-5.2: Keyboard-First UI Callout
-- [ ] **HP-036:** Build `<KeyboardBadge>` component — small dark card showing keyboard shortcut examples: `⌘K` (command palette), `G C` (go to candidates), `A` (approve draft) — styled like a terminal / OS key-cap UI
-- [ ] **HP-037:** Embed badge in a callout box: `"Built for speed. Every action has a shortcut."` — Superhuman-philosophy nod
+- [x] **HP-036:** Build `<KeyboardBadge>` component — small dark card showing keyboard shortcut examples: `⌘K` (command palette), `G C` (go to candidates), `A` (approve draft) — styled like a terminal / OS key-cap UI
+- [x] **HP-037:** Embed badge in a callout box: `"Built for speed. Every action has a shortcut."` — Superhuman-philosophy nod
 
 ---
 
