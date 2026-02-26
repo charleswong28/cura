@@ -64,9 +64,9 @@ Agencies test tools before switching; no dominant freemium model exists in the r
 
 | Tier | Price | Target | AI Credits/mo | Key Limits |
 | :--- | :--- | :--- | :--- | :--- |
-| **Free** ("Solo Recruiter") | £0 | Individual recruiters, adoption | ~200 | 1 seat, 50 candidates, 1 active job, Cura branding |
-| **Starter** | £39–£59 /user/mo | Boutique agencies | 2,000 | Unlimited jobs, email & LinkedIn sync, basic automations |
-| **Pro** | £99–£129 /user/mo | Scaling agencies | 10,000 | Autonomous pipeline agents, zero-loss memory, voice & meeting summaries |
+| **Free** ("Solo Recruiter") | £0 | Individual recruiters, adoption | 500 | 1 seat, 50 candidates, 1 active job, Cura branding |
+| **Starter** ("Boutique") | £149 /user/mo | Boutique agencies | 3,000 | Unlimited jobs, email & LinkedIn sync, basic automations |
+| **Pro** ("Scaling Agency") | £199 /user/mo | Scaling agencies | 10,000 | Autonomous pipeline agents, zero-loss memory, voice & meeting summaries |
 | **Enterprise** | Custom | Large staffing firms | Unlimited (fair use) | EU AI Act audit trails, dedicated infra, SLA |
 
 ### AI Credit Model
@@ -75,8 +75,21 @@ Agencies test tools before switching; no dominant freemium model exists in the r
 - Top-ups available: £10 per 1,000 credits
 - Background tasks use cheaper models; foreground actions use full models — avoids runaway cost
 
+### Internal Credit Discount Structure (not customer-facing)
+Included credits are provided at a discount vs the public top-up rate of £10/1,000:
+
+| Plan | Credits included | Effective rate | Saving vs top-up |
+| :--- | :--- | :--- | :--- |
+| Free | 500 | — (no comparable top-up value) | — |
+| Starter (Boutique) | 3,000 | £9/1,000 | 10% |
+| Pro (Scaling Agency) | 10,000 | £8/1,000 | 20% |
+| Enterprise | Unlimited (fair use) | — | — |
+
+- The 20% discount is exclusive to Pro — used as a tier upgrade lever, not disclosed publicly
+- Effective rates inform cost-of-goods modelling; do not surface on pricing page or in sales materials
+
 ### Positioning Advantages
-- **Competitors**: Loxo Basic £169/seat/mo, Recruit CRM ~$85 entry, Gem up to $4,000/seat/yr — none are truly free
+- **Competitors**: Loxo Basic $169/seat/mo (~£133), Recruit CRM ~$85/user/mo, Gem up to $4,000/seat/yr — priced at a premium above Loxo, positioned as the AI-first category leader rather than a budget alternative
 - Freemium enables bottom-up viral adoption; agencies share tools laterally
 - Credit model makes AI value measurable ("X credits consumed = Y hours saved") — builds trust before upsell
 - Recruiter behavior: test on side, resist long sales cycles, value immediate ROI → PLG fits perfectly

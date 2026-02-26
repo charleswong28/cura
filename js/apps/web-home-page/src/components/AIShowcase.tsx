@@ -40,17 +40,13 @@ function MatchPanel() {
       {/* Candidate header + score circle */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          <div className="text-mock-3xl font-semibold text-cura-white/90">
-            Sarah Chen
-          </div>
+          <div className="text-mock-3xl font-semibold text-cura-white/90">Sarah Chen</div>
           <div className="text-mock-base text-cura-white/40 mt-0.5">
             CFO · Meridian Capital · London
           </div>
         </div>
         <div className="flex flex-col items-center justify-center w-14 h-14 rounded-full border-2 border-cura-accent/70 bg-cura-accent/10 shrink-0">
-          <div className="text-mock-2xl font-bold text-cura-accent-soft leading-none">
-            87%
-          </div>
+          <div className="text-mock-2xl font-bold text-cura-accent-soft leading-none">87%</div>
           <div className="text-mock-2xs text-cura-accent-soft/60 uppercase tracking-widest mt-0.5">
             fit
           </div>
@@ -76,13 +72,8 @@ function MatchPanel() {
         </div>
         <div className="flex flex-col gap-1.5">
           {WHY_MATCH.map((text) => (
-            <div
-              key={text}
-              className="flex items-start gap-2 text-mock-base text-cura-white/65"
-            >
-              <span className="text-cura-accent font-bold leading-[1.65] shrink-0">
-                ✓
-              </span>
+            <div key={text} className="flex items-start gap-2 text-mock-base text-cura-white/65">
+              <span className="text-cura-accent font-bold leading-[1.65] shrink-0">✓</span>
               <span className="leading-[1.65]">{text}</span>
             </div>
           ))}
@@ -132,22 +123,20 @@ function DraftPanel({ displayed, complete }: DraftPanelProps) {
       <div className="border-b border-white/8 pb-2.5 mb-3 space-y-1.5">
         <div className="flex items-center gap-2 text-mock-sm">
           <span className="text-cura-white/30 w-7 shrink-0">To</span>
-          <span className="text-cura-white/55">
-            Marcus Webb &lt;m.webb@northstar.com&gt;
-          </span>
+          <span className="text-cura-white/55">Marcus Webb &lt;m.webb@northstar.com&gt;</span>
         </div>
         <div className="flex items-center gap-2 text-mock-sm">
-          <span className="text-cura-white/30 w-7 flex-shrink-0">Re</span>
+          <span className="text-cura-white/30 w-7 shrink-0">Re</span>
           <span className="text-cura-white/55">{DRAFT_SUBJECT}</span>
         </div>
       </div>
 
       {/* Typewriter body */}
-      <div className="text-mock-base text-cura-white/65 leading-[1.75] whitespace-pre-wrap min-h-[5rem]">
+      <div className="text-mock-base text-cura-white/65 leading-[1.75] whitespace-pre-wrap min-h-20">
         {displayed}
         {!complete && (
           <span
-            className="inline-block w-[2px] h-[0.85em] bg-cura-accent ml-0.5 align-middle rounded-sm"
+            className="inline-block w-0.5 h-[0.85em] bg-cura-accent ml-0.5 align-middle rounded-sm"
             style={{ animation: "blink-cursor 1s step-end infinite" }}
           />
         )}
@@ -165,7 +154,7 @@ function DraftPanel({ displayed, complete }: DraftPanelProps) {
 // ─── Brief Panel (HP-033 Brief tab) ──────────────────────────────────────────
 
 const FOLLOW_UPS = [
-  { done: true,  text: "Send Northstar Capital investment thesis" },
+  { done: true, text: "Send Northstar Capital investment thesis" },
   { done: false, text: "Confirm exclusive window extended to Friday" },
   { done: false, text: "Send Sarah prep notes before Thursday" },
 ] as const;
@@ -184,37 +173,36 @@ function BriefPanel() {
             Sarah Chen · Zoom · in 10 mins
           </div>
         </div>
-        <span className="px-2 py-0.5 rounded-full bg-cura-accent/12 border border-cura-accent/22 text-cura-accent-soft text-mock-xs font-semibold flex-shrink-0">
+        <span className="px-2 py-0.5 rounded-full bg-cura-accent/12 border border-cura-accent/22 text-cura-accent-soft text-mock-xs font-semibold shrink-0">
           AI Generated
         </span>
       </div>
 
       {/* What was discussed */}
-      <div className="border-b border-white/[0.06] pb-3 mb-3">
+      <div className="border-b border-white/6 pb-3 mb-3">
         <div className="text-mock-xs text-cura-accent-soft/70 uppercase tracking-[0.12em] mb-1.5">
           What we discussed
         </div>
         <div className="text-mock-base text-cura-white/65 leading-[1.65]">
-          Sarah confirmed strong interest in the Northstar CFO role. She's been
-          considering a move for ~6 months but hasn't told her current board yet
-          — handle with discretion. Wants to understand equity structure before
-          going further.
+          Sarah confirmed strong interest in the Northstar CFO role. She&apos;s been considering a
+          move for ~6 months but hasn&apos;t told her current board yet — handle with discretion.
+          Wants to understand equity structure before going further.
         </div>
       </div>
 
       {/* Personal touches */}
-      <div className="border-b border-white/[0.06] pb-3 mb-3">
+      <div className="border-b border-white/6 pb-3 mb-3">
         <div className="text-mock-xs text-cura-accent-soft/70 uppercase tracking-[0.12em] mb-1.5">
           Personal context
         </div>
         <div className="flex flex-col gap-1">
           {[
-            "Daughter just started at Cambridge — she's ready for \"a new chapter\"",
+            'Daughter just started at Cambridge — she\'s ready for "a new chapter"',
             "Prefers email over calls; typically replies within 2 hrs",
             "Climbs on weekends — mentioned Fontainebleau trip next month",
           ].map((note) => (
             <div key={note} className="flex items-start gap-1.5 text-mock-base text-cura-white/55">
-              <span className="text-cura-accent-soft/50 flex-shrink-0 mt-[0.1rem]">·</span>
+              <span className="text-cura-accent-soft/50 shrink-0 mt-[0.1rem]">·</span>
               <span className="leading-[1.6]">{note}</span>
             </div>
           ))}
@@ -259,7 +247,7 @@ function BriefPanel() {
 
 function Key({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex items-center justify-center min-w-[1.6rem] px-2 py-1 rounded-md bg-white/[0.08] border border-white/[0.16] border-b-[3px] text-cura-white/75 text-mock-sm font-mono font-semibold select-none">
+    <kbd className="inline-flex items-center justify-center min-w-[1.6rem] px-2 py-1 rounded-md bg-white/8 border border-white/16 border-b-[3px] text-cura-white/75 text-mock-sm font-mono font-semibold select-none">
       {children}
     </kbd>
   );
@@ -268,9 +256,9 @@ function Key({ children }: { children: React.ReactNode }) {
 // Each shortcut has one or more key combos (groups). Multiple groups are
 // rendered side-by-side separated by "/" — used to show ⌘1 / ⌘2 / ⌘3.
 const SHORTCUTS: { groups: string[][]; label: string }[] = [
-  { groups: [["⌘", "K"]],                        label: "Command palette"     },
-  { groups: [["⌘", "1 / 2 / 3"]],                      label: "Switch tabs"           },
-  { groups: [["↵"]],                              label: "Approve draft"       },
+  { groups: [["⌘", "K"]], label: "Command palette" },
+  { groups: [["⌘", "1 / 2 / 3"]], label: "Switch tabs" },
+  { groups: [["↵"]], label: "Approve draft" },
 ];
 
 function KeyCombo({ keys }: { keys: string[] }) {
@@ -279,9 +267,7 @@ function KeyCombo({ keys }: { keys: string[] }) {
       {keys.map((k, i) => (
         <span key={i} className="flex items-center gap-1">
           <Key>{k}</Key>
-          {i < keys.length - 1 && (
-            <span className="text-cura-white/20 text-mock-xs">+</span>
-          )}
+          {i < keys.length - 1 && <span className="text-cura-white/20 text-mock-xs">+</span>}
         </span>
       ))}
     </span>
@@ -293,9 +279,7 @@ function KeyboardBadge() {
     <div className="dark-panel w-full max-w-70">
       <div className="flex items-center gap-2 mb-3.5">
         <span className="text-cura-accent text-base">⌨</span>
-        <span className="text-mock-xl font-semibold text-cura-white/75">
-          Keyboard shortcuts
-        </span>
+        <span className="text-mock-xl font-semibold text-cura-white/75">Keyboard shortcuts</span>
       </div>
       <div className="flex flex-col gap-2.5">
         {SHORTCUTS.map(({ groups, label }) => (
@@ -372,9 +356,8 @@ export default function AIShowcase() {
   }, [activeTab, inViewport]);
 
   return (
-    <section ref={sectionRef} className="section-padding bg-cura-black">
+    <section id="ai-showcase" ref={sectionRef} className="section-padding bg-cura-black">
       <div className="container-page">
-
         {/* HP-032 — eyebrow + headline + subline */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cura-accent/10 border border-cura-accent/20 text-cura-accent-soft text-xs font-semibold uppercase tracking-widest mb-6">
@@ -385,8 +368,8 @@ export default function AIShowcase() {
             Intelligence that compounds.
           </h2>
           <p className="text-body-fluid text-cura-white/50 max-w-xl mx-auto leading-[1.8]">
-            Every interaction makes Cura smarter. Match scores tighten. Drafts
-            improve. Briefings sharpen.
+            Every interaction makes Cura smarter. Match scores tighten. Drafts improve. Briefings
+            sharpen.
           </p>
         </div>
 
@@ -413,9 +396,7 @@ export default function AIShowcase() {
           {/* Panel — key triggers fade-in animation on each tab switch */}
           <div key={activeTab} style={{ animation: "fade-in-up 0.25s ease both" }}>
             {activeTab === "match" && <MatchPanel />}
-            {activeTab === "draft" && (
-              <DraftPanel displayed={draftText} complete={draftComplete} />
-            )}
+            {activeTab === "draft" && <DraftPanel displayed={draftText} complete={draftComplete} />}
             {activeTab === "brief" && <BriefPanel />}
           </div>
         </div>
@@ -432,12 +413,12 @@ export default function AIShowcase() {
               Built for speed. Every action has a shortcut.
             </div>
             <div className="text-cura-white/40 text-sm leading-[1.7]">
-              Every action has a keyboard shortcut. Navigate the entire platform without lifting your hands from the keys.
+              Every action has a keyboard shortcut. Navigate the entire platform without lifting
+              your hands from the keys.
             </div>
           </div>
           <KeyboardBadge />
         </div>
-
       </div>
     </section>
   );

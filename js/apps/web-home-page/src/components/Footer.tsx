@@ -15,7 +15,7 @@ const CONSENT_KEY = "cura-cookie-consent";
 const LINKS = {
   Product: [
     { label: "Features", href: "#product" },
-    { label: "AI Showcase", href: "#product" },
+    { label: "AI Showcase", href: "#ai-showcase" },
     { label: "Pricing", href: "#pricing" },
   ],
   Company: [
@@ -123,8 +123,7 @@ export default function Footer() {
                 <span className="font-semibold text-white text-lg tracking-tight">Cura</span>
               </div>
               <p className="text-sm text-white/40 leading-relaxed">
-                AI-first recruitment CRM for boutique agencies who win on speed and human
-                connection.
+                AI-first recruitment CRM for agencies who win on speed and human connection.
               </p>
               {/* Social icons */}
               <div className="flex items-center gap-3 mt-2">

@@ -4,7 +4,7 @@
  * Four-tier freemium model: Free · Starter · Pro · Enterprise
  * HP-054: Multi-column plan cards
  * HP-055: CTAs linking to waitlist
- * HP-056: "No contracts. No per-seat traps."
+ * HP-056: "No contracts. No seat minimums."
  */
 
 const PLANS = [
@@ -16,19 +16,19 @@ const PLANS = [
     description: "Test the full AI experience with no commitment.",
     cta: "Start for free",
     ctaHref: "#waitlist",
-    credits: "200 AI credits / mo",
+    credits: "500 AI credits / mo",
     features: ["1 seat", "50 candidates", "1 active job", "AI match scoring", "Cura branding"],
     note: "No credit card required.",
   },
   {
     tier: "Starter",
     label: "Boutique",
-    price: "£39–£59",
+    price: "£149",
     period: "/user/mo",
     description: "For small agencies ready to replace their stack.",
     cta: "Join the waitlist",
     ctaHref: "#waitlist",
-    credits: "2,000 AI credits / mo",
+    credits: "3,000 AI credits / mo",
     features: [
       "Unlimited candidates & jobs",
       "Email & LinkedIn sync",
@@ -36,12 +36,12 @@ const PLANS = [
       "Natural language search",
       "Keyboard-first UI",
     ],
-    note: "Undercuts Recruit CRM at ~$85/user.",
+    note: "3,000 credits included — top up at £10/1,000.",
   },
   {
     tier: "Pro",
     label: "Scaling Agency",
-    price: "£99–£129",
+    price: "£199",
     period: "/user/mo",
     description: "Full AI autonomy for agencies that move fast.",
     cta: "Join the waitlist",
@@ -55,7 +55,7 @@ const PLANS = [
       "Human-in-the-loop approvals",
       "EU AI Act compliance tools",
     ],
-    note: "Competes directly with Loxo at a third of the price.",
+    note: "10,000 AI credits / mo included.",
   },
   {
     tier: "Enterprise",
@@ -99,7 +99,7 @@ export default function PricingTeaser() {
         <div className="text-center mb-12">
           <h2 className="text-section-lg font-bold text-white mb-4">Simple, honest pricing.</h2>
           {/* HP-056 */}
-          <p className="text-lg text-white/50">No contracts. No per-seat traps.</p>
+          <p className="text-lg text-white/50">No contracts. No seat minimums.</p>
         </div>
 
         {/* HP-054 — Four-column plan grid */}
@@ -204,11 +204,6 @@ export default function PricingTeaser() {
             lock in early-bird rates.
           </p>
         </div>
-
-        {/* Competitor anchor */}
-        <p className="text-center text-xs text-white/25 mt-6">
-          *Loxo Basic from $169/seat/mo · Gem up to $4,000/seat/yr · Recruit CRM ~$85/user/mo
-        </p>
       </div>
     </section>
   );

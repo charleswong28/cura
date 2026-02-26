@@ -51,23 +51,23 @@ function PillarVisual({ id }: { id: PillarId }) {
 
 export default function ValuePropsSection() {
   return (
-    <section id="product">
+    <section>
       <SpeedBanner />
-      {PILLARS.map((pillar) => (
-        <div key={pillar.id}>
+      {PILLARS.map((pillar, i) => (
+        <div key={pillar.id} id={i === 0 ? "product" : undefined}>
           <div className="section-padding min-h-[70vh] flex items-center bg-cura-cream">
             <div className="container-page w-full">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 xl:gap-20 items-center">
                 {/* Text block — HP-029: indigo left-border accent line */}
                 <div className={pillar.reverse ? "lg:order-2" : "lg:order-1"}>
                   <div className="border-l-[3px] border-cura-accent pl-6">
-                    <div className="text-mock-base uppercase tracking-[0.1em] text-cura-accent font-semibold mb-3">
+                    <div className="text-mock-base uppercase tracking-widest text-cura-accent font-semibold mb-3">
                       {pillar.label}
                     </div>
                     <h2 className="text-pillar font-bold text-cura-black leading-[1.1] mb-5">
                       {pillar.headline}
                     </h2>
-                    <p className="text-body-fluid text-cura-muted leading-[1.7] max-w-[480px]">
+                    <p className="text-body-fluid text-cura-muted leading-[1.7] max-w-120">
                       {pillar.subtext}
                     </p>
                   </div>
