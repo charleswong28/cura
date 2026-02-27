@@ -8,7 +8,7 @@ Cura is an AI-augmented recruitment platform designed to evolve from a high-touc
 - **Zero-Loss Engagement Memory** — Every interaction captured and contextualized 
 - **Single Responsibility per Module** — Clear boundaries and ownership
 - **Compliance by design** — Built-in audit trails and transparent logic
-- **"Stop Clicking. Start Connecting"** — Minimize administrative burden, maximize relationship time
+- **"AI Runs the ATS. You Close the Deal."** — AI handles the administrative heavy lifting so recruiters focus on the only thing that closes deals: human connection
 
 ### Implementation Philosophy
 

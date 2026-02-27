@@ -1,6 +1,6 @@
 # **Cura: The AI-First North Star for Human-Centric Recruitment**
 
-**Mission Statement:** To eliminate the "robotic" administrative burden of recruitment through autonomous intelligence, allowing human professionals to dedicate 100% of their energy to high-value relationships and expert curation.
+**Mission Statement:** To eliminate the administrative tax of recruitment through autonomous AI, freeing recruiters to focus on the only thing that actually closes deals: human connection.
 
 ## ---
 
@@ -44,7 +44,7 @@ In a market where only 37% of job seekers trust AI to select candidates, Cura pr
 
 Cura is positioned as the fastest recruitment experience ever built, mirroring the **Superhuman** philosophy of "speed, zero clutter, and keyboard-first fluidity".
 
-* **Aesthetic Speed:** A minimalist interface that eliminates the "excessive clicking" required by Bullhorn and Loxo.
+* **Aesthetic Speed:** A minimalist, keyboard-first interface that eliminates the excessive clicking endemic to legacy tools — 11 clicks to move a candidate in most ATS tools; Cura does it in one.
 
 ### **3.2 Compliance by Design (The Regulatory Moat)**
 
@@ -103,9 +103,9 @@ Included credits are provided at a discount vs the public top-up rate of £10/1,
 
 ---
 
-**Positioning Hook:** "Stop Clicking. Start Connecting."
+**Positioning Hook:** "AI Runs the ATS. You Close the Deal."
 
-**The Narrative:** Cura doesn't just track candidates; it moves the deal. AI does the administrative heavy lifting so the human recruiter can focus on the one thing AI cannot replicate: **the human connection.**
+**The Narrative:** Your competitors close deals while you're updating spreadsheets. Cura handles the heavy lifting — reading emails, advancing pipeline stages, drafting briefing notes — so the recruiter can focus on the only thing that closes deals: human connection. Your instinct is your edge. Cura makes sure admin never eats it alive.
 
 #### **Works cited**
 

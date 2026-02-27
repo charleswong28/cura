@@ -16,6 +16,7 @@
 | `js/cura-crm-project-management.md` | Project Management | EPIC/Story/Task breakdown for Phase 1 CRM (Candidates, Clients, Jobs CRUD). 5 EPICs, 11 Stories, 56 Tasks |
 | `js/apps/web-home-page/home-page-project-management.md` | Project Management | Marketing home page plan (cura.com) — Superhuman-inspired design, 8 EPICs, 12 Stories, 63 Tasks (HP-001–HP-063) |
 | `USAGE.md` | Developer Guide | How to start the project locally, bin scripts reference, service ports, and Docker Compose commands |
+| `docs/customer_interview/2026-02-27-interview-with-man.md` | Customer Research | Sourcing-first recruiter interview. Key themes: job spec auto-generation, multi-channel sourcing, one-click outreach, auto-enrichment. Gap analysis vs. current north star included. |
 
 ---
 
