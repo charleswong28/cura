@@ -64,8 +64,8 @@
 
 - [x] **TASK-006:** Create core Prisma schema (Tenant, User, Candidate, Client, Job)
 - [x] **TASK-007:** Implement tenant isolation with Prisma extension
-- [ ] **TASK-008:** Set up database migrations
-- [ ] **TASK-009:** Create seed data for development
+- [x] **TASK-008:** Set up database migrations
+- [x] **TASK-009:** Create seed data for development
 
 #### Story 1.3: API Foundation
 
@@ -397,7 +397,7 @@
 
 - **EPICs:** 0/6 Complete
 - **Stories:** 6/27 Complete
-- **Tasks:** 26/121 Complete (7 BE + 19 FE)
+- **Tasks:** 28/121 Complete (9 BE + 19 FE)
 
 ### Current Sprint
 
