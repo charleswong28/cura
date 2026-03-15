@@ -124,10 +124,10 @@
 
 #### Story 2.1: Clerk Backend Integration (BE)
 
-- [ ] **TASK-048:** Set up Clerk Organizations for multi-tenancy
-- [ ] **TASK-049:** Configure JWT with tenant_id custom claims
-- [ ] **TASK-050:** Implement ClerkAuthGuard for NestJS
-- [ ] **TASK-052:** Test tenant data isolation
+- [x] **TASK-048:** Set up Clerk Organizations for multi-tenancy
+- [x] **TASK-049:** Configure JWT with tenant_id custom claims
+- [x] **TASK-050:** Implement ClerkAuthGuard for NestJS
+- [x] **TASK-052:** Test tenant data isolation
 
 #### Story 2.2: Clerk Frontend Integration (FE)
 
@@ -396,13 +396,13 @@
 ### Completion Status
 
 - **EPICs:** 0/6 Complete
-- **Stories:** 7/27 Complete
-- **Tasks:** 32/121 Complete (13 BE + 19 FE)
+- **Stories:** 8/27 Complete
+- **Tasks:** 36/121 Complete (17 BE + 19 FE)
 
 ### Current Sprint
 
 **Sprint:** Sprint 2
-**Active Stories:** None started
+**Active Stories:** Story 2.1 ✅
 **Blocked Items:** None
 
 ---

@@ -17,7 +17,12 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: ["http://localhost:3000", "https://cura.com"],
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://cura.com",
+      "https://app.cura.com",
+    ],
   });
 
   await app.listen(8000);

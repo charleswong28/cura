@@ -1,8 +1,9 @@
 import { join } from "path";
 import { Module } from "@nestjs/common";
-import { APP_FILTER } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { GraphQLModule } from "@nestjs/graphql";
 import { ApolloDriver, ApolloDriverConfig } from "@nestjs/apollo";
+import { ClerkAuthGuard } from "./auth";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { WaitlistModule } from "./waitlist/waitlist.module";
@@ -16,6 +17,7 @@ import { GraphqlExceptionFilter } from "./common/filters";
       autoSchemaFile: join(process.cwd(), "src/schema.gql"),
       sortSchema: true,
       playground: true,
+      context: ({ req }: { req: any }) => ({ req }),
     }),
     PrismaModule,
     DataLoaderModule,
@@ -23,6 +25,10 @@ import { GraphqlExceptionFilter } from "./common/filters";
     WaitlistModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ClerkAuthGuard,
+    },
     {
       provide: APP_FILTER,
       useClass: GraphqlExceptionFilter,

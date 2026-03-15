@@ -37,6 +37,23 @@
 
 **Alternative rejected:** Custom tenant management (too complex for Phase 1).
 
+**Backend Auth Implementation (decided 2026-03-15):**
+
+**Decision:** Use `@clerk/backend` SDK directly with a NestJS guard (no Passport).
+
+**Implementation:**
+- `ClerkAuthGuard` verifies JWT via `verifyToken()` from `@clerk/backend`
+- Guard registered as `APP_GUARD` in `AppModule` — all endpoints require auth by default
+- `@Public()` decorator opts out (health ping, waitlist)
+- `@CurrentUser()` param decorator extracts `{ clerkUserId, tenantId, orgRole }` from request
+- Guard resolves Clerk `org_id` → internal ULID `tenantId` via DB lookup with in-memory cache
+- Explicit `@Inject()` decorators required because `tsx`/esbuild doesn't emit decorator metadata
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **@clerk/backend (chosen)** | 1 package, Clerk handles JWKS/rotation, simpler | Less community examples |
+| Passport + jwks-rsa | Well-documented NestJS pattern | 4 packages, more abstraction layers |
+
 ### 2.2 Data Model: Tenant → Client → Job → Candidate
 
 ```
