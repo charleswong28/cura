@@ -92,10 +92,10 @@
 
 > Configure Apollo Client to talk to the NestJS GraphQL API.
 
-- [ ] **WA-011:** Install `@apollo/client` and configure `ApolloProvider` in root layout
-- [ ] **WA-012:** Set up Apollo link with auth header injection (Clerk JWT)
-- [ ] **WA-013:** Configure Apollo cache with type policies (ULID-based key fields)
-- [ ] **WA-014:** Add error handling link (network errors, GraphQL errors → toast notifications)
+- [x] **WA-011:** Install `@apollo/client` and configure `ApolloProvider` in root layout
+- [x] **WA-012:** Set up Apollo link with auth header injection (Clerk JWT)
+- [x] **WA-013:** Configure Apollo cache with type policies (ULID-based key fields)
+- [x] **WA-014:** Add error handling link (network errors, GraphQL errors → toast notifications)
 
 #### Story WA-2.2: GraphQL Codegen & Typed Hooks
 
@@ -309,12 +309,12 @@
 
 - **EPICs:** 0/7 Complete
 - **Stories:** 0/17 Complete
-- **Tasks:** 10/79 Complete
+- **Tasks:** 14/79 Complete
 
 ### Current Sprint
 
 **Sprint:** Sprint 1
-**Active Stories:** WA-1.2 (Top Bar & Page Header) ✅, WA-1.1 (Sidebar Navigation) ✅
+**Active Stories:** WA-1.2 (Top Bar & Page Header) ✅, WA-1.1 (Sidebar Navigation) ✅, WA-2.1 (Apollo Client Setup) ✅
 **Blocked Items:** None
 
 ---
