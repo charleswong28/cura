@@ -6,23 +6,50 @@
 
 **1\. Core Design Principles**
 
-### **1.1 Autonomous Outcome Ownership**
+### **1.1 Dual Interaction Surface: CRM Web App + Claude MCP**
 
-Cura moves beyond simple "workflow automation" (triggers and rules) to **Agentic AI**. While competitors require manual oversight for deal movement, Cura assigns responsibility to AI agents to monitor intent and advance the pipeline.
+Cura has two first-class ways to work:
 
-* **The Workflow:** Agents monitor calendar syncs and communication to automatically advance candidates to the next stage and draft briefing notes without recruiter intervention.
+| Surface | Best for |
+|---|---|
+| **CRM web app** (`app.cura.com`) | Structured pipeline management, bulk review, dashboards, settings — anything that benefits from a persistent visual interface |
+| **Claude via MCP** | Ad-hoc commands, sourcing runs, drafting outreach, quick lookups — anything faster to say than to click |
 
-### **1.2 Zero-Loss Engagement Memory**
+Both write to the same system of record. Recruiters choose the right tool for the moment. The MCP model mirrors Apollo.io's deployment: Claude becomes an execution surface; Cura is the database and action layer.
 
-Cura solves the "data silo" problem prevalent in legacy systems where context is lost between email, LinkedIn, and CRM modules.1
+* **MCP Workflow:** "Find 20 CFOs at Series B fintech in London" → Cura executes multi-channel search, returns enriched profiles, queues personalised outreach — all inside a Claude conversation.
+* **Governance:** Plan-based credit limits, no destructive bulk operations, full audit trail. Every MCP action writes back to the CRM.
 
-* **The Moat:** Every signal—Zoom transcripts, InMail replies, and email opens—is synthesized into a single, permanent source of truth. Recruiters enter every conversation with the full historical context of every prior touchpoint.
+### **1.2 Omni-Trigger — Subscribe to Everything, Act Automatically**
 
-### **1.3 Human-in-the-Loop (The "Human Touch" Gateway)**
+Cura subscribes to every recruitment-relevant event source so Claude can work autonomously. The recruiter's only required touch is the **final approval step**. No clicking, no tab-switching — events flow into Cura, Claude decides what to do, and the recruiter approves.
 
-In a market where only 37% of job seekers trust AI to select candidates, Cura prioritizes the human professional as the ultimate gatekeeper.3
+**Event sources Cura subscribes to:**
 
-* **Verify & Commit:** AI handles the "System 2" logic (sourcing, matching, screening) while the human provides "System 1" intuition and relationship management. High-stakes actions (e.g., client submissions) require a manual "Seal of Approval," protecting against AI hallucinations and "speed of rejection" legal liabilities.
+| Event | What Claude does | Recruiter touch |
+|---|---|---|
+| **Inbound email** (candidate reply, client brief, referral) | Classify, enrich from CRM, draft reply or create task | Review → approve |
+| **LinkedIn activity** (InMail reply, connection accepted, message) | Identify candidate, pull CRM context, draft next action | Review → approve |
+| **New candidate sourcing** (scheduled runs) | Search all channels, enrich & deduplicate, score fit, surface shortlist | Review shortlist → approve outreach |
+| **Post-call** (call ends) | Transcribe, extract signals, update candidate profile, draft follow-up | Review → approve |
+| **Pipeline staleness** (scheduled scan) | Generate proactive nudge with context and drafted action | Review → approve |
+| **Inbound form / referral** | Create candidate record, draft acknowledgement | Review → approve |
+
+**Principle:** Cura is the always-on subscriber. Claude is the autonomous actor. The recruiter is the final approver. No trigger requires the recruiter or Claude to initiate — all events are pushed into the system by server-side subscriptions.
+
+A Chrome extension may exist as a **convenience tool** for recruiter-initiated additions (e.g., pinning a LinkedIn profile to Cura while browsing), but it is not part of the trigger architecture.
+
+### **1.3 Sourcing-First, Pipeline-Ready**
+
+The entry point is the spec (or even a job title). Cura generates the full job spec, searches all channels simultaneously, and builds the candidate list before the recruiter has opened a second tab. Once candidates are in, pipeline management and zero-loss memory serve the follow-through.
+
+* **For the headhunter (Herman persona):** spec → search → outreach is the entire value proposition.
+* **For the pipeline-manager persona:** the same sourcing engine feeds a structured CRM with stage tracking, client management, and revenue reporting.
+* **Core capability stack:** job spec generation, multi-channel sourcing (LinkedIn, PDL, ContactOut, internal DB), one-click outreach (email / InMail / WhatsApp), pipeline tracking (sourced → placed), client management, communications log, calendar & scheduling, revenue tracking.
+
+### **1.4 Auto-Enrichment as Default**
+
+Every search automatically updates existing profiles — no stale duplicates. External data sources (PDL, Lusha, LinkedIn) continuously sync to the local database. The BYOK model lets firms supply their own API keys (already in schema), keeping data costs transparent and under recruiter control.
 
 ## ---
 
@@ -30,11 +57,12 @@ In a market where only 37% of job seekers trust AI to select candidates, Cura pr
 
 | Competitor | Core Strength | Critical Weakness (The "Manual" Trap) |
 | :---- | :---- | :---- |
-| **Loxo** | **Talent Intelligence:** Combines CRM/ATS with a 1.2B profile database. | **Manual Deal Flow:** Underlying legacy architecture limits deep integration; users report clunky deal-board management. |
-| **Recruit CRM** | **User Satisfaction:** Extremely easy setup and intuitive Kanban interface for SMBs. | **Scalability & Lock-in:** Limited custom reporting and data export risks for larger firms. |
+| **Apollo.io** | **MCP-native GTM execution:** Deployed MCP server; `Search → Enrich → Contact → Sequence` runs entirely inside Claude. 210M+ contact database. | **Sales-only:** Built for SDRs and AEs. No headhunting workflows, no placement tracking, no candidate experience. Cura is Apollo for recruitment. |
+| **Loxo** | **Talent Intelligence:** Combines CRM/ATS with a 1.2B profile database. | **Manual Deal Flow:** Underlying legacy architecture limits deep integration; users report clunky deal-board management. No MCP / Claude integration. |
+| **Recruit CRM** | **User Satisfaction:** Extremely easy setup and intuitive Kanban interface for SMBs. | **Scalability & Lock-in:** Limited custom reporting and data export risks for larger firms. No AI sourcing. |
 | **Bullhorn** | **Enterprise Stability:** The industry standard for large staffing firms. | **Legacy Lag:** Lacks native webhooks, making real-time AI automation and modern "autonomous" flows impossible. |
 | **Gem** | **Outbound Mastery:** Elite multi-channel outreach and analytics. | **Cost-Prohibitive:** Seat costs of up to $4,000/yr make it inaccessible for boutique firms. |
-| **LinkedIn** | **Signal Data:** Unparalleled access to 1B+ members and "intent" signals. | **Context Blindness:** Frequently fails on role nuance (e.g., confusing M\&A Directors with Film Directors).5 |
+| **LinkedIn** | **Signal Data:** Unparalleled access to 1B+ members and "intent" signals. | **Context Blindness:** Frequently fails on role nuance (e.g., confusing M\&A Directors with Film Directors).5 No system-of-record or pipeline layer. |
 
 ## ---
 
@@ -103,9 +131,9 @@ Included credits are provided at a discount vs the public top-up rate of £10/1,
 
 ---
 
-**Positioning Hook:** "AI Runs the ATS. You Close the Deal."
+**Positioning Hook:** "Recruit from wherever work happens. Claude handles the rest."
 
-**The Narrative:** Your competitors close deals while you're updating spreadsheets. Cura handles the heavy lifting — reading emails, advancing pipeline stages, drafting briefing notes — so the recruiter can focus on the only thing that closes deals: human connection. Your instinct is your edge. Cura makes sure admin never eats it alive.
+**The Narrative:** A client sends a brief. You tell Claude. Within minutes, Cura has generated the job spec, searched LinkedIn, PDL, and your internal database, and drafted personalised outreach for 20 candidates — without switching tabs. When a reply lands in Gmail, your Chrome extension surfaces the candidate's full history. When a call ends, Cura transcribes it and updates the record automatically. The pipeline tracks itself. You stay in the conversation.
 
 #### **Works cited**
 

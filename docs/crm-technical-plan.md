@@ -2,7 +2,6 @@
 
 ## 1. System Architecture
 
-### 1.1 High-Level Architecture
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐    ┌──────────────┐
 │   User Browser  │───▶│   Next.js        │───▶│   NestJS API    │───▶│ PostgreSQL   │
@@ -16,41 +15,30 @@
                         └──────────────────┘
 ```
 
-### 1.2 Request/Response Flow
-**Example: User drags candidate to new pipeline stage**
-
-1. **Frontend Action:** User drags candidate card in Kanban board
-2. **GraphQL Mutation:** Next.js sends `moveCandidateToStage` mutation with Clerk JWT
-3. **Authentication:** NestJS validates JWT, extracts `tenant_id` and `user_id`
-4. **Database Update:** Prisma updates candidate stage with tenant isolation
-5. **Real-time Broadcast:** NestJS emits event to Soketi WebSocket
-6. **Live Updates:** All connected team members see board update instantly
-7. **Response:** Frontend receives confirmation and updates optimistic UI
-
 ---
 
 ## 2. Core Technical Decisions
 
-### 2.1 Multi-Tenancy Strategy
-**Decision:** Clerk Organizations as tenant boundary
+### 2.1 Multi-Tenancy: Clerk Organizations
+
+**Decision:** Clerk Organizations as tenant boundary.
 
 **Implementation:**
 - Each headhunting firm = Clerk Organization
-- JWT includes `org_id` as tenant identifier  
+- JWT includes `org_id` as tenant identifier
 - Database queries auto-scoped by `tenant_id`
+- Built-in user management, SSO, and org switching UI
 
 | Pros | Cons |
 |------|------|
-| ✅ Built-in user management & SSO | ❌ Vendor lock-in to Clerk |
-| ✅ JWT includes org context | ❌ Limited customization |
-| ✅ Easy org switching UI | ❌ Subscription costs scale |
+| Built-in user management & SSO | Vendor lock-in to Clerk |
+| JWT includes org context automatically | Limited customisation |
+| Easy org switching UI out of the box | Subscription costs scale with users |
 
-**Alternative Considered:** Custom tenant management (rejected for complexity)
+**Alternative rejected:** Custom tenant management (too complex for Phase 1).
 
-### 2.2 Data Model Hierarchy
-**Decision:** Tenant → Client → Job → Candidate pipeline
+### 2.2 Data Model: Tenant → Client → Job → Candidate
 
-**Core Entities:**
 ```
 Tenant (Org)
 ├── Users (Recruiters)
@@ -60,248 +48,115 @@ Tenant (Org)
     └── Pipeline Stages
 ```
 
-| Pros | Cons |
-|------|------|
-| ✅ Clear ownership chain | ❌ Rigid hierarchy |
-| ✅ Simple access control | ❌ Candidate can't work multiple clients |
-| ✅ Easy to understand | ❌ May need restructuring later |
+**Alternative rejected:** Many-to-many relationships (Phase 1 complexity).
 
-**Alternative Considered:** Many-to-many relationships (rejected for Phase 1 complexity)
+### 2.3 Stack: Next.js + NestJS + Prisma + PostgreSQL
 
-### 2.3 Tech Stack for Fast Development
-**Decision:** Next.js + NestJS + Prisma + PostgreSQL
+- **Next.js 15:** React with SSR, App Router, Turbopack
+- **NestJS 10:** TypeScript-first, GraphQL code-first
+- **Prisma 7:** Type-safe ORM, ULID primary keys
+- **PostgreSQL 16:** JSONB support, mature ecosystem
 
-**Stack Rationale:**
-- **Next.js:** React with SSR, great DX, rapid UI development
-- **NestJS:** TypeScript-first, GraphQL support, scalable architecture  
-- **Prisma:** Type-safe ORM, great migrations, excellent DX
-- **PostgreSQL:** Reliable, JSONB support, mature ecosystem
+**Alternative rejected:** Rails/Laravel (slower TypeScript iteration).
 
-| Pros | Cons |
-|------|------|
-| ✅ TypeScript end-to-end type safety | ❌ Newer ecosystem, smaller talent pool |
-| ✅ Rapid development & iteration | ❌ Some tools still maturing |
-| ✅ Excellent developer experience | ❌ Learning curve for team |
-| ✅ Strong community & resources | ❌ More moving parts than monolith |
+### 2.4 API: GraphQL Code-First
 
-**Alternative Considered:** Rails/Laravel (rejected for slower TypeScript iteration)
+NestJS generates schema from TypeScript classes. Frontend auto-generates typed hooks via GraphQL Codegen. DataLoader prevents N+1 queries.
 
-### 2.4 API Strategy
-**Decision:** GraphQL with code-first schema generation
+**Alternative rejected:** REST (more verbose, less type-safe).
 
-**Implementation:**
-- NestJS generates GraphQL schema from TypeScript classes
-- Frontend auto-generates typed hooks via GraphQL Codegen
-- DataLoader prevents N+1 queries
+### 2.5 IDs: Pure ULID
 
-| Pros | Cons |
-|------|------|
-| ✅ Type safety from DB to UI | ❌ GraphQL learning curve |
-| ✅ Efficient queries, no over-fetching | ❌ Complex caching vs REST |
-| ✅ Auto-generated client types | ❌ Harder to debug than REST |
-| ✅ Single endpoint, flexible queries | ❌ File uploads more complex |
+Single ULID field as primary key. 26-character string, timestamp + randomness, sortable by creation time, globally unique. Multi-tenant safe, no enumerable IDs.
 
-**Alternative Considered:** REST API (simpler but more verbose, less type-safe)
+| Strategy | Storage | Join Speed | Security | Recommendation |
+|----------|---------|------------|----------|----------------|
+| Pure Integer | 4 bytes | Fast | Insecure | Rejected |
+| **Pure ULID** | 16 bytes | Good | Secure | **Chosen** |
+| Hybrid (int + ulid) | 20 bytes | Fast | Secure | Over-engineering |
 
-### 2.5 ID Strategy
-**Decision:** Pure ULID (Universally Unique Lexicographically Sortable ID)
+**Why not hybrid:** Added complexity (dual lookups, extra indexes) for negligible performance gain at CRM scale (10K–100K candidates per tenant).
 
-**Implementation:**
-- Single ULID field as primary key
-- 26-character string, timestamp + randomness  
-- Sortable by creation time, globally unique
-- Prisma: `@id @default(ulid())`
+### 2.6 Real-time: Soketi (self-hosted Pusher alternative)
 
-| Strategy | Storage | Join Speed | Security | Complexity | Recommendation |
-|----------|---------|------------|----------|------------|----------------|
-| **Pure Integer** | 4 bytes | ⭐⭐⭐ | ❌ | ⭐⭐⭐ | Fast but insecure |
-| **Pure ULID** | 16 bytes | ⭐⭐ | ✅ | ⭐⭐ | **Chosen** |
-| **Hybrid (int + ulid)** | 20 bytes | ⭐⭐⭐ | ✅ | ⭐ | Over-engineering |
+Live Kanban updates, notifications, collaborative editing conflicts. Pusher-compatible protocol (easy migration to hosted Pusher if needed).
 
-**Why Pure ULID over Hybrid:**
-```typescript
-// Hybrid approach considered:
-model Candidate {
-  id    Int    @id @default(autoincrement()) // Fast joins
-  ulid  String @unique @default(ulid())      // API security
-}
+### 2.7 Monorepo: pnpm + Turborepo
 
-// Rejected because:
-// ❌ Added complexity (dual lookups, extra indexes)
-// ❌ Premature optimization (CRM scale doesn't need it)
-// ❌ Slower development (Phase 1 priority = speed)
-```
+**pnpm** over Bun — best NestJS/Docker compatibility, production-proven. **Turborepo** for build caching and task parallelisation.
 
-**Pure ULID Benefits:**
-- Multi-tenant safety (no collision across orgs)
-- Natural chronological sorting when needed  
-- API security (no enumerable IDs)
-- Simpler schema and queries
-- Future-proof for distributed services
-
-**Performance Reality:** For typical CRM scale (10K-100K candidates per tenant), string join performance difference is negligible vs development complexity trade-off.
-
-### 2.6 Real-time Updates
-**Decision:** Soketi (self-hosted Pusher alternative)
-
-**Use Cases:**
-- Live Kanban board updates
-- Notification system
-- Collaborative editing conflicts
-
-| Pros | Cons |
-|------|------|
-| ✅ Real-time user experience | ❌ Additional infrastructure complexity |
-| ✅ Self-hosted = cost effective | ❌ WebSocket connection management |
-| ✅ Pusher-compatible (easy migration) | ❌ Scaling WebSocket connections |
-
-**Alternative Considered:** Simple polling (rejected for poor UX)
-
-### 2.7 Monorepo & Build Tooling Strategy
-
-#### Package Manager: pnpm
-
-| Factor | pnpm | Bun |
-|--------|------|-----|
-| Workspace support | Mature, battle-tested | Works but newer |
-| NestJS compatibility | Perfect | Works with caveats |
-| Docker builds | Established patterns | Less documented |
-| Speed | Fast | Faster (25x npm) |
-| Stability | Production-proven | Emerging |
-
-> **Note on Vite:** Vite is a frontend *build tool*, not a package manager. For the Next.js frontend, Next.js 15's built-in Turbopack is the correct choice (SSR-capable; Vite is SPA-only).
-
-**Decision: pnpm** – best NestJS/Docker compatibility, industry standard for TypeScript monorepos.
-
-#### Monorepo Orchestration: Turborepo + pnpm workspaces
-
-| Factor | Plain Workspaces | Turborepo |
-|--------|-----------------|-----------|
-| Build caching | None (rebuild always) | Intelligent caching |
-| Task parallelization | Manual | Automatic |
-| CI/CD speed | Slow | Fast (only rebuild changed) |
-| Setup complexity | Low | Low–Medium |
-| DX | Basic | Great |
-
-**Decision: Turborepo + pnpm workspaces** – standard for 2025/26 production monorepos.
-
-**Monorepo Structure (`js/`):**
 ```
 js/
-├── package.json          # root workspace (pnpm)
-├── pnpm-workspace.yaml   # workspace globs: apps/*, packages/*
-├── turbo.json            # pipeline: build, dev, lint, test
-├── tsconfig.base.json    # shared TS config
 ├── apps/
-│   ├── api/              # NestJS GraphQL app
-│   └── web/              # Next.js frontend (future)
-└── packages/             # shared libs (future)
+│   ├── api/              # NestJS GraphQL (port 8000)
+│   ├── web-app/          # Next.js CRM (port 3001)
+│   └── web-home-page/    # Next.js marketing (port 3000)
+└── packages/             # shared libs
 ```
 
 ---
 
 ## 3. Database Design (Core Entities)
 
-### 3.1 Tenant Isolation Strategy
+### 3.1 Tenant Isolation: Prisma Client Extension
 
-**Decision:** Prisma client extension (`$extends`) for automatic query scoping
-
-**Implementation:** `src/prisma/tenant.extension.ts` defines `tenantExtension(tenantId)`.
-Consumed via `PrismaService.forTenant(tenantId)` in every service method.
+**Decision:** `$extends` for automatic query scoping via `PrismaService.forTenant(tenantId)`.
 
 ```typescript
-// In a NestJS service:
 const db = this.prisma.forTenant(tenantId);
 const candidates = await db.candidate.findMany(); // tenantId injected automatically
 ```
 
-**Scoping rules applied by the extension:**
+All operations (`findMany`, `create`, `update`, `delete`, `upsert`) get `tenantId` injected. `findUnique` rewritten to `findFirst` (Prisma validates unique-constraint fields only). `Tenant` model operations bypass scoping.
 
-| Operation type | Action |
-|----------------|--------|
-| `findMany`, `findFirst`, `findFirstOrThrow`, `count`, `aggregate`, `groupBy` | `where.tenantId` injected |
-| `findUnique` / `findUniqueOrThrow` | Rewritten to `findFirst` / `findFirstOrThrow` with `tenantId` in `where` |
-| `update`, `updateMany`, `delete`, `deleteMany` | `where.tenantId` injected |
-| `create`, `createMany`, `createManyAndReturn` | `data.tenantId` injected |
-| `upsert` | `where.tenantId` + `create.tenantId` injected |
-| `Tenant` model (any op) | Bypassed — Tenant IS the root, has no `tenantId` column |
+**Alternative rejected:** PostgreSQL RLS (DB-level complexity, conflicts with connection pooling).
 
-**Why `findUnique` is rewritten to `findFirst`:**
-Prisma validates that `findUnique.where` contains only the unique-constraint fields
-(e.g. `{ id }` alone for PK lookups).  Adding `tenantId` would break validation
-even though the intent is correct.  `findFirst` accepts arbitrary `where` predicates
-and produces identical semantics.
+### 3.2 Core Schema
 
-**Alternative considered:** Row-level security (PostgreSQL RLS)
-Rejected for Phase 1 — adds DB-level complexity and requires per-connection role
-switching, which conflicts with the connection-pool model.
-
-```sql
--- Every table includes tenant_id for strict isolation
-CREATE TABLE candidates (
-  id UUID PRIMARY KEY,
-  tenant_id UUID NOT NULL,  -- Automatic scoping
-  first_name VARCHAR NOT NULL,
-  -- ... other fields
-);
-```
-
-### 3.2 Core Schema (Simplified)
-```typescript
+```prisma
 model Tenant {
-  id         String @id @default(ulid())
-  clerk_org_id String @unique
-  name       String
-  
-  users      User[]
-  clients    Client[]
-  candidates Candidate[]
-  jobs       Job[]
+  id           String @id @default(ulid())
+  org_id       String @unique
+  name         String
+  users        User[]
+  clients      Client[]
+  candidates   Candidate[]
+  jobs         Job[]
 }
 
 model Candidate {
-  id           String @id @default(ulid())
-  tenant_id    String
-  first_name   String
-  last_name    String
-  email        String?
-  
-  // Pipeline management (Phase 1 focus)
-  stage_id     String?
-  stage        PipelineStage? @relation(fields: [stage_id])
-  
-  // Human verification tracking
-  last_updated_by String?
+  id                 String    @id @default(ulid())
+  tenant_id          String
+  first_name         String
+  last_name          String
+  email              String?
+  stage_id           String?
+  stage              PipelineStage? @relation(fields: [stage_id])
+  last_updated_by    String?
   verification_notes String?
-  
-  // ULID provides natural sorting by creation time
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
 }
 
 model Client {
-  id        String @id @default(ulid())
-  tenant_id String
-  name      String
-  industry  String?
-  
-  jobs      Job[]
+  id         String   @id @default(ulid())
+  tenant_id  String
+  name       String
+  industry   String?
+  jobs       Job[]
   created_at DateTime @default(now())
 }
 
 model Job {
-  id          String @id @default(ulid())
+  id          String    @id @default(ulid())
   tenant_id   String
   client_id   String
-  client      Client @relation(fields: [client_id])
-  
+  client      Client    @relation(fields: [client_id])
   title       String
   description String
   status      JobStatus @default(OPEN)
-  
-  // Human assignment
-  assigned_to String // Recruiter user_id
-  created_at  DateTime @default(now())
+  assigned_to String
+  created_at  DateTime  @default(now())
 }
 ```
 
@@ -309,59 +164,229 @@ model Job {
 
 ## 4. Phase 1 Implementation Priorities
 
-### 4.1 Human-Heavy Features (Launch Requirements)
-1. **Manual Kanban Board** - Drag & drop with real-time sync
-2. **Basic CRUD Operations** - Candidates, Clients, Jobs
-3. **Activity Timeline** - Manual logging of interactions  
-4. **Human Decision Audit** - Track all recruiter actions
-5. **Tenant Isolation** - Strict data separation
+### 4.1 Launch Requirements
+1. Manual Kanban Board (drag & drop + real-time sync)
+2. Basic CRUD (Candidates, Clients, Jobs)
+3. Activity Timeline (manual interaction logging)
+4. Human Decision Audit (track all recruiter actions)
+5. Tenant Isolation (strict data separation)
 
 ### 4.2 Technical Infrastructure
-1. **Authentication** - Clerk integration with tenant context
-2. **Database** - Prisma schema with tenant isolation
-3. **Real-time** - Soketi WebSocket for live updates
-4. **API Layer** - GraphQL with type generation
-5. **Frontend** - Next.js with Shadcn/ui components
+1. Clerk authentication with tenant context
+2. Prisma schema with tenant isolation
+3. Soketi WebSocket for live updates
+4. GraphQL with type generation
+5. Next.js with Shadcn/ui + Tailwind v4
 
 ---
 
-## 5. Future-Proofing (Phase 2+ Preparation)
+## 5. Cowork Task Queue & Scheduled Execution (Phase 3)
 
-### 5.1 AI Integration Points
-```typescript
-// Placeholder interfaces for future AI services
-interface IAIService {
-  suggestMatches(jobId: string): Promise<Candidate[]>;
-  draftMessage(candidateId: string, jobId: string): Promise<string>;
-  parseResume(file: Buffer): Promise<CandidateData>;
+CRM manages a **generic task queue** that Claude Cowork consumes on a 30-min schedule. CRM is the brain (creates, prioritises, monitors). Cowork is the hands (pulls via MCP, executes in browser). See @docs/outreaching-technical-plan.md for LinkedIn-specific limits and strategy.
+
+### 5.1 Task Model
+
+```prisma
+model CoworkTask {
+  id              String           @id @default(dbgenerated("gen_random_ulid()"))
+  tenantId        String
+  userId          String
+  type            CoworkTaskType
+  priority        Int              @default(100)  // lower = higher priority
+  status          CoworkTaskStatus
+  payload         Json             // type-specific data
+  result          Json?
+  errorMessage    String?
+  retryCount      Int              @default(0)
+  maxRetries      Int              @default(2)
+  createdAt       DateTime         @default(now())
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  staleSince      DateTime?
+  candidateId     String?
+  jobId           String?
+  parentTaskId    String?
+  candidate       Candidate?       @relation(fields: [candidateId], references: [id])
+
+  @@index([tenantId, userId, status])
+  @@index([tenantId, status, priority])
+  @@index([status, startedAt])
 }
 
-// Phase 1: Mock implementations return empty/null
-// Phase 3+: Real AI service integration
+enum CoworkTaskType {
+  SEND_CONNECTION_REQUEST
+  SEND_MESSAGE
+  SEND_INMAIL
+  SCAN_INBOX
+  SCAN_CONNECTIONS
+  SEARCH_PROFILES
+  VIEW_PROFILE
+  CHECK_ACCOUNT_HEALTH
+}
+
+enum CoworkTaskStatus {
+  DRAFT
+  PENDING_APPROVAL
+  READY
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  STALE
+  SKIPPED
+  CANCELLED
+}
 ```
 
-### 5.2 Extensibility Considerations
+### 5.2 Task Payloads
+
+| Type | Payload Fields |
+|------|---------------|
+| SEND_CONNECTION_REQUEST | `linkedinUrl`, `candidateName`, `note` (≤300 chars) |
+| SEND_MESSAGE | `linkedinUrl`, `candidateName`, `message` |
+| SEND_INMAIL | `linkedinUrl`, `candidateName`, `subject`, `message` |
+| SCAN_INBOX | `lookbackHours` (default: 24) |
+| SCAN_CONNECTIONS | `pendingTaskIds` |
+| SEARCH_PROFILES | `query`, `filters` (title, location, company, industry), `maxResults`, `jobId` |
+| VIEW_PROFILE | `linkedinUrl`, `extractFields` |
+| CHECK_ACCOUNT_HEALTH | (none) |
+
+### 5.3 Session Execution Order
+
+Every 30 min, Cowork runs tasks in this order:
+
+1. **Health check** → if session expired or restricted, alert and stop
+2. **Budget check** → if daily limit reached, skip outreach
+3. **Inbox scan** → replies take priority; CRM classifies and drafts follow-ups
+4. **Connection accept check** → auto-draft follow-up messages
+5. **Outreach** → ordered by priority (messages > InMail > connection requests); claim → execute → complete/fail; random delay 30s–3min between actions
+6. **Report** → log session summary to CRM
+
+### 5.4 MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `getTasks(type?, status, limit?)` | Pull READY tasks ordered by priority |
+| `claimTask(taskId)` | Atomically set IN_PROGRESS + startedAt |
+| `completeTask(taskId, result)` | Mark completed with result data |
+| `failTask(taskId, errorMessage)` | Increment retryCount; re-queue if under maxRetries |
+| `reportReply(senderUrl, messageText, timestamp)` | Match reply to outreach task, classify, draft follow-up |
+| `reportConnectionAccepted(taskId, linkedinUrl)` | Create follow-up MESSAGE task |
+| `getOutreachBudget()` | Remaining daily/weekly limits by tier (see @docs/outreaching-technical-plan.md Section 4) |
+| `checkAccountHealth()` | Verify LinkedIn session is alive |
+| `reportSessionSummary(...)` | Log session stats for analytics |
+
+### 5.5 Task Creation Sources
+
+| Source | Task Types | Approval Required? |
+|--------|-----------|-------------------|
+| Recruiter via Claude MCP | Outreach (SEND_*) | Yes — DRAFT → approve → READY |
+| CRM auto-schedule (cron) | SCAN_INBOX, SCAN_CONNECTIONS, CHECK_ACCOUNT_HEALTH | No — auto-created as READY every 30 min |
+| Reply classification | SEND_MESSAGE (follow-up) | Yes — auto-drafted, recruiter approves |
+| Connection accepted | SEND_MESSAGE (follow-up pitch) | Yes — auto-drafted, recruiter approves |
+| Pipeline staleness agent | SEND_MESSAGE (nudge) | Yes — auto-drafted, recruiter approves |
+| Recruiter via CRM UI | Any | Yes |
+
+### 5.6 Stale Detection & Alerting
+
+A task is **stale** if IN_PROGRESS > 1 hour. Server-side cron runs every 5 min to detect and mark stale tasks.
+
+**Alert model:**
+
+```prisma
+model Alert {
+  id          String        @id @default(dbgenerated("gen_random_ulid()"))
+  tenantId    String
+  userId      String?
+  type        AlertType
+  severity    AlertSeverity
+  message     String
+  metadata    Json?
+  isRead      Boolean       @default(false)
+  isResolved  Boolean       @default(false)
+  resolvedBy  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@index([tenantId, isResolved])
+  @@index([tenantId, userId, isRead])
+}
+
+enum AlertType {
+  TASK_STALE
+  SESSION_EXPIRED
+  ACCOUNT_RESTRICTED
+  DAILY_LIMIT_REACHED
+  COWORK_SESSION_FAILED
+  REPLY_DETECTED
+}
+
+enum AlertSeverity { INFO  WARNING  ERROR  CRITICAL }
+```
+
+**Escalation rules:**
+
+| Condition | Severity | Auto-Action |
+|-----------|----------|-------------|
+| 1 task stale > 1 hour | WARNING | Offer Retry/Cancel |
+| 3+ stale for same user | ERROR | Pause all READY tasks |
+| Stale across 2+ tenants | CRITICAL | System-wide investigation |
+| Session expired | ERROR | Pause tasks; show "Reconnect LinkedIn" |
+| Account restricted | ERROR | Pause tasks; 24h cooldown |
+| Daily limit reached | INFO | Skip outreach; inbox scan still runs |
+
+**Recovery:** Recruiter can Retry (re-queue as READY), Cancel, or Check LinkedIn manually.
+
+### 5.7 Schedule Configuration
+
+Schedule is configured in **Claude Cowork**, not in the CRM. The recruiter sets a recurring task in Cowork (interval, active hours, active days). CRM's only job is to keep the right tasks in READY status. Recurring task creation (SCAN_INBOX, SCAN_CONNECTIONS, CHECK_ACCOUNT_HEALTH) is a server-side NestJS cron that runs every 30 min.
+
+### 5.8 Session Audit
+
+```prisma
+model CoworkSession {
+  id                  String        @id @default(dbgenerated("gen_random_ulid()"))
+  tenantId            String
+  userId              String
+  startedAt           DateTime
+  completedAt         DateTime?
+  status              SessionStatus // RUNNING, COMPLETED, FAILED, TIMED_OUT
+  tasksAttempted      Int           @default(0)
+  tasksCompleted      Int           @default(0)
+  tasksFailed         Int           @default(0)
+  tasksSkipped        Int           @default(0)
+  repliesFound        Int           @default(0)
+  connectionsAccepted Int           @default(0)
+  budgetAtStart       Json?
+  budgetAtEnd         Json?
+  errorMessage        String?
+  createdAt           DateTime      @default(now())
+
+  @@index([tenantId, userId, startedAt])
+}
+```
+
+---
+
+## 6. Future-Proofing (Phase 2+)
+
+- **AI Integration:** `IAIService` interface for `suggestMatches`, `draftMessage`, `parseResume` — Phase 1 mocks, Phase 3+ real
 - **Plugin Architecture:** Input channels as separate modules
-- **Event System:** Database changes emit events for future automation
-- **Audit Trail:** All human decisions logged for AI training data
-- **Confidence Scoring:** Framework for future automation thresholds
+- **Event System:** Database changes emit events for automation
+- **Audit Trail:** All human decisions logged (future AI training data)
 
 ---
 
-## 6. Success Metrics & Performance Targets
+## 7. Performance Targets
 
-### 6.1 User Experience
-- **Time to first candidate added:** < 10 minutes from signup
-- **Kanban drag responsiveness:** < 100ms
-- **Real-time sync latency:** < 500ms
-- **Page load times:** < 2 seconds
-
-### 6.2 Technical Performance
-- **API response time:** < 200ms (95th percentile)
-- **Database queries:** < 50ms average
-- **WebSocket uptime:** > 99.9%
-- **Concurrent users per tenant:** 50+
-
----
-
-This technical design prioritizes **speed of development** and **human trust-building** while establishing the foundation for future AI automation phases.
+| Metric | Target |
+|--------|--------|
+| Time to first candidate added | < 10 min from signup |
+| Kanban drag responsiveness | < 100ms |
+| Real-time sync latency | < 500ms |
+| Page load | < 2s |
+| API response (p95) | < 200ms |
+| DB queries (avg) | < 50ms |
+| WebSocket uptime | > 99.9% |
+| Concurrent users/tenant | 50+ |

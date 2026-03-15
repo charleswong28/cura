@@ -2,13 +2,15 @@
 
 Cura is an AI-augmented recruitment platform designed to evolve from a high-touch "System of Record" to an autonomous "System of Intelligence." The project follows a strict phased rollout: establishing a rock-solid CRM core first, followed by incremental AI layers where humans remain the authoritative gatekeepers for every interaction until the system demonstrates reliable outcomes.
 
-### Design Principles (Aligned with North Star)
+### Design Principles
 
-- **AI first, human verify** — AI handles administrative work, humans gate all critical decisions
-- **Zero-Loss Engagement Memory** — Every interaction captured and contextualized 
+- **Claude-native interaction layer** — Cura is a CRM with MCP server; recruiters can command it through Claude in natural language or from the CRM UI. Claude Cowork + Claude for Chrome extends this to browser-based execution (LinkedIn outreach, profile search).
+- **Omni-trigger** — Cura subscribes to every recruitment-relevant event source (email, LinkedIn, calls, CRM events, forms). Events flow in automatically; Claude acts; the recruiter approves.
+- **Sourcing-first, pipeline-ready** — Entry point is the spec (or job title); system generates spec → searches all channels → builds candidate list. Pipeline management and zero-loss memory handle the follow-through.
+- **Every module is configuable** - Each module starts with system prompt. User should be able to customize the system prompt and setup SKILL to dynamically inject context.
+- **Auto-enrichment as default** — Every search updates existing profiles. External sources (PDL, Lusha, LinkedIn) sync continuously to the local DB. BYOK model for API keys.
 - **Single Responsibility per Module** — Clear boundaries and ownership
-- **Compliance by design** — Built-in audit trails and transparent logic
-- **"AI Runs the ATS. You Close the Deal."** — AI handles the administrative heavy lifting so recruiters focus on the only thing that closes deals: human connection
+- **Compliance by design** — Built-in audit trails and transparent logic; human "Seal of Approval" gates all high-stakes actions (client submissions, offer communications)
 
 ### Implementation Philosophy
 
@@ -18,32 +20,48 @@ Cura is an AI-augmented recruitment platform designed to evolve from a high-touc
 
 ## 2. Implementation Phases
 
-### Phase 1: Core CRM Foundation (Human-Heavy)
-**Goal:** Establish rock-solid system of record with full human control
+### Phase 1: Core CRM Foundation + MCP Server Skeleton
+**Goal:** Rock-solid system of record AND the MCP interaction layer as the primary UX surface
 - Manual Kanban board for pipeline management
 - Basic CRUD operations (candidates, clients, jobs)
-- **Human verification gates for ALL outreach**
+- **Cura MCP Server** — exposes core entities (candidates, jobs, clients) as Claude tools; natural language commands read/write CRM
+- **Human verification gates for ALL outreach** — AI drafts, human approves, human sends
 - Activity timeline with manual logging
 - Simple AI suggestions (human decides everything)
 
-### Phase 2: Input Channels (Selective Automation) 
-**Goal:** Add data ingestion with human oversight
-- LinkedIn Extension (manual capture + human review)
+### Phase 2: Omni-Trigger — Subscribe to Everything
+**Goal:** Cura subscribes to all recruitment event sources so Claude can act autonomously; recruiter approves
+- **Email subscription** — inbound emails trigger classification, CRM enrichment, and Claude-drafted responses
+- **LinkedIn reply detection via email notifications** — LinkedIn sends email on new messages; Cura email subscription captures them, matches sender to CRM candidate by LinkedIn URL, creates reply record + dashboard notification. See @docs/outreaching-technical-plan.md Section 5.1
+- **LinkedIn activity subscription** — connection accepts, InMail replies, and messages trigger Claude follow-up drafts
+- **Post-call subscription** — call/meeting end events trigger transcript ingestion, candidate enrichment, and follow-up drafts
+- **Pipeline staleness subscription** — scheduled scans detect idle candidates and trigger proactive Claude nudges; auto-draft follow-up after 7+ days with no reply. See @docs/outreaching-technical-plan.md Section 5.3
 - Email/Calendar sync (automated logging, human verification)
 - CV Parser (AI extracts, human approves changes)
 - Enrichment workflows (AI suggests, human approves)
+- Chrome extension as optional **convenience tool** for recruiter-initiated additions (not part of trigger architecture)
 
-### Phase 3: Intelligence Layer (Advisory Only)
-**Goal:** AI recommendations with mandatory human approval
+### Phase 3: Sourcing Automation + Intelligence Layer
+**Goal:** Spec-to-candidate-list automation; AI recommendations with mandatory human approval
+- **Job spec generation** — client brief / job title → full spec auto-generated via Claude
+- **Multi-channel sourcing** — MCP tool executes parallel search across LinkedIn, PDL, ContactOut, internal DB; returns enriched list
+- **LinkedIn outreach via Claude Cowork** — candidate found → personalised LinkedIn message drafted → human approves in CRM → recruiter starts Cowork session → Claude for Chrome sends connection requests / messages / InMails from recruiter's own browser. See @docs/outreaching-technical-plan.md
+- **Cowork task queue** — generic task queue (`CoworkTask` model) consumed by Cowork on 30-min schedule. Task types: `SEND_CONNECTION_REQUEST`, `SEND_MESSAGE`, `SEND_INMAIL`, `SCAN_INBOX`, `SCAN_CONNECTIONS`, `SEARCH_PROFILES`, `SYNC_PROFILE`, `WITHDRAW_INVITATION`, `CHECK_ACCOUNT_HEALTH`. See @docs/crm-technical-plan.md Section 5
+- **CRM-driven match prioritisation** — every outreach action is expensive (LinkedIn caps ~15 connection requests/day); CRM scores candidates by role fit, skill match, location, recency, prior relationship signals, and response likelihood. Daily budget filter selects top-N targets. See @docs/outreaching-technical-plan.md Section 3
+- **Session execution order** — each 30-min session runs: health check → budget check → inbox scan → connection accept check → outreach (ordered by priority) → session report. See @docs/crm-technical-plan.md Section 5.3
+- **Stale detection & alerting** — tasks IN_PROGRESS > 1 hour marked stale; escalation from WARNING → ERROR → CRITICAL. Alert model with severity levels and auto-actions (pause, cooldown). See @docs/crm-technical-plan.md Section 5.6
+- **Reply classification** — replies classified by Claude as interested / not interested / question / referral / out of office / connection accepted → auto-draft appropriate follow-up → recruiter approves. See @docs/outreaching-technical-plan.md Section 5.4
 - AI Matching Engine (scored suggestions only)
-- Draft generation (AI writes, human reviews/edits ALL messages)
 - Pipeline suggestions (AI recommends, human executes)
+- **Background pipeline agent** — monitors stage triggers; pushes proactive Claude prompts ("Candidate X hasn't been contacted in 7 days")
 - Compliance monitoring (automated flagging, human resolution)
 
-### Phase 4+: Gradual Automation (Future)
-**Goal:** Reduce verification based on proven performance
-- Progressive removal of verification requirements
-- Selective autonomous actions for low-risk operations
+### Phase 4+: Progressive Automation (Future)
+**Goal:** Reduce verification overhead based on proven performance
+- Auto-approve for pre-approved outreach templates (recruiter opts in per template)
+- LinkedIn Recruiter API adapter (official InMail for customers with seats)
+- Multi-channel outreach: email via Gmail/Outlook OAuth (same task queue model)
+- Revenue tracking, advanced analytics
 - Human escalation paths for edge cases
 
 ---
@@ -52,48 +70,51 @@ Cura is an AI-augmented recruitment platform designed to evolve from a high-touc
 
 ### System Layers
 
-1. **Input Channels** — Data ingestion, sourcing, enrichment  
-2. **Core Platform (Cura CRM)** — Source of truth & manual workflows  
-3. **Intelligence Layer** — AI suggestions & advisory scoring  
-4. **Execution Layer** — Human-verified outreach automation  
-5. **Governance Layer** — Compliance & audit trails  
+1. **MCP Interaction Layer** — Claude as the primary UX surface; natural language → Cura actions
+2. **Cowork Execution Layer** — Claude Cowork + Chrome extension controls recruiter's browser for LinkedIn outreach and search; fetches tasks from CRM via MCP, reports results back
+3. **Omni-Trigger Subscriptions** — server-side event subscriptions (email, LinkedIn, calls, pipeline, forms)
+4. **Core Platform (Cura CRM)** — Source of truth, outreach task queue, rate limiting, approval workflows
+5. **Intelligence Layer** — AI sourcing, matching, draft generation; human approval for all high-stakes actions
+6. **Governance Layer** — Compliance & audit trails
 
 ```text
-INPUT CHANNELS (HUMAN-VERIFIED)                    CENTRAL HUB (THE BRAIN)              OUTPUTS & ACTIONS (HUMAN-GATED)
-====================================               ========================             ====================================
+INTERACTION SURFACE                   CENTRAL HUB (THE BRAIN)              OUTPUTS & ACTIONS (HUMAN-GATED)
+====================================  ========================             ====================================
 
-+--------------------------------+                                              +---------------------------------------+
-| LinkedIn Chrome Extension      |-- Manual Capture ---+                        | Human-Verified Outreach               |
-| (Recruiter Manual Selection)   |  + Human Review     |                        | ┌─ Draft Review Required ─┐          |
-+--------------------------------+                     |                        | │ • Email Review & Approve │          |
-                                                       v                        | │ • LinkedIn Msg Review    │          |
-+----------------------------+                      +-----------------------+    | │ • Manual Send Action     │          |
-| Email & Calendar Sync      |-- Auto Log --------->|     Cura CRM          |----| └─────────────────────────┘          |
-| (Activity Capture Only)    |   Human Verify       |   (Single Source)     |    +---------------------------------------+
-+----------------------------+                      |                       |                    ^
-                                                    | - Candidate Profiles  |                    |
-+----------------------------+                      | - Client Job Orders   |                    |
-| Meeting & Call Sync        |- Notes Capture ----->| - Manual Kanban       |      +----------------------------+
-| (Transcript + Human Notes) |   Human Review       | - Activity Timeline   |----->| AI Advisory Layer          |
-+----------------------------+                      | - Human Decision Log  |      | • Scoring Suggestions      |
-                                                    +-----------------------+      | • Match Recommendations    |
-+----------------------------+                      ^                              | • HUMAN APPROVAL REQUIRED  |
-| AI CV Parser               |-- Extract Data ------+                              +----------------------------+
-| ┌─ Human Review Required ─┐|   Human Approve      |     
-| │ All changes must be     │|                      |                             +----------------------------+
-| │ reviewed before saving  │|                      |                             | Compliance & Audit         |
-| └─────────────────────────┘|                      |                             | • All Actions Logged       |
-+----------------------------+                      |                             | • Human Decision Tracking  |
-                                                    |                             | • Verification Audit Trail |
-+----------------------------+                      |                             +----------------------------+
-| Data Enrichment            |-- Suggest Changes ---+
-| ┌─ Approval Required ─────┐|   Human Approve
-| │ No auto-application of  │|
-| │ enriched data           │|
-| └─────────────────────────┘|
-+----------------------------+
++--------------------------------+                                         +---------------------------------------+
+| Claude (MCP Client)            |<--- natural language -----+            | LinkedIn Outreach (Phase 3)           |
+| "Find 20 CFOs at Series B..."  |---> MCP tool calls ------>|            | ┌─ Claude Cowork Execution ──┐       |
++--------------------------------+                           |            | │ • Recruiter approves in CRM │       |
+                                                             v            | │ • Cowork fetches READY tasks │       |
++--------------------------------+                                        | │ • Chrome ext sends on LI    │       |
+| Claude Cowork + Chrome ext     |<--- MCP (fetch tasks) ----+            | │ • Results sync back to CRM  │       |
+| (recruiter's own browser)      |---> MCP (report results)->|            | └──────────────────────────────┘       |
++--------------------------------+                           |            +---------------------------------------+
+                                                             v                          ^
+OMNI-TRIGGER SUBSCRIPTIONS                     +-----------------------+                |
+(all server-side, push into Cura)              |     Cura CRM          |----------------+
+====================================           |   (Single Source)     |
++----------------------------+                 |                       |
+| Email events               |-- auto ------->| - Candidate Profiles  |
+| LinkedIn events            |-- auto ------->| - Client Job Orders   |  +----------------------------+
+| Call/meeting end events    |-- auto ------->| - Manual Kanban       |->| AI Intelligence Layer      |
+| Pipeline staleness scans   |-- auto ------->| - Activity Timeline   |  | • Multi-channel sourcing   |
+| Inbound forms / referrals  |-- auto ------->| - Human Decision Log  |  | • Job spec generation      |
++----------------------------+                 | - Outreach Task Queue |  | • Match scoring            |
+                                               +-----------^-----------+  | • Outreach drafts          |
++----------------------------+                             |              | • HUMAN APPROVAL REQUIRED  |
+| Convenience tools          |                            |              +----------------------------+
+| Chrome extension (optional)|-- manual capture --------->|
+| AI CV Parser               |-- extract + approve ------>|              +----------------------------+
+| Data Enrichment            |-- suggest + approve ------>|              | Compliance & Audit         |
++----------------------------+                            |              | • All Actions Logged       |
+                                                          |              | • Human Decision Tracking  |
+                                                          +              | • Verification Audit Trail |
+                                                                         +----------------------------+
 
-PHASE 1 PRIORITY: Manual Kanban + Human-Gated Actions
+PHASE 1 PRIORITY: CRM CRUD + MCP Server skeleton (Claude can read/write candidates, jobs, clients)
+PHASE 2 PRIORITY: Reply detection pipeline (email notifications → inbox scan → CRM staleness nudges)
+PHASE 3 PRIORITY: Outreach task queue + MCP tools for Cowork execution + CRM match prioritisation
 ```
 
 ---
@@ -101,11 +122,11 @@ PHASE 1 PRIORITY: Manual Kanban + Human-Gated Actions
 ## 4. Human Verification Points (Phase 1 Requirements)
 
 ### 4.1 Outreach Verification (MANDATORY)
-- **Email Drafts:** Every email must be reviewed and manually approved before sending
-- **LinkedIn Messages:** All InMail/connection requests require human review and edit
+- **LinkedIn Messages:** All connection requests, InMails, and messages require human review and approval in CRM before Claude Cowork executes them
 - **Follow-up Sequences:** Each message in sequence needs individual approval
 - **Client Communications:** All client-facing messages require manual verification
-- **Bulk Actions:** No bulk sending without individual message review
+- **Bulk Actions:** No bulk sending without individual message review (bulk approve available but each draft visible)
+- **Execution visibility:** Recruiter can watch Claude Cowork's LinkedIn session and pause/stop at any time
 
 ### 4.2 Data Change Verification
 - **Profile Updates:** AI suggestions require human approval before saving
@@ -135,25 +156,45 @@ PHASE 1 PRIORITY: Manual Kanban + Human-Gated Actions
 
 ### 4.1 Input Channels (Data Ingestion & Sourcing Layer)
 
-#### 4.1.1 LinkedIn Chrome Extension (Manual / Semi-Automated Sourcing)
+#### 4.1.0 Cura MCP Server (Phase 1 — Core Interaction Layer)
 
-**Purpose:** Enable recruiters to manually / semi-automatically source candidates from LinkedIn.
+**Purpose:** Expose Cura as an MCP server so recruiters can command the platform through Claude in natural language.
 
 **Owns**
-- Scraping visible profile data
-- Recruiter-triggered capture
-- Semi-automated bulk extraction
-- Recruiter notes capture
-- Triggering candidate create/update in CRM
+- MCP tool definitions for all core entities (candidates, jobs, clients, pipeline stages)
+- OAuth handshake for Claude Connectors menu
+- Translating Claude tool calls → Cura API mutations
+- Returning structured results to Claude (enriched profiles, sourcing lists, draft messages)
+- Plan-based rate limits and credit consumption per tool call
+- Full audit log of all MCP-originated actions
 
 **Does NOT own**
-- Automated sourcing pipelines
-- Data storage
-- Matching logic
-- Outreach automation
+- Claude model itself
+- Data storage (delegates to CRM)
+- Matching logic (delegates to Intelligence Layer)
 
 **Key Boundary**
-> Human-in-the-loop sourcing only.
+> Claude is the UX surface; Cura MCP is the action and database layer. Every action writes back to the system of record.
+
+---
+
+#### 4.1.1 Chrome Extension (Convenience Tool — Not a Trigger)
+
+**Purpose:** Optional recruiter-initiated tool for manually adding profiles or surfacing Cura context while browsing LinkedIn/Gmail. Not part of the omni-trigger architecture.
+
+**Owns**
+- LinkedIn profile page: display candidate's Cura history; one-click "Add to Cura"
+- Recruiter-triggered capture from LinkedIn (profile data)
+- Recruiter notes capture
+
+**Does NOT own**
+- Automated event subscriptions (all triggers are server-side)
+- Data storage
+- Matching logic
+- Outreach sending (drafts only; human approves and sends)
+
+**Key Boundary**
+> Convenience only. All automatic event handling is server-side via omni-trigger subscriptions.
 
 ---
 
@@ -245,6 +286,46 @@ PHASE 1 PRIORITY: Manual Kanban + Human-Gated Actions
 
 ---
 
+#### 4.1.5b Post-Call Event Handler (Phase 2 — Omni-Trigger)
+
+**Purpose:** Subscribe to call/meeting end events; automatically enrich candidate profiles and draft follow-up tasks.
+
+**Owns**
+- Subscribing to call/meeting end event sources
+- Transcript ingestion and AI summarization
+- Pushing enriched notes and key signals to candidate profile
+- Drafting follow-up task in CRM
+- Surfacing pending approval to recruiter
+
+**Does NOT own**
+- Outreach sending (always human-approved)
+- Pipeline stage changes (always human-confirmed)
+- Matching decisions
+
+**Key Boundary**
+> Post-call data arrives automatically via subscription; all resulting actions require human approval.
+
+---
+
+#### 4.1.5c Background Pipeline Agent (Phase 3 — Omni-Trigger)
+
+**Purpose:** Monitor CRM pipeline events and push proactive prompts to Claude when recruiter action is required.
+
+**Owns**
+- Scheduled scan of pipeline stages and last-contact dates
+- Rule evaluation ("no contact in N days", "stage stale for X days")
+- Generating proactive Claude prompt with context ("Candidate X at Offer stage — no contact in 7 days. Draft follow-up?")
+- Logging agent-triggered events in audit trail
+
+**Does NOT own**
+- Taking any action autonomously — all prompts require human response
+- Sending messages, updating stages, or altering records without recruiter approval
+- Matching logic
+
+**Key Boundary**
+> Advisory and notification only. Agent prompts; human decides and acts.
+
+---
 
 #### 4.1.5 AI CV / Resume Parser
 
@@ -346,36 +427,49 @@ PHASE 1 PRIORITY: Manual Kanban + Human-Gated Actions
 
 ### 4.4 Execution Layer
 
-#### 5.4.1 Human-Verified Outreach (Phase 3)
+#### 5.4.1 LinkedIn Outreach via Claude Cowork (Phase 3)
 
-**Purpose:** Execute engagement with mandatory human approval.
+**Purpose:** Execute LinkedIn engagement with mandatory human approval, using Claude Cowork as the execution layer.
 
 **Phase 1-2 - Manual Only**
 - **Human writes all messages**
-- Manual sending through existing tools
+- Manual sending through LinkedIn directly
 - Activity logged manually in CRM
 
-**Phase 3 - AI Draft + Human Approval**
-- **AI drafts messages (LinkedIn, Email)**
-- **Mandatory human review and edit**
-- **Manual approval required before sending**
-- Personalization suggestions (human selects)
+**Phase 3 - AI Draft + Human Approval + Cowork Execution**
+- **AI drafts LinkedIn messages** (connection requests, InMails, direct messages) via Claude MCP
+- **Mandatory human review and edit in CRM** (outreach task queue with approval flow: DRAFT → PENDING_APPROVAL → READY)
+- **Recruiter approves drafts** → tasks marked READY
+- **Claude Cowork + Chrome extension executes** — fetches READY tasks from CRM via MCP, sends from recruiter's own browser/LinkedIn session
+- **Rate limiting enforced by CRM** — Cura limits well below LinkedIn thresholds (70 conn requests/week, 15/day, 40 messages/day, 200 profile views/day). 4-week warm-up for new accounts (3 → 5 → 10 → full). See @docs/outreaching-technical-plan.md Section 4.5–4.6
+- **Full task type coverage** — connection requests, messages, InMails, inbox scan, connection scan, invitation withdrawal, profile search, profile sync, account health check
+- **MCP tools for Cowork** — `getTasks`, `claimTask`, `completeTask`, `failTask`, `reportReply`, `reportConnectionAccepted`, `getOutreachBudget`, `checkAccountHealth`, `reportSessionSummary`. See @docs/crm-technical-plan.md Section 5.4
+- **Session audit trail** — `CoworkSession` model logs tasks attempted/completed/failed/skipped, replies found, connections accepted, budget snapshots. See @docs/crm-technical-plan.md Section 5.8
 - Follow-up sequence drafts (each message approved individually)
-- Delivery tracking (opens, replies)
+- **Reply detection pipeline** — three mechanisms: (1) LinkedIn email notifications → Cura email subscription (Phase 2), (2) scheduled inbox scan every 30 min, (3) CRM staleness nudges. See @docs/outreaching-technical-plan.md Section 5
+- See @docs/outreaching-technical-plan.md for full technical design
 
-**Phase 4+ - Selective Automation**  
-- Auto-send for pre-approved templates only
-- Human approval for important communications
-- Confidence-based automation rules
+**Recruiter Onboarding Requirements (Phase 3)**
+- Claude Max subscription ($100–200/mo) — required for Cowork + Chrome extension
+- Claude for Chrome extension installed
+- LinkedIn Premium / Sales Nav / Recruiter — free accounts limited to ~5 personalised notes/month
+- 150+ LinkedIn connections — below this, LinkedIn flags activity
+- No other automation tools running (Dux-Soup, LinkedHelper increase detection risk)
+- See @docs/outreaching-technical-plan.md Section 6
+
+**Phase 4+ - Selective Automation**
+- Auto-approve for pre-approved templates (recruiter opts in)
+- LinkedIn Recruiter API adapter (for customers with seats — official InMail)
+- Multi-channel: email outreach via Gmail/Outlook OAuth
 
 **Does NOT own (Any Phase)**
 - Candidate storage
-- Matching logic  
-- Automatic sending without human approval
+- Matching logic
+- Sending without human approval (Cowork only executes READY tasks)
 - Consent policy definition
 
 **Key Principle**
-> AI drafts, human verifies, human sends. No autonomous outreach.
+> CRM is the brain (drafts, approvals, rate limits). Cowork is the hands (browser execution). Recruiter approves; Cowork sends.
 
 ---
 
@@ -427,38 +521,74 @@ PHASE 1 PRIORITY: Manual Kanban + Human-Gated Actions
 
 ## 6. Phase-by-Phase Workflows
 
-### 6.1 Phase 1: Manual Candidate Sourcing Flow (Human-Heavy)
+### 6.1 Phase 1: CRM + MCP Foundation Flow
 
-1. **Recruiter manually captures profile** via LinkedIn Extension
-2. **Human reviews all captured data** before saving 
-3. **Manual data entry/correction** in CRM
-4. **Human decides pipeline stage** placement
-5. **Manual activity logging**
+1. **Recruiter opens Claude** — types "Show me all candidates at Offer stage" or "Add John Smith, CFO at Acme, to pipeline"
+2. **Cura MCP executes** — reads/writes CRM via tool calls, returns result to Claude conversation
+3. Fallback: **manually capture profile** via LinkedIn Extension → human reviews → save to CRM
+4. **Human decides pipeline stage** and logs activity
 
-### 6.2 Phase 2: Semi-Automated Sourcing Flow (Human Oversight)
+### 6.2 Phase 2: Omni-Trigger Flow
 
-1. Automated sourcing suggests candidates
-2. **Human reviews all suggestions** before import
-3. **Human approves data changes** from enrichment
-4. **Manual pipeline stage assignment**
-5. AI suggests job matches → **Human decides**
+**Email event:** Inbound email arrives → Cura classifies, enriches from CRM → Claude drafts reply or creates task → **human approves → sends**
 
-### 6.3 Phase 3: AI-Assisted Flow (Human Verification)
+**Post-call event:** Call/meeting ends → Cura ingests transcript → auto-enriches candidate profile → drafts follow-up task → **human reviews and approves**
 
-1. AI auto-imports candidates → **Human reviews conflicts**
-2. AI suggests enrichment → **Human approves changes**
-3. AI generates job match scores → **Human makes decisions**
-4. **AI drafts outreach → Human reviews every message**
-5. **Human manually sends all communications**
+**LinkedIn reply detection (via email):** Candidate replies on LinkedIn → LinkedIn emails recruiter → Cura email subscription captures it → classifier detects LinkedIn notification → matches sender to CRM candidate by LinkedIn URL → creates reply record + dashboard notification → next Cowork session reads full message content
 
-### 6.4 Human-Verified Outreach Flow (All Phases)
+**LinkedIn event:** LinkedIn activity detected (InMail reply, connection accepted) → Cura identifies candidate, pulls CRM context → Claude classifies reply (interested / not interested / question / referral / out of office) → drafts appropriate next action → **human approves**
 
-1. **AI drafts message** (Phase 3+) OR **Human writes** (Phase 1-2)
-2. **Mandatory human review and edit**
-3. **Human clicks "Approve & Send"**
-4. **System logs human decision + message content**
-5. **Activity automatically synced to timeline**
-6. **Human tracks responses and updates pipeline**
+**Pipeline staleness:** Scheduled scan detects idle candidates → Claude generates proactive nudge with context → **human reviews and acts**. Escalation: 48h no reply = informational note; 7+ days = auto-draft follow-up; connection accepted with no follow-up = auto-draft pitch
+
+### 6.3 Phase 3: Sourcing-First Flow (Headhunter)
+
+1. **Client brief arrives** → email subscription or MCP command creates job draft in Cura
+2. **Claude: "Generate spec for CFO role at Series B fintech"** → Cura generates full job spec → **human reviews**
+3. **Claude: "Source 20 candidates for this role"** → Cura MCP executes search (PDL, ContactOut, internal DB) + Claude Cowork searches LinkedIn directly → returns enriched list
+4. **CRM match scoring ranks candidates** — role fit, skill match, location, recency, prior relationship, response likelihood → ranked list with match percentages
+5. **Human reviews shortlist** → dashboard shows "Today's Outreach Queue (15 of 43 candidates)" with match scores → **recruiter approves selection**
+6. **Claude: "Draft outreach for shortlisted candidates"** → Cura drafts personalised LinkedIn messages → **human reviews each → approves in CRM** → tasks marked READY
+7. **Recruiter opens Cowork: "Do my LinkedIn outreach"** → Cowork runs session: health check → budget check → inbox scan → connection check → outreach in priority order → session report → **results synced back to CRM**
+8. **Reply arrives** → detected via email notification (Phase 2) or inbox scan → classified → follow-up auto-drafted → **recruiter approves** → queued for next session
+9. **Background agent monitors pipeline** → proactive Claude prompt when follow-up is due → **human acts**
+
+### 6.4 LinkedIn Outreach Execution Flow (Phase 3+)
+
+```
+PREPARATION (in Cura CRM)                    EXECUTION (Claude Cowork — every 30 min)
+══════════════════════════                    ══════════════════════════════════════════
+
+1. CRM scores candidates by match fit
+2. AI drafts personalised messages ─────────────────────────────────┐
+3. Recruiter reviews ranked queue:                                   │
+   "Today's Outreach (15 of 43) — #1 Sarah Chen 94%..."             │
+4. Recruiter clicks "Approve"                                        │
+   → Task status: DRAFT → PENDING_APPROVAL → READY                  │
+                                                                     │
+                                              5. Recruiter opens Chrome + Cowork
+                                              6. "Do my LinkedIn outreach"
+                                              7. Session starts:
+                                                 a. CHECK_ACCOUNT_HEALTH → if restricted, stop
+                                                 b. getOutreachBudget() → if limit reached, skip outreach
+                                                 c. SCAN_INBOX → new replies? classify & sync to CRM
+                                                 d. SCAN_CONNECTIONS → accepted? create follow-up tasks
+                                                 e. WITHDRAW_INVITATION → clear stale pending (3+ weeks)
+                                                 f. SEND_CONNECTION_REQUEST → highest priority first
+                                                 g. SEND_MESSAGE → follow-ups to connections
+                                                 h. SEND_INMAIL → top targets (scarce credits)
+                                                 i. SEARCH_PROFILES → sourcing (if budget allows)
+                                                 j. SYNC_PROFILE → refresh stale CRM data
+                                              8. Random 30s–3min delay between actions
+                                              9. Each action → MCP: claimTask → completeTask/failTask
+                                             10. reportSessionSummary → "16/18 sent. 2 skipped."
+
+FOLLOW-UP (back in Cura CRM)
+════════════════════════════
+11. Reply detected via: (a) LinkedIn email notification → Cura email sub, or (b) next inbox scan
+12. Claude classifies reply → interested / question / referral / not interested / OOO
+13. Auto-drafts follow-up → recruiter approves → queued for next session
+14. Stale task detection: IN_PROGRESS > 1hr → WARNING → offer Retry/Cancel
+```
 
 ---
 

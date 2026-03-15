@@ -11,7 +11,8 @@
 | `docs/way-of-work.md` | Working Agreements | How we work: repo-as-brain, document structure rules, AI-first principles, dynamic context injection, `@link` vs plain link, decision format |
 | `docs/product-north-star.md` | Strategy & Vision | Product vision, target market, competitive positioning, and north star for the Cura recruitment platform |
 | `docs/project-plan.md` | Project Planning | Phase-by-phase implementation plan, human verification gates, module responsibilities, and architectural principles |
-| `docs/crm-technical-plan.md` | Technical Design | Phase 1 system architecture, core technical decisions (multi-tenancy, IDs, GraphQL, real-time, monorepo tooling), and database schema |
+| `docs/crm-technical-plan.md` | Technical Design | Phase 1 system architecture, core technical decisions (multi-tenancy, IDs, GraphQL, real-time, monorepo tooling), database schema. **Phase 3:** Cowork task queue design (CoworkTask model, MCP tools, scheduled 30-min execution, stale detection & alerting, session history) |
+| `docs/outreaching-technical-plan.md` | Technical Design | LinkedIn outreach HOW — interaction patterns (connection request, message, InMail, inbox scan, profile search steps), LinkedIn rate limits & enforcement, reply detection pipeline (email notifications → inbox scan → CRM nudges), error handling, recruiter onboarding. Task queue/scheduling lives in crm-technical-plan.md |
 | `docs/ai-playbook.md` | AI Operations | AI behaviour rules, decision documentation protocol, and server validation steps |
 | `js/cura-crm-project-management.md` | Project Management | EPIC/Story/Task breakdown for Phase 1 CRM (Candidates, Clients, Jobs CRUD). 5 EPICs, 11 Stories, 56 Tasks |
 | `js/apps/web-home-page/home-page-project-management.md` | Project Management | Marketing home page plan (cura.com) — Superhuman-inspired design, 8 EPICs, 12 Stories, 63 Tasks (HP-001–HP-063) |
