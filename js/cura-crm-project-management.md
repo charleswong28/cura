@@ -69,10 +69,10 @@
 
 #### Story 1.3: API Foundation
 
-- [ ] **TASK-010:** Set up GraphQL schema generation (code-first)
-- [ ] **TASK-011:** Configure GraphQL Codegen for frontend
-- [ ] **TASK-012:** Implement DataLoader for N+1 query prevention
-- [ ] **TASK-013:** Set up API error handling and validation
+- [x] **TASK-010:** Set up GraphQL schema generation (code-first)
+- [x] **TASK-011:** Configure GraphQL Codegen for frontend
+- [x] **TASK-012:** Implement DataLoader for N+1 query prevention
+- [x] **TASK-013:** Set up API error handling and validation
 
 #### Story 1.4: App Shell — Sidebar Navigation (FE)
 
@@ -396,8 +396,8 @@
 ### Completion Status
 
 - **EPICs:** 0/6 Complete
-- **Stories:** 6/27 Complete
-- **Tasks:** 28/121 Complete (9 BE + 19 FE)
+- **Stories:** 7/27 Complete
+- **Tasks:** 32/121 Complete (13 BE + 19 FE)
 
 ### Current Sprint
 

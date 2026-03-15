@@ -390,3 +390,45 @@ model CoworkSession {
 | DB queries (avg) | < 50ms |
 | WebSocket uptime | > 99.9% |
 | Concurrent users/tenant | 50+ |
+
+---
+
+## 8. API Foundation Decisions (Story 1.3)
+
+### 8.1 TypeScript Runtime: tsx instead of nest start
+
+**Decision:** Use `tsx` (via `tsx watch` for dev, `tsx src/main.ts` for prod) instead of `nest start --watch` / `node dist/main`.
+
+**Why:** Prisma 7 generates ESM-only TypeScript code (`import.meta.url`, ES imports). NestJS's default tsc compiler outputs CJS (no `"type": "module"` in package.json), causing `ReferenceError: exports is not defined in ES module scope` at runtime. `tsx` transparently handles mixed ESM/CJS modules.
+
+**Alternatives considered:**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| `tsx` (chosen) | Zero config, handles ESM/CJS, already a dep | Slight startup overhead vs raw `node` |
+| SWC builder | NestJS-recommended | `@swc/cli` v0.8 incompatible with `@nestjs/cli` v10 |
+| `"type": "module"` in package.json | Native ESM | Breaks NestJS/Jest configs, widespread import changes |
+
+**Trade-offs:** Marginal startup overhead from tsx is acceptable for dev and low-traffic API.
+
+### 8.2 DataLoader for N+1 Prevention
+
+**Decision:** Request-scoped `DataLoaderService` (global module) with batch loaders for each entity.
+
+**Implementation:**
+- `DataLoaderService` is `@Injectable({ scope: Scope.REQUEST })` — fresh per GraphQL request, no cross-request cache leakage
+- Loaders: `clientById`, `userById`, `candidateById`, `jobsByClientId`
+- Resolvers use `@ResolveField()` + DataLoader for relationship fields instead of eager includes
+
+### 8.3 Error Handling & Validation
+
+**Decision:** Three-layer approach:
+1. **ValidationPipe** (global) — `class-validator` decorators on DTOs, whitelist mode, forbid unknown properties
+2. **GraphqlExceptionFilter** — catches all resolver exceptions, maps HTTP status codes to Apollo error codes (BAD_USER_INPUT, NOT_FOUND, UNAUTHENTICATED, FORBIDDEN, INTERNAL_SERVER_ERROR)
+3. **Structured logging** — unexpected errors logged with full stack, sanitized message returned to client
+
+### 8.4 GraphQL Code-First Object Types
+
+**Decision:** Shared GraphQL ObjectType models in `src/common/graphql/models/` with registered enums in `src/common/graphql/enums.ts`.
+
+**Pattern:** Models declare scalar fields only. Relationship fields (Client→Jobs, Job→Client, Job→AssignedTo) are resolved via `@ResolveField()` in their respective resolvers using DataLoaders, avoiding circular imports and N+1 queries.
