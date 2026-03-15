@@ -63,9 +63,9 @@
 
 > Persistent left sidebar with links to all CRM sections. Collapsible on smaller screens.
 
-- [ ] **WA-001:** Create app shell layout (`(app)/layout.tsx`) with sidebar + main content area
-- [ ] **WA-002:** Build `Sidebar` component with navigation links (Dashboard, Candidates, Clients, Jobs, Settings)
-- [ ] **WA-003:** Add active route highlighting using `usePathname`
+- [x] **WA-001:** Create app shell layout (`(app)/layout.tsx`) with sidebar + main content area
+- [x] **WA-002:** Build `Sidebar` component with navigation links (Dashboard, Candidates, Clients, Jobs, Settings)
+- [x] **WA-003:** Add active route highlighting using `usePathname`
 - [ ] **WA-004:** Implement sidebar collapse/expand toggle with persistent state (localStorage)
 - [ ] **WA-005:** Add keyboard shortcut for sidebar toggle (e.g., `Cmd+\`)
 
@@ -309,12 +309,12 @@
 
 - **EPICs:** 0/7 Complete
 - **Stories:** 0/17 Complete
-- **Tasks:** 0/79 Complete
+- **Tasks:** 3/79 Complete
 
 ### Current Sprint
 
-**Sprint:** Not Started
-**Active Stories:** None
+**Sprint:** Sprint 1
+**Active Stories:** WA-1.1 (Sidebar Navigation)
 **Blocked Items:** None
 
 ---
