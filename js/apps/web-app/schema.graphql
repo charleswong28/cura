@@ -1,0 +1,262 @@
+# Development schema — mirrors the expected NestJS GraphQL API.
+# Used by GraphQL Codegen until the API resolvers are built.
+# Once the API exposes the full schema, switch codegen to introspect from
+# http://localhost:8000/graphql (see codegen.ts).
+
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
+
+enum CandidateStatus {
+  ACTIVE
+  INACTIVE
+  PLACED
+  BLACKLISTED
+}
+
+enum ClientStatus {
+  PROSPECT
+  ACTIVE
+  INACTIVE
+}
+
+enum JobStatus {
+  OPEN
+  ON_HOLD
+  FILLED
+  CLOSED
+}
+
+enum JobPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+# ---------------------------------------------------------------------------
+# Types
+# ---------------------------------------------------------------------------
+
+type Candidate {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  currentCompany: String
+  currentTitle: String
+  location: String
+  status: CandidateStatus!
+  notes: String
+  linkedinUrl: String
+  githubUrl: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Client {
+  id: ID!
+  name: String!
+  industry: String
+  website: String
+  phone: String
+  address: String
+  status: ClientStatus!
+  jobs: [Job!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Job {
+  id: ID!
+  title: String!
+  description: String
+  status: JobStatus!
+  priority: JobPriority!
+  client: Client!
+  assignedTo: User
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type User {
+  id: ID!
+  email: String!
+  firstName: String!
+  lastName: String!
+}
+
+# ---------------------------------------------------------------------------
+# Pagination
+# ---------------------------------------------------------------------------
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type CandidateEdge {
+  cursor: String!
+  node: Candidate!
+}
+
+type CandidateConnection {
+  edges: [CandidateEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ClientEdge {
+  cursor: String!
+  node: Client!
+}
+
+type ClientConnection {
+  edges: [ClientEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type JobEdge {
+  cursor: String!
+  node: Job!
+}
+
+type JobConnection {
+  edges: [JobEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+# ---------------------------------------------------------------------------
+# Inputs
+# ---------------------------------------------------------------------------
+
+input CreateCandidateInput {
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String
+  currentCompany: String
+  currentTitle: String
+  location: String
+  status: CandidateStatus
+  notes: String
+  linkedinUrl: String
+  githubUrl: String
+}
+
+input UpdateCandidateInput {
+  firstName: String
+  lastName: String
+  email: String
+  phone: String
+  currentCompany: String
+  currentTitle: String
+  location: String
+  status: CandidateStatus
+  notes: String
+  linkedinUrl: String
+  githubUrl: String
+}
+
+input CreateClientInput {
+  name: String!
+  industry: String
+  website: String
+  phone: String
+  address: String
+  status: ClientStatus
+}
+
+input UpdateClientInput {
+  name: String
+  industry: String
+  website: String
+  phone: String
+  address: String
+  status: ClientStatus
+}
+
+input CreateJobInput {
+  title: String!
+  clientId: ID!
+  description: String
+  status: JobStatus
+  priority: JobPriority
+  assignedToId: ID
+}
+
+input UpdateJobInput {
+  title: String
+  clientId: ID
+  description: String
+  status: JobStatus
+  priority: JobPriority
+  assignedToId: ID
+}
+
+# ---------------------------------------------------------------------------
+# Queries & Mutations
+# ---------------------------------------------------------------------------
+
+scalar DateTime
+
+type Query {
+  candidates(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    search: String
+    status: CandidateStatus
+    sortBy: String
+    sortOrder: String
+  ): CandidateConnection!
+
+  candidate(id: ID!): Candidate
+
+  clients(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    search: String
+    status: ClientStatus
+    sortBy: String
+    sortOrder: String
+  ): ClientConnection!
+
+  client(id: ID!): Client
+
+  jobs(
+    first: Int
+    after: String
+    last: Int
+    before: String
+    search: String
+    status: JobStatus
+    priority: JobPriority
+    sortBy: String
+    sortOrder: String
+  ): JobConnection!
+
+  job(id: ID!): Job
+}
+
+type Mutation {
+  createCandidate(input: CreateCandidateInput!): Candidate!
+  updateCandidate(id: ID!, input: UpdateCandidateInput!): Candidate!
+  deleteCandidate(id: ID!): Boolean!
+
+  createClient(input: CreateClientInput!): Client!
+  updateClient(id: ID!, input: UpdateClientInput!): Client!
+  deleteClient(id: ID!): Boolean!
+
+  createJob(input: CreateJobInput!): Job!
+  updateJob(id: ID!, input: UpdateJobInput!): Job!
+  deleteJob(id: ID!): Boolean!
+}

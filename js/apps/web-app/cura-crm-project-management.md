@@ -101,11 +101,11 @@
 
 > Auto-generate TypeScript types and React hooks from GraphQL schema.
 
-- [ ] **WA-015:** Install and configure `@graphql-codegen/cli` with `typescript`, `typescript-operations`, and `typescript-react-apollo` plugins
-- [ ] **WA-016:** Write `.graphql` query/mutation files for Candidate operations
-- [ ] **WA-017:** Write `.graphql` query/mutation files for Client operations
-- [ ] **WA-018:** Write `.graphql` query/mutation files for Job operations
-- [ ] **WA-019:** Add `codegen` script to `package.json` and verify generated hooks compile
+- [x] **WA-015:** Install and configure `@graphql-codegen/cli` with `typescript`, `typescript-operations`, and `typescript-react-apollo` plugins
+- [x] **WA-016:** Write `.graphql` query/mutation files for Candidate operations
+- [x] **WA-017:** Write `.graphql` query/mutation files for Client operations
+- [x] **WA-018:** Write `.graphql` query/mutation files for Job operations
+- [x] **WA-019:** Add `codegen` script to `package.json` and verify generated hooks compile
 
 ---
 
@@ -309,12 +309,12 @@
 
 - **EPICs:** 0/7 Complete
 - **Stories:** 0/17 Complete
-- **Tasks:** 14/79 Complete
+- **Tasks:** 19/79 Complete
 
 ### Current Sprint
 
 **Sprint:** Sprint 1
-**Active Stories:** WA-1.2 (Top Bar & Page Header) ✅, WA-1.1 (Sidebar Navigation) ✅, WA-2.1 (Apollo Client Setup) ✅
+**Active Stories:** WA-1.2 (Top Bar & Page Header) ✅, WA-1.1 (Sidebar Navigation) ✅, WA-2.1 (Apollo Client Setup) ✅, WA-2.2 (GraphQL Codegen & Typed Hooks) ✅
 **Blocked Items:** None
 
 ---

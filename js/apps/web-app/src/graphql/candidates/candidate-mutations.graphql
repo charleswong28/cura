@@ -1,0 +1,15 @@
+mutation CreateCandidate($input: CreateCandidateInput!) {
+  createCandidate(input: $input) {
+    ...CandidateFields
+  }
+}
+
+mutation UpdateCandidate($id: ID!, $input: UpdateCandidateInput!) {
+  updateCandidate(id: $id, input: $input) {
+    ...CandidateFields
+  }
+}
+
+mutation DeleteCandidate($id: ID!) {
+  deleteCandidate(id: $id)
+}

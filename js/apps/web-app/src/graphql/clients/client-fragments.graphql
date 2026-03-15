@@ -1,0 +1,21 @@
+fragment ClientFields on Client {
+  id
+  name
+  industry
+  website
+  phone
+  address
+  status
+  createdAt
+  updatedAt
+}
+
+fragment ClientWithJobs on Client {
+  ...ClientFields
+  jobs {
+    id
+    title
+    status
+    priority
+  }
+}

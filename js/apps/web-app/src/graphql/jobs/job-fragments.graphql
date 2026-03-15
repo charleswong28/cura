@@ -1,0 +1,18 @@
+fragment JobFields on Job {
+  id
+  title
+  description
+  status
+  priority
+  client {
+    id
+    name
+  }
+  assignedTo {
+    id
+    firstName
+    lastName
+  }
+  createdAt
+  updatedAt
+}

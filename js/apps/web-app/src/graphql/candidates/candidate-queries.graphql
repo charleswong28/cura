@@ -1,0 +1,35 @@
+query Candidates(
+  $first: Int
+  $after: String
+  $search: String
+  $status: CandidateStatus
+  $sortBy: String
+  $sortOrder: String
+) {
+  candidates(
+    first: $first
+    after: $after
+    search: $search
+    status: $status
+    sortBy: $sortBy
+    sortOrder: $sortOrder
+  ) {
+    edges {
+      cursor
+      node {
+        ...CandidateFields
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}
+
+query Candidate($id: ID!) {
+  candidate(id: $id) {
+    ...CandidateFields
+  }
+}

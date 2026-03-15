@@ -1,0 +1,16 @@
+fragment CandidateFields on Candidate {
+  id
+  firstName
+  lastName
+  email
+  phone
+  currentCompany
+  currentTitle
+  location
+  status
+  notes
+  linkedinUrl
+  githubUrl
+  createdAt
+  updatedAt
+}

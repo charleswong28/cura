@@ -1,0 +1,35 @@
+query Clients(
+  $first: Int
+  $after: String
+  $search: String
+  $status: ClientStatus
+  $sortBy: String
+  $sortOrder: String
+) {
+  clients(
+    first: $first
+    after: $after
+    search: $search
+    status: $status
+    sortBy: $sortBy
+    sortOrder: $sortOrder
+  ) {
+    edges {
+      cursor
+      node {
+        ...ClientFields
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+    totalCount
+  }
+}
+
+query Client($id: ID!) {
+  client(id: $id) {
+    ...ClientWithJobs
+  }
+}
