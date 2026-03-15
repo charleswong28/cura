@@ -66,8 +66,8 @@
 - [x] **WA-001:** Create app shell layout (`(app)/layout.tsx`) with sidebar + main content area
 - [x] **WA-002:** Build `Sidebar` component with navigation links (Dashboard, Candidates, Clients, Jobs, Settings)
 - [x] **WA-003:** Add active route highlighting using `usePathname`
-- [ ] **WA-004:** Implement sidebar collapse/expand toggle with persistent state (localStorage)
-- [ ] **WA-005:** Add keyboard shortcut for sidebar toggle (e.g., `Cmd+\`)
+- [x] **WA-004:** Implement sidebar collapse/expand toggle with persistent state (localStorage)
+- [x] **WA-005:** Add keyboard shortcut for sidebar toggle (e.g., `Cmd+b`)
 
 #### Story WA-1.2: Top Bar & Page Header
 
@@ -309,7 +309,7 @@
 
 - **EPICs:** 0/7 Complete
 - **Stories:** 0/17 Complete
-- **Tasks:** 3/79 Complete
+- **Tasks:** 5/79 Complete
 
 ### Current Sprint
 
