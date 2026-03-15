@@ -73,9 +73,9 @@
 
 > Consistent top bar with breadcrumbs, search, and user menu.
 
-- [ ] **WA-006:** Build `TopBar` component with breadcrumb trail and user avatar area
-- [ ] **WA-007:** Create `PageHeader` component (title, description, action buttons) — reusable across all pages
-- [ ] **WA-008:** Add global command palette trigger (Cmd+K) — placeholder, wired in EPIC-WA-007
+- [x] **WA-006:** Build `TopBar` component with breadcrumb trail and user avatar area
+- [x] **WA-007:** Create `PageHeader` component (title, description, action buttons) — reusable across all pages
+- [x] **WA-008:** Add global command palette trigger (Cmd+K) — placeholder, wired in EPIC-WA-007
 
 #### Story WA-1.3: Responsive Layout
 
@@ -309,12 +309,12 @@
 
 - **EPICs:** 0/7 Complete
 - **Stories:** 0/17 Complete
-- **Tasks:** 5/79 Complete
+- **Tasks:** 8/79 Complete
 
 ### Current Sprint
 
 **Sprint:** Sprint 1
-**Active Stories:** WA-1.1 (Sidebar Navigation)
+**Active Stories:** WA-1.2 (Top Bar & Page Header) ✅, WA-1.1 (Sidebar Navigation) ✅
 **Blocked Items:** None
 
 ---
