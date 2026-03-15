@@ -24,37 +24,41 @@ const routeLabels: Record<string, string> = {
 
 interface TopBarProps {
   onCommandPaletteOpen: () => void;
+  mobileNavTrigger?: React.ReactNode;
 }
 
-export function TopBar({ onCommandPaletteOpen }: TopBarProps) {
+export function TopBar({ onCommandPaletteOpen, mobileNavTrigger }: TopBarProps) {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b px-6">
-      {/* Breadcrumbs */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          {segments.map((segment, index) => {
-            const href = "/" + segments.slice(0, index + 1).join("/");
-            const label = routeLabels[segment] ?? segment;
-            const isLast = index === segments.length - 1;
+    <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 md:px-6">
+      {/* Left side: mobile menu + breadcrumbs */}
+      <div className="flex items-center gap-2">
+        {mobileNavTrigger}
+        <Breadcrumb>
+          <BreadcrumbList>
+            {segments.map((segment, index) => {
+              const href = "/" + segments.slice(0, index + 1).join("/");
+              const label = routeLabels[segment] ?? segment;
+              const isLast = index === segments.length - 1;
 
-            return (
-              <BreadcrumbItem key={href}>
-                {index > 0 && <BreadcrumbSeparator />}
-                {isLast ? (
-                  <BreadcrumbPage>{label}</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink asChild>
-                    <Link href={href}>{label}</Link>
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            );
-          })}
-        </BreadcrumbList>
-      </Breadcrumb>
+              return (
+                <BreadcrumbItem key={href}>
+                  {index > 0 && <BreadcrumbSeparator />}
+                  {isLast ? (
+                    <BreadcrumbPage>{label}</BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink asChild>
+                      <Link href={href}>{label}</Link>
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+              );
+            })}
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
 
       {/* Right side: search trigger + user avatar */}
       <div className="flex items-center gap-2">

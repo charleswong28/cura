@@ -10,10 +10,12 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
+  Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -29,24 +31,16 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
-export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
+interface MobileSidebarProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function SidebarNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <aside
-      className={cn(
-        "flex h-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200",
-        collapsed ? "w-16" : "w-56"
-      )}
-    >
-      {/* Logo / Brand */}
-      <div className="flex h-14 items-center gap-2 px-4">
-        <span className="text-lg font-semibold text-sidebar-primary">C</span>
-        {!collapsed && <span className="text-lg font-semibold text-sidebar-primary">Cura</span>}
-      </div>
-
-      <Separator />
-
+    <>
       {/* Main nav */}
       <nav className="flex-1 space-y-1 px-2 py-3">
         {navItems.map((item) => {
@@ -55,6 +49,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isActive
@@ -79,6 +74,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isActive
@@ -92,6 +88,31 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             </Link>
           );
         })}
+      </div>
+    </>
+  );
+}
+
+export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
+  return (
+    <aside
+      className={cn(
+        "hidden h-full flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
+        collapsed ? "w-16" : "w-56"
+      )}
+    >
+      {/* Logo / Brand */}
+      <div className="flex h-14 items-center gap-2 px-4">
+        <span className="text-lg font-semibold text-sidebar-primary">C</span>
+        {!collapsed && <span className="text-lg font-semibold text-sidebar-primary">Cura</span>}
+      </div>
+
+      <Separator />
+
+      <SidebarNav collapsed={collapsed} />
+
+      {/* Collapse toggle */}
+      <div className="px-2 pb-3">
         <Button
           variant="ghost"
           size="sm"
@@ -112,5 +133,35 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         </Button>
       </div>
     </aside>
+  );
+}
+
+export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="left"
+        className="w-64 bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+      >
+        <SheetTitle className="sr-only">Navigation</SheetTitle>
+        {/* Logo / Brand */}
+        <div className="flex h-14 items-center gap-2 px-4">
+          <span className="text-lg font-semibold text-sidebar-primary">C</span>
+          <span className="text-lg font-semibold text-sidebar-primary">Cura</span>
+        </div>
+
+        <Separator />
+
+        <SidebarNav collapsed={false} onNavigate={() => onOpenChange(false)} />
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export function MobileSidebarTrigger({ onClick }: { onClick: () => void }) {
+  return (
+    <Button variant="ghost" size="icon-sm" className="md:hidden" onClick={onClick}>
+      <Menu className="h-5 w-5" />
+    </Button>
   );
 }

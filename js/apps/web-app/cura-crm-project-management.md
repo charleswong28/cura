@@ -81,8 +81,8 @@
 
 > Sidebar becomes a mobile drawer on small screens. Layout adapts gracefully.
 
-- [ ] **WA-009:** Implement mobile drawer variant of sidebar (slide-over with overlay)
-- [ ] **WA-010:** Add responsive breakpoint handling for sidebar collapse
+- [x] **WA-009:** Implement mobile drawer variant of sidebar (slide-over with overlay)
+- [x] **WA-010:** Add responsive breakpoint handling for sidebar collapse
 
 ---
 
@@ -309,7 +309,7 @@
 
 - **EPICs:** 0/7 Complete
 - **Stories:** 0/17 Complete
-- **Tasks:** 8/79 Complete
+- **Tasks:** 10/79 Complete
 
 ### Current Sprint
 
