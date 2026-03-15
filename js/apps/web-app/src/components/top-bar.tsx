@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, CircleUser } from "lucide-react";
+import { Search } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -77,10 +78,11 @@ export function TopBar({ onCommandPaletteOpen, mobileNavTrigger }: TopBarProps) 
         <Button variant="ghost" size="icon-sm" className="sm:hidden" onClick={onCommandPaletteOpen}>
           <Search className="h-4 w-4" />
         </Button>
-        {/* User avatar — placeholder until Clerk integration (WA-024) */}
-        <Button variant="ghost" size="icon-sm">
-          <CircleUser className="h-5 w-5 text-muted-foreground" />
-        </Button>
+        <UserButton
+          appearance={{
+            elements: { avatarBox: "h-8 w-8" },
+          }}
+        />
       </div>
     </header>
   );

@@ -1,21 +1,9 @@
-import { ApolloClient, InMemoryCache, HttpLink, ApolloLink } from "@apollo/client";
+import { ApolloClient, InMemoryCache, HttpLink, ApolloLink, Observable } from "@apollo/client";
 import { ErrorLink } from "@apollo/client/link/error";
 import { CombinedGraphQLErrors } from "@apollo/client/errors";
 import { toast } from "sonner";
 
 const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_URL ?? "http://localhost:8000/graphql";
-
-/**
- * Auth link — injects Authorization header from Clerk JWT.
- * Stubbed as a pass-through until Clerk is integrated (EPIC-WA-003).
- */
-const authLink = new ApolloLink((operation, forward) => {
-  // TODO (WA-012): Once Clerk is integrated, inject the JWT here:
-  //   const { getToken } = useAuth();
-  //   const token = await getToken();
-  //   operation.setContext({ headers: { authorization: `Bearer ${token}` } });
-  return forward(operation);
-});
 
 /**
  * Error link — surfaces GraphQL and network errors as toast notifications.
@@ -48,7 +36,30 @@ const cache = new InMemoryCache({
   },
 });
 
-export function createApolloClient() {
+/**
+ * Creates an auth link that injects the Clerk JWT into every GraphQL request.
+ * Uses an async getToken callback provided by Clerk's useAuth() hook.
+ */
+function createAuthLink(getToken: () => Promise<string | null>) {
+  return new ApolloLink((operation, forward) => {
+    return new Observable((observer) => {
+      getToken()
+        .then((token) => {
+          if (token) {
+            operation.setContext({
+              headers: { authorization: `Bearer ${token}` },
+            });
+          }
+          forward(operation).subscribe(observer);
+        })
+        .catch((err) => observer.error(err));
+    });
+  });
+}
+
+export function createApolloClient(getToken: () => Promise<string | null>) {
+  const authLink = createAuthLink(getToken);
+
   return new ApolloClient({
     link: ApolloLink.from([errorLink, authLink, httpLink]),
     cache,

@@ -133,11 +133,24 @@
 
 > Protect all CRM routes behind Clerk login. Show sign-in/sign-up pages for unauthenticated users.
 
-- [ ] **WA-020:** Install `@clerk/nextjs` and configure `ClerkProvider` in root layout
-- [ ] **WA-021:** Create sign-in page (`/sign-in/[[...sign-in]]/page.tsx`)
-- [ ] **WA-022:** Create sign-up page (`/sign-up/[[...sign-up]]/page.tsx`)
-- [ ] **WA-023:** Add `clerkMiddleware` in `middleware.ts` to protect `(app)` routes
-- [ ] **WA-024:** Display user name + avatar in sidebar/topbar from Clerk session
+- [x] **WA-020:** Install `@clerk/nextjs` and configure `ClerkProvider` in root layout
+- [x] **WA-021:** Create sign-in page (`/sign-in/[[...sign-in]]/page.tsx`)
+- [x] **WA-022:** Create sign-up page (`/sign-up/[[...sign-up]]/page.tsx`)
+- [x] **WA-023:** Add `clerkMiddleware` in `middleware.ts` to protect `(app)` routes
+- [x] **WA-024:** Display user name + avatar in sidebar/topbar from Clerk session
+
+#### Story 2.2.1: Clerk Webhook Sync (BE)
+
+> Provision Tenant and User records automatically when orgs/users are created or updated in Clerk.
+
+- [ ] **TASK-057:** Install `svix` package for webhook signature verification
+- [ ] **TASK-058:** Create `/webhooks/clerk` REST endpoint (WebhookController) with raw body parsing and Svix signature verification
+- [ ] **TASK-059:** Handle `organization.created` event — create Tenant row with `clerkOrgId` + org name
+- [ ] **TASK-060:** Handle `organization.updated` event — update Tenant name
+- [ ] **TASK-061:** Handle `organizationMembership.created` event — create User row linked to Tenant (resolve clerkOrgId → tenantId, set email/name/role from Clerk)
+- [ ] **TASK-062:** Handle `organizationMembership.deleted` event — delete User row
+- [ ] **TASK-063:** Handle `user.updated` event — update User email/name
+- [ ] **TASK-064:** Add `CLERK_WEBHOOK_SECRET` to `.env.example` and document Clerk Dashboard webhook setup
 
 #### Story 2.3: Organization Switching (FE)
 
@@ -396,13 +409,13 @@
 ### Completion Status
 
 - **EPICs:** 0/6 Complete
-- **Stories:** 8/27 Complete
-- **Tasks:** 36/121 Complete (17 BE + 19 FE)
+- **Stories:** 9/28 Complete
+- **Tasks:** 41/129 Complete (17 BE + 24 FE)
 
 ### Current Sprint
 
 **Sprint:** Sprint 2
-**Active Stories:** Story 2.1 ✅
+**Active Stories:** Story 2.1 ✅, Story 2.2 ✅, Story 2.2.1 (next)
 **Blocked Items:** None
 
 ---
