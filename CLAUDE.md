@@ -15,6 +15,7 @@
 | `docs/outreaching-technical-plan.md` | Technical Design | LinkedIn outreach HOW — interaction patterns (connection request, message, InMail, inbox scan, profile search steps), LinkedIn rate limits & enforcement, reply detection pipeline (email notifications → inbox scan → CRM nudges), error handling, recruiter onboarding. Task queue/scheduling lives in crm-technical-plan.md |
 | `docs/ai-playbook.md` | AI Operations | AI behaviour rules, decision documentation protocol, and server validation steps |
 | `js/cura-crm-project-management.md` | Project Management | EPIC/Story/Task breakdown for Phase 1 CRM (Candidates, Clients, Jobs CRUD). 5 EPICs, 11 Stories, 56 Tasks |
+| `js/apps/web-app/cura-crm-project-management.md` | Project Management | CRM web app frontend plan (app.cura.com) — app shell, auth, Candidate/Client/Job CRUD, dashboard, command palette. 7 EPICs, 17 Stories, 79 Tasks (WA-001–WA-079) |
 | `js/apps/web-home-page/home-page-project-management.md` | Project Management | Marketing home page plan (cura.com) — Superhuman-inspired design, 8 EPICs, 12 Stories, 63 Tasks (HP-001–HP-063) |
 | `USAGE.md` | Developer Guide | How to start the project locally, bin scripts reference, service ports, and Docker Compose commands |
 | `docs/customer_interview/2026-02-27-interview-with-man.md` | Customer Research | Sourcing-first recruiter interview. Key themes: job spec auto-generation, multi-channel sourcing, one-click outreach, auto-enrichment. Gap analysis vs. current north star included. |
