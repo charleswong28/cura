@@ -1,10 +1,12 @@
-import { Catch, HttpException, Logger } from "@nestjs/common";
-import { GqlExceptionFilter } from "@nestjs/graphql";
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from "@nestjs/common";
+import { GqlArgumentsHost, GqlContextType } from "@nestjs/graphql";
 import { GraphQLError } from "graphql";
 
 /**
- * Catches all exceptions thrown in GraphQL resolvers and converts them
- * into well-structured GraphQLError responses with appropriate error codes.
+ * Catches all exceptions and converts them into well-structured responses.
+ *
+ * - GraphQL requests: returns a GraphQLError with Apollo error codes
+ * - HTTP/REST requests: delegates to NestJS default exception handling
  *
  * Error codes follow Apollo conventions:
  * - BAD_USER_INPUT: validation failures (400)
@@ -14,10 +16,16 @@ import { GraphQLError } from "graphql";
  * - INTERNAL_SERVER_ERROR: unexpected errors (500+)
  */
 @Catch()
-export class GraphqlExceptionFilter implements GqlExceptionFilter {
+export class GraphqlExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GraphqlExceptionFilter.name);
 
-  catch(exception: unknown) {
+  catch(exception: unknown, host: ArgumentsHost) {
+    // Only intercept GraphQL requests — let REST use NestJS default handling
+    if (host.getType<GqlContextType>() !== "graphql") {
+      this.handleHttpException(exception, host);
+      return;
+    }
+
     if (exception instanceof GraphQLError) {
       return exception;
     }
@@ -42,6 +50,25 @@ export class GraphqlExceptionFilter implements GqlExceptionFilter {
     return new GraphQLError("Internal server error", {
       extensions: { code: "INTERNAL_SERVER_ERROR" },
     });
+  }
+
+  private handleHttpException(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse();
+
+    if (exception instanceof HttpException) {
+      const status = exception.getStatus();
+      const body = exception.getResponse();
+      response
+        .status(status)
+        .json(typeof body === "string" ? { statusCode: status, message: body } : body);
+    } else {
+      this.logger.error(
+        "Unhandled exception in HTTP handler",
+        exception instanceof Error ? exception.stack : String(exception)
+      );
+      response.status(500).json({ statusCode: 500, message: "Internal server error" });
+    }
   }
 }
 

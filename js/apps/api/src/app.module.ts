@@ -7,6 +7,7 @@ import { ClerkAuthGuard } from "./auth";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { WaitlistModule } from "./waitlist/waitlist.module";
+import { WebhookModule } from "./webhook/webhook.module";
 import { DataLoaderModule } from "./dataloader";
 import { GraphqlExceptionFilter } from "./common/filters";
 
@@ -23,6 +24,7 @@ import { GraphqlExceptionFilter } from "./common/filters";
     DataLoaderModule,
     HealthModule,
     WaitlistModule,
+    WebhookModule,
   ],
   providers: [
     {

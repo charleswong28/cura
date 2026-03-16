@@ -143,14 +143,14 @@
 
 > Provision Tenant and User records automatically when orgs/users are created or updated in Clerk.
 
-- [ ] **TASK-057:** Install `svix` package for webhook signature verification
-- [ ] **TASK-058:** Create `/webhooks/clerk` REST endpoint (WebhookController) with raw body parsing and Svix signature verification
-- [ ] **TASK-059:** Handle `organization.created` event — create Tenant row with `clerkOrgId` + org name
-- [ ] **TASK-060:** Handle `organization.updated` event — update Tenant name
-- [ ] **TASK-061:** Handle `organizationMembership.created` event — create User row linked to Tenant (resolve clerkOrgId → tenantId, set email/name/role from Clerk)
-- [ ] **TASK-062:** Handle `organizationMembership.deleted` event — delete User row
-- [ ] **TASK-063:** Handle `user.updated` event — update User email/name
-- [ ] **TASK-064:** Add `CLERK_WEBHOOK_SECRET` to `.env.example` and document Clerk Dashboard webhook setup
+- [x] **TASK-057:** Install `svix` package for webhook signature verification
+- [x] **TASK-058:** Create `/webhooks/clerk` REST endpoint (WebhookController) with raw body parsing and Svix signature verification
+- [x] **TASK-059:** Handle `organization.created` event — create Tenant row with `clerkOrgId` + org name
+- [x] **TASK-060:** Handle `organization.updated` event — update Tenant name
+- [x] **TASK-061:** Handle `organizationMembership.created` event — create User row linked to Tenant (resolve clerkOrgId → tenantId, set email/name/role from Clerk)
+- [x] **TASK-062:** Handle `organizationMembership.deleted` event — delete User row
+- [x] **TASK-063:** Handle `user.updated` event — update User email/name
+- [x] **TASK-064:** Add `CLERK_WEBHOOK_SECRET` to `.env.example` and document Clerk Dashboard webhook setup
 
 #### Story 2.3: Organization Switching (FE)
 
@@ -409,13 +409,13 @@
 ### Completion Status
 
 - **EPICs:** 0/6 Complete
-- **Stories:** 9/28 Complete
-- **Tasks:** 41/129 Complete (17 BE + 24 FE)
+- **Stories:** 10/28 Complete
+- **Tasks:** 49/129 Complete (25 BE + 24 FE)
 
 ### Current Sprint
 
 **Sprint:** Sprint 2
-**Active Stories:** Story 2.1 ✅, Story 2.2 ✅, Story 2.2.1 (next)
+**Active Stories:** Story 2.1 ✅, Story 2.2 ✅, Story 2.2.1 ✅, Story 2.3 (next)
 **Blocked Items:** None
 
 ---
