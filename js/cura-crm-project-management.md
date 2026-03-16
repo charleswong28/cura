@@ -156,9 +156,9 @@
 
 > Recruiters can switch between tenants (Clerk Organizations). Active org determines tenant context.
 
-- [ ] **WA-025:** Add Clerk `<OrganizationSwitcher>` to sidebar
-- [ ] **WA-026:** Create organization setup page for first-time users (create or join org)
-- [ ] **WA-027:** Ensure Apollo Client re-fetches data on org switch (cache clear + refetch)
+- [x] **WA-025:** Add Clerk `<OrganizationSwitcher>` to sidebar
+- [x] **WA-026:** Create organization setup page for first-time users (create or join org)
+- [x] **WA-027:** Ensure Apollo Client re-fetches data on org switch (cache clear + refetch)
 
 #### Story 2.4: User Management (BE)
 
@@ -409,13 +409,13 @@
 ### Completion Status
 
 - **EPICs:** 0/6 Complete
-- **Stories:** 10/28 Complete
-- **Tasks:** 49/129 Complete (25 BE + 24 FE)
+- **Stories:** 11/28 Complete
+- **Tasks:** 52/129 Complete (25 BE + 27 FE)
 
 ### Current Sprint
 
 **Sprint:** Sprint 2
-**Active Stories:** Story 2.1 ✅, Story 2.2 ✅, Story 2.2.1 ✅, Story 2.3 (next)
+**Active Stories:** Story 2.1 ✅, Story 2.2 ✅, Story 2.2.1 ✅, Story 2.3 ✅, Story 2.4 (next)
 **Blocked Items:** None
 
 ---

@@ -12,6 +12,7 @@ import {
   PanelLeft,
   Menu,
 } from "lucide-react";
+import { OrganizationSwitcher } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -109,6 +110,26 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
       <Separator />
 
+      {/* Organization switcher */}
+      <div className={cn("px-2 py-3", collapsed && "flex justify-center")}>
+        <OrganizationSwitcher
+          hidePersonal
+          afterSelectOrganizationUrl="/dashboard"
+          afterCreateOrganizationUrl="/dashboard"
+          appearance={{
+            elements: {
+              rootBox: cn("w-full", collapsed && "w-auto"),
+              organizationSwitcherTrigger: cn(
+                "w-full rounded-md border-sidebar-border",
+                collapsed && "w-auto px-1 [&>span]:hidden [&>svg:last-child]:hidden"
+              ),
+            },
+          }}
+        />
+      </div>
+
+      <Separator />
+
       <SidebarNav collapsed={collapsed} />
 
       {/* Collapse toggle */}
@@ -148,6 +169,23 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
         <div className="flex h-14 items-center gap-2 px-4">
           <span className="text-lg font-semibold text-sidebar-primary">C</span>
           <span className="text-lg font-semibold text-sidebar-primary">Cura</span>
+        </div>
+
+        <Separator />
+
+        {/* Organization switcher */}
+        <div className="px-2 py-3">
+          <OrganizationSwitcher
+            hidePersonal
+            afterSelectOrganizationUrl="/dashboard"
+            afterCreateOrganizationUrl="/dashboard"
+            appearance={{
+              elements: {
+                rootBox: "w-full",
+                organizationSwitcherTrigger: "w-full rounded-md",
+              },
+            }}
+          />
         </div>
 
         <Separator />
