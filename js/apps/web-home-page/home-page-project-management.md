@@ -1,317 +1,260 @@
-# Cura — Marketing Home Page: Project Management
+# Cura — Marketing Home Page: V2 Rework
 
-## Project Status: ✅ Complete (all 63 tasks shipped)
+## Project Status: 🔄 In progress (21 tasks: HP-064 to HP-084)
 
-**Goal:** Ship a Superhuman-inspired marketing landing page that converts recruitment agency leaders into early-access sign-ups. Dark, fast, keyboard-forward, AI-futuristic aesthetic. Every word earns its place.
+**Goal:** Rework the home page selling points to match the evolved product direction. The original V1 (63 tasks, all shipped) is archived in `home-page-v1-archived.md`.
 
-**Positioning Hook:** _"Stop Clicking. Start Connecting."_
+**Positioning Hook:** _"Your AI Recruiter. Ready in 5 Minutes."_
 **Target Reader:** Boutique and mid-market recruitment agency owners/leads frustrated by legacy ATS clutter (Bullhorn, Loxo).
 
----
-
-## Competitive Intelligence: What Loxo & RecruitCRM Say (and What They Miss)
-
-### What they say well (messages we must also cover)
-
-| Message                                                    | Who uses it | Our version                                                                                                              |
-| ---------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
-| "One platform. One workflow."                              | Loxo        | "One brain. Every signal." — we go further: not just consolidated, but _thinking_                                        |
-| "Turn your messy tech stack into one disciplined workflow" | Loxo        | "Replace five tools with one platform that actually acts"                                                                |
-| "Build a scalable hiring machine"                          | RecruitCRM  | "Scale without losing the human touch that wins mandates"                                                                |
-| "From sourcing to placements"                              | RecruitCRM  | "Let the AI recruitment CRM handle the admin work so recruiters can focus on what AI can't replicate: human connection." |
-| "Death-by-a-thousand-clicks"                               | Loxo        | Our problem section owns this — we named it "The Endless Click"                                                          |
-| "The Headache Tax" (multi-tool friction)                   | Loxo        | We call it "The Tool Tax" — four vendors, four invoices, four context switches                                           |
-
-### Gaps they do NOT address (Cura's exclusive territory)
-
-| Gap                                      | Why it matters                                                                                                                                                       |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Truly autonomous pipeline movement**   | Loxo/RecruitCRM have _assistance-level_ AI (note-taker, email suggester). Neither has an agent that reads intent signals and _advances the deal without being told_. |
-| **Zero-loss engagement memory**          | Both track activity logs. Neither synthesizes Zoom + LinkedIn + email + calendar into a unified, searchable context layer.                                           |
-| **Human-in-the-Loop as a trust feature** | Competitors position automation as "set and forget." Cura flips it: human gates are a _feature_, not a limitation — audit trail, compliance, quality control.        |
-| **EU AI Act compliance-ready**           | Neither competitor mentions it. The August 2026 deadline is a live threat for agencies with EU operations. Cura is built for it from day one.                        |
-| **Keyboard-first speed UX**              | Both have standard point-and-click UIs. No competitor offers Superhuman-style keyboard navigation and command palette.                                               |
-| **Natural language search**              | Loxo has it (Professional tier, expensive). We include it as standard.                                                                                               |
-| **Boutique-agency pricing**              | Loxo Basic: **$169/seat/month**. RecruitCRM is volume-focused. Boutique executive search firms are underserved on pricing.                                           |
-
-### Competitor pricing anchor (for our page copy)
-
-- **Loxo Basic:** $169/user/month (annual billing) — AI features only on Professional (custom, higher)
-- **RecruitCRM:** Volume/scale focus; per-seat pricing not publicly listed
-- **Cura positioning:** Fair, transparent, boutique-first — no per-seat traps, no custom-quote walls
+> **Rework rationale (2026-03-20):** The V1 page positioned Cura as "an AI-first ATS that saves clicks." The product has evolved into an AI recruiter that works autonomously — sourcing, outreaching, following up — while the human focuses on relationship work. Customers don't care about technical architecture (MCP, dual surfaces, omni-triggers). They care about the outcome: **an AI recruiter that's ready in 5 minutes and does outreach for you.** Auto CRM update is the secondary selling point — it frees recruiters to focus on relationships. Inspired by [nume.ai](https://www.nume.ai/) positioning ("Onboard Your AI CFO In 5 Minutes") — AI as a team member, not a tool.
 
 ---
 
-## Design Philosophy
+## New Competitive Gaps (added to V1 intelligence)
 
-| Principle                      | Implementation                                                                                                                                                                         |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dark hero, light content**   | Hero section stays near-black for impact; content sections (`#FAFAF8` / white) alternate to light backgrounds following Superhuman's rhythm — dark opener, bright content, dark closer |
-| **Bold, sparse typography**    | Large display serif/sans mix (inspired by Superhuman's Super Serif); every section has one headline, one subline                                                                       |
-| **Motion with purpose**        | Subtle entrance animations (fade-up), no decorative spinners; speed is felt, not performed                                                                                             |
-| **Conversion at every scroll** | Primary CTA ("Get Early Access") persists in nav and recurs at section boundaries                                                                                                      |
-| **No clutter**                 | Zero sidebars, zero badges, zero stock-photo humans — just sharp copy, sharp visuals                                                                                                   |
-
----
-
-## 📋 EPICs
-
-### EPIC-HP-001: 🏗️ Page Foundation
-
-**Objective:** Design system tokens, layout skeleton, and navigation that establish the aesthetic
-**Priority:** P0 — everything else builds on this
-**Sections:** Global nav, page shell, fonts, color/spacing tokens
-
-### EPIC-HP-002: 🦸 Hero Section
-
-**Objective:** Full-viewport opening punch — headline, subline, animated background, waitlist CTA
-**Priority:** P0 — first impression, highest conversion impact
-
-### EPIC-HP-003: 😤 The Problem Section
-
-**Objective:** Mirror the recruiter's daily frustration so precisely they feel seen
-**Priority:** P0 — establishes emotional hook before the pitch
-
-### EPIC-HP-004: ⚡ Core Value Propositions
-
-**Objective:** Three-pillar feature showcase (Autonomous Pipeline, Zero-Loss Memory, Human-in-the-Loop)
-**Priority:** P0 — product differentiation
-
-### EPIC-HP-004B: 🗂️ Replace Your Stack Section
-
-**Objective:** Show explicitly what tools Cura replaces — single-platform consolidation with a thinking AI layer on top
-**Priority:** P1 — directly counters Loxo's "one platform" pitch by going further
-
-### EPIC-HP-005: 🤖 AI Intelligence Showcase
-
-**Objective:** Visual demo of Cura's AI in action — pipeline movement, briefing notes, match scoring
-**Priority:** P1 — proof the AI is real and useful
-
-### EPIC-HP-006: 📊 Competitive Moat Section
-
-**Objective:** Subtle comparison table positioning Cura against Bullhorn/Loxo/Gem without naming them negatively
-**Priority:** P1 — justifies switching for agency owners
-
-### EPIC-HP-007: 🗣️ Social Proof
-
-**Objective:** Testimonials, recruiter quotes, trusted-by logos
-**Priority:** P1 — credibility and trust
-
-### EPIC-HP-008: 📬 Conversion & Footer
-
-**Objective:** Early-access waitlist form, pricing teaser, footer links
-**Priority:** P0 — primary revenue goal of the page
+| Gap                                 | Why it matters                                                                                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **5-minute AI recruiter setup**     | No competitor positions as "onboard an AI team member." All require extensive configuration and manual operation.                                                  |
+| **Automated personalised outreach** | Competitors either blast templates or require manual sending. Cura drafts personalised messages from CRM data and sends from the recruiter's own browser.          |
+| **LinkedIn-safe by design**         | All automation tools use detectable infrastructure (data centre IPs, headless browsers). Cura runs in the recruiter's real Chrome — indistinguishable from manual. |
+| **Self-updating CRM**               | Competitors require manual data entry. Cura captures every signal (email, LinkedIn, calls) automatically — the CRM maintains itself.                               |
 
 ---
 
-## 📖 Stories & Tasks
+## EPICs
+
+### EPIC-HP-009: Hero Rework — AI Recruiter Positioning
+
+**Objective:** Reposition the hero from "AI ATS" to "your AI recruiter that's ready in 5 minutes." Position Cura as a team member (like Nume's "AI CFO"), not a tool. The speed promise is the hook.
+**Priority:** P0 — first impression drives the entire page narrative
+
+### EPIC-HP-010: How It Works Section
+
+**Objective:** Show the 3-step setup-to-value journey. Customer should think "that's it? I just connect my accounts and it works?"
+**Priority:** P0 — bridges the hero promise to the product reality
+
+### EPIC-HP-011: Outreach Section — "Outreach That Gets Replies"
+
+**Objective:** Combine smart targeting + LinkedIn safety + human approval into one outcome-focused section. Addresses the three recruiter concerns: will this work? Will I get banned? Do I stay in control?
+**Priority:** P0 — directly addresses known fears and a genuine technical moat
+
+### EPIC-HP-012: Auto CRM Section — "Your CRM Updates Itself"
+
+**Objective:** Position auto-updating CRM as the thing that frees recruiters to focus on relationship work. Every signal captured = zero admin = full context for every conversation.
+**Priority:** P0 — the secondary selling point that enables the primary value (relationship focus)
+
+### EPIC-HP-013: AI Showcase — Source Tab
+
+**Objective:** Add sourcing demo tab to the existing AI Showcase section
+**Priority:** P1 — extends existing section, low effort
+
+### EPIC-HP-014: Comparison Table — New Rows
+
+**Objective:** Add outcome-focused capability rows to the comparison table
+**Priority:** P1 — straightforward data addition
+
+### EPIC-HP-015: Pricing Tier Alignment
+
+**Objective:** Align pricing tier names with the north star pricing model
+**Priority:** P2 — cosmetic alignment
+
+### EPIC-HP-016: Competitive Intelligence Update
+
+**Objective:** Verify the new competitive gaps against latest product docs and competitor research
+**Priority:** P2 — documentation
 
 ---
 
-### EPIC-HP-001: 🏗️ Page Foundation
-
-#### Story HP-1.1: Design Tokens & Global Styles
-
-- [x] **HP-001:** Define color palette — `--cura-black: #0A0A0A`, `--cura-white: #F5F5F3`, `--cura-accent: #6366F1` (electric indigo), `--cura-muted: #3F3F46` as Tailwind CSS variables in `globals.css`
-- [x] **HP-002:** Configure custom fonts — load `Inter` (body) + `Playfair Display` or `Instrument Serif` (display headlines) via `next/font`; mirror the Superhuman serif/sans pairing
-- [x] **HP-003:** Set up base spacing scale, max-width container (`max-w-6xl`), and section padding utilities (`section-padding` class)
-- [x] **HP-004:** Create `<GradientBackground>` component — radial gradient blobs (indigo/violet, low opacity) layered over `#0A0A0A`; subtle CSS `@keyframes` float animation
-
-#### Story HP-1.2: Navigation
-
-- [x] **HP-005:** Build sticky `<NavBar>` — logo left, links centre (`Product`, `Why Cura`, `Pricing`), CTA button right (`Get Early Access` → scrolls to waitlist); transparent on top of hero, blurs to `bg-black/80 backdrop-blur` on scroll
-- [x] **HP-006:** Add mobile hamburger nav with slide-down drawer; all nav items accessible at ≤ 768 px
-- [x] **HP-007:** Implement scroll-spy to highlight active nav section as user scrolls
-
-#### Story HP-1.3: Page Shell & SEO
-
-- [x] **HP-008:** Create `/app/page.tsx` home page route that composes all section components
-- [x] **HP-009:** Add `<head>` metadata — title `"Cura — AI-First Recruitment CRM"`, OG image (dark-themed card with tagline), Twitter card
-- [x] **HP-010:** Add `robots.txt` and `sitemap.xml` for the marketing site
+## Stories & Tasks
 
 ---
 
-### EPIC-HP-002: 🦸 Hero Section
+### EPIC-HP-009: Hero Rework — AI Recruiter Positioning
 
-#### Story HP-2.1: Hero Copy & Layout
+#### Story HP-9.1: Reworked Hero Copy
 
-- [x] **HP-011:** Build `<HeroSection>` full-viewport (`min-h-screen`) layout — vertically centred, left-aligned text column, right-side animated visual panel
-- [x] **HP-012:** Implement headline: `"Stop Clicking."` (display serif, white, ~96 px) / `"Start Connecting."` (display serif, indigo gradient, ~96 px) — two lines, separate color treatment
-- [x] **HP-013:** Add subheadline: `"AI handles the administrative heavy lifting so you can focus on what AI can't replicate: human connection."` (~20 px, muted white, max-width 520 px); emphasis on human connection differentiates from AI-as-automation competitors
-- [x] **HP-014:** Add supporting stat bar below subheadline: four micro-stats with dividers — `"3 hrs saved/day"` · `"5 tools replaced"` · `"Zero lost context"` · `"Human always in control"`; each stat in indigo, label in muted white; `"5 tools replaced"` is the stack-consolidation hook
+- [ ] **HP-064:** Rework `<HeroSection>` headline:
+  - Line 1: `"Your AI Recruiter."` (display sans, white, `text-hero` size)
+  - Line 2: `"Ready in 5 Minutes."` (display sans, indigo gradient)
+  - Mirrors Nume's "Onboard Your AI CFO In 5 Minutes" — positions Cura as a team member, not software. The speed promise is the hook.
 
-#### Story HP-2.2: Hero CTA
+- [ ] **HP-065:** Rework subheadline: `"Connect your LinkedIn and email. Cura sources candidates, drafts personalised outreach, and follows up — automatically. You focus on the conversations that close deals."` (~20 px, muted white, max-width 540 px). Communicates the full value loop: setup → AI works → you do relationship work.
 
-- [x] **HP-015:** Primary CTA button: `"Get Early Access →"` — indigo background, white text, pill-shaped, hover scale; clicking scrolls to `#waitlist`
-- [x] **HP-016:** Secondary ghost link below: `"Watch 90-second demo ▶"` — opens a modal with embedded demo video placeholder
-- [x] **HP-017:** Add social-proof micro-copy beneath CTAs: `"Trusted by 40+ recruitment agencies in beta"` with three avatar circles (placeholder)
+- [ ] **HP-066:** Rework stat bar. Replace current 4 micro-stats with:
+  - `"5 min"` / `"setup"` — speed promise reinforcement
+  - `"24/7"` / `"sourcing & outreach"` — always-on
+  - `"25-40%"` / `"reply rate"` — concrete, quantifiable outcome
+  - `"Human"` / `"always approves"` — trust signal
 
-#### Story HP-2.3: Hero Visual
+#### Story HP-9.2: Reworked Hero Visual
 
-- [x] **HP-018:** Build `<HeroVisual>` right panel — dark frosted-glass card mockup of the Cura pipeline Kanban; populate with placeholder candidate cards with stage labels (`Sourced`, `Screened`, `Interviewing`, `Offer`)
-- [x] **HP-019:** Animate a candidate card auto-advancing from `Screened → Interviewing` with a subtle AI badge ("AI moved · just now") — CSS keyframe loop, 4 s interval
-- [x] **HP-020:** Add floating tooltip over the moving card: `"Your Cura AI meeting notes are ready."` — appears and fades after 2 s
+- [ ] **HP-067:** Replace `<HeroVisual>` pipeline Kanban with an "AI recruiter at work" dashboard mockup. Dark frosted-glass card showing:
+  - Top bar: `"Cura AI — Working"` with a green pulse dot
+  - Activity feed (3 lines, typewriter animation staggered):
+    - `"✓ Found 23 CFO candidates in London"` (fade in at 0s)
+    - `"✓ Drafted outreach for top 15"` (fade in at 2s)
+    - `"⏳ Awaiting your approval (15 messages)"` (fade in at 4s, indigo highlight)
+  - Bottom: mini avatar row of sourced candidates with match % badges
+  - Shows the AI doing work and waiting for human approval — the core value loop.
 
----
-
-### EPIC-HP-003: 😤 The Problem Section
-
-#### Story HP-3.1: Pain-Point Narrative
-
-- [x] **HP-021:** Build `<ProblemSection>` with light background (`#FAFAF8`) — Superhuman-style contrast after the dark hero
-- [x] **HP-022:** Section headline: `"Your competitors close deals while you're updating spreadsheets."` — large serif, centred
-- [x] **HP-023:** Four-column pain cards, each with an icon, bold label, and one-sentence description:
-  - **"The Endless Click"** — `"11 clicks to move a candidate in most ATS tools. We counted."` (⚡)
-  - **"Context Amnesia"** — `"You switch between email, LinkedIn, and CRM and lose the thread every single time."` (🧠)
-  - **"Slow = Lost"** — `"The recruiter who replies in minutes places the candidate. You're still searching the inbox."` (⏱)
-  - **"The Tool Tax"** — `"ATS. Outreach tool. Enrichment API. LinkedIn Recruiter. You're paying for four tools and managing five context switches — daily."` (💸) — directly counters Loxo's "Headache Tax" framing with our own sharper version
-- [x] **HP-024:** Below the cards: italic pull-quote `"Your instinct is your edge. But admin is eating it alive."` — large, low-opacity white, centred
+- [ ] **HP-068:** Add a subtle `"Set up once. It never stops working."` caption below the visual — muted, italic, small.
 
 ---
 
-### EPIC-HP-004: ⚡ Core Value Propositions
+### EPIC-HP-010: How It Works Section
 
-#### Story HP-4.1: Three-Pillar Feature Grid
+#### Story HP-10.1: Three-Step Flow
 
-- [x] **HP-025:** Build `<ValuePropsSection>` — alternating left/right layout, each pillar takes a full screen row
-- [x] **HP-026:** **Pillar 1 — Autonomous Pipeline:** Headline `"AI that moves the deal."` Subtext: `"Cura reads your meeting notes and emails. When a candidate is interviewed, their stage advances and a briefing note is ready — before you've had coffee."` Visual: animated pipeline with stage-advance arrow
-- [x] **HP-027:** **Pillar 2 — Zero-Loss Memory:** Headline `"Every signal. One timeline."` Subtext: `"LinkedIn replies, Zoom transcripts, email opens — everything is synthesized into a single, permanent record. Enter every conversation knowing exactly where things stand."` Visual: stacked timeline feed (mock entries)
-- [x] **HP-028:** **Pillar 3 — Human-in-the-Loop:** Headline `"AI drafts. You decide."` Subtext: `"No autonomous sending. No hallucination risk. For every high-stakes action — client submission, offer, key message — Cura presents a draft and waits for your approval."` Visual: approval modal mockup with `Approve & Send` button
-- [x] **HP-029:** Each pillar section has a subtle indigo accent line (left border on the text block) and an icon badge top-left of the visual panel
+- [ ] **HP-069:** Build `<HowItWorksSection>` — light background (`#FAFAF8`). Section eyebrow: `"How it works"` (indigo, uppercase). Headline: `"Set up. Let it work. Close deals."` (display sans, dark text). Subline: `"Three steps between you and an AI recruiter that sources, outreaches, and follows up around the clock."` (muted, centred).
 
-#### Story HP-4.2: Speed Statistic Interlude
+- [ ] **HP-070:** Three numbered step cards (horizontal on desktop, stacked on mobile), each with an icon, title, and description:
+  - **Step 1 — "Connect your accounts"** (link/plug icon)
+    `"Link your LinkedIn and email. Import your existing candidates or start fresh. Cura syncs everything in under 5 minutes."`
+  - **Step 2 — "AI goes to work"** (robot/zap icon)
+    `"Give Cura a job brief — or just a title. It generates the spec, searches LinkedIn and talent databases, drafts personalised outreach, and starts the pipeline. Automatically."`
+  - **Step 3 — "You close the deal"** (handshake icon)
+    `"Review the AI's work. Approve outreach with one click. Enter every candidate conversation with full context. Focus on the human connection that actually wins placements."`
+  - Each card has a top number badge (01, 02, 03) in indigo. Connecting dotted line between cards on desktop.
 
-- [x] **HP-030:** Build `<SpeedBanner>` full-width stripe between pillars 1 and 2 — dark indigo gradient, single bold stat: `"Recruiters using Cura reclaim an average of 3 hours per day."` with source footnote
-- [x] **HP-031:** Add animated counter that counts up (`0 → 3 hrs`) when the stripe enters the viewport (Intersection Observer)
-
----
-
-### EPIC-HP-004B: 🗂️ Replace Your Stack Section
-
-#### Story HP-4B.1: Stack Replacement Visual
-
-- [x] **HP-060:** Build `<ReplaceStackSection>` — headline `"One brain. Not five tools."` (serif, centred); subline: `"Cura replaces your entire patchwork of ATS, outreach tool, enrichment API, and calendar sync — and adds an AI layer that actually acts on what it learns."`
-- [x] **HP-061:** Create a visual "old stack vs Cura" comparison — left side shows 5 greyed-out tool-pill logos (generic: `ATS`, `LinkedIn Recruiter`, `Email Sequencer`, `Enrichment API`, `Calendar Sync`) with a red "×" strike; right side shows a single Cura logo with a glowing indigo halo; an animated arrow sweeps left → right
-- [x] **HP-062:** Add cost implication subtext beneath the visual: `"Five subscriptions. Five logins. Five sources of truth. Or one."` — muted, italic; aligns with anti-$169/seat-Loxo sentiment without naming names
-- [x] **HP-063:** Add natural language search callout chip within this section: `"Ask Cura anything: 'Show me CFO candidates in London who interviewed in the last 90 days'"` — styled as a terminal / command input with a blinking cursor; demonstrates NLP search is standard, not a $169/month add-on
+- [ ] **HP-071:** Below the steps, add a trust line: `"Every AI action requires your approval. No autonomous sending. No surprises."` — centred, muted italic.
 
 ---
 
-### EPIC-HP-005: 🤖 AI Intelligence Showcase
+### EPIC-HP-011: Outreach Section — "Outreach That Gets Replies"
 
-#### Story HP-5.1: Live Demo Preview
+#### Story HP-11.1: Outreach Outcomes
 
-- [x] **HP-032:** Build `<AIShowcase>` section — headline `"Intelligence that compounds."` — dark background, centred
-- [x] **HP-033:** Create tabbed showcase with three tabs (`📋 Match`, `✉️ Draft`, `📅 Brief`) — clicking each swaps the displayed mock UI panel:
-  - **Match tab:** Candidate match score card (87% fit, skill chips, "Why this match" explainer)
-  - **Draft tab:** AI-generated outreach email draft in a text editor chrome; cursor blinking at end
-  - **Brief tab:** Auto-generated candidate briefing note with sections (Background, Salary, Availability, Next Step)
-- [x] **HP-034:** Animate the Draft tab typewriter effect — text types in at ~40 chars/sec on first enter-viewport; only plays once
-- [x] **HP-035:** Add caption beneath showcase: `"AI does the thinking. You make the call."` — muted, italic
+- [ ] **HP-072:** Build `<OutreachSection>` — dark background. Section eyebrow: `"AI-powered outreach"` (indigo). Headline: `"Outreach that actually gets replies."` (display sans, white). Subline: `"LinkedIn caps you at ~15 connection requests per day. Most tools blast through them blindly. Cura's AI scores every candidate and picks the 15 most likely to reply — then sends from your own browser, so LinkedIn never flags you."` (muted white, centred).
 
-#### Story HP-5.2: Keyboard-First UI Callout
+- [ ] **HP-073:** Three-column metric cards:
+  - **Card 1 — "Manual outreach":** `"~15/day"` / `"Gut feel"` / `"10-20% reply rate"` — grey, muted
+  - **Card 2 — "Automation tools":** `"~50-100/day"` / `"Basic filters"` / `"5-10% reply rate"` + red `"Ban risk"` badge — grey with warning
+  - **Card 3 — "Cura":** `"~15/day"` / `"AI-scored & ranked"` / `"25-40% reply rate"` + indigo `"LinkedIn-safe"` badge — highlighted, elevated (border glow, slight elevation)
 
-- [x] **HP-036:** Build `<KeyboardBadge>` component — small dark card showing keyboard shortcut examples: `⌘K` (command palette), `G C` (go to candidates), `A` (approve draft) — styled like a terminal / OS key-cap UI
-- [x] **HP-037:** Embed badge in a callout box: `"Built for speed. Every action has a shortcut."` — Superhuman-philosophy nod
+- [ ] **HP-074:** Two side-by-side feature callouts below the metrics:
+  - **Left — "Smart targeting"** (target icon): `"Role fit, skill match, prior relationship, response likelihood — every candidate scored before a single message is sent."` — frosted glass card
+  - **Right — "Your browser, your IP"** (shield icon): `"Cura sends from your real Chrome session. No data centre IPs, no headless browsers, no cookie injection. LinkedIn sees a normal recruiter."` — frosted glass card
 
----
-
-### EPIC-HP-006: 📊 Competitive Moat Section
-
-#### Story HP-6.1: Comparison Table
-
-- [x] **HP-038:** Build `<ComparisonSection>` — headline `"Recruitment CRMs were built for the 2010s. Cura is built for now."` — centred, serif
-- [x] **HP-039:** Render comparison table. Use archetypes (no direct competitor names) — `"Legacy Enterprise"` (Bullhorn), `"Talent Intelligence"` (Loxo), `"Scale & Volume"` (RecruitCRM), `"Cura"`. Rows derived from actual feature gaps identified in Q1 2026 research:
-
-  | Capability                                | Legacy Enterprise | Talent Intelligence | Scale & Volume | **Cura** |
-  | ----------------------------------------- | :---------------: | :-----------------: | :------------: | :------: |
-  | Autonomous pipeline movement              |         ✗         |       partial       |       ✗        |    ✅    |
-  | Zero-loss engagement memory               |         ✗         |          ✗          |       ✗        |    ✅    |
-  | Unified context (Zoom + email + LinkedIn) |         ✗         |          ✗          |       ✗        |    ✅    |
-  | Human-in-the-loop approval gates          |         ✗         |          ✗          |       ✗        |    ✅    |
-  | Natural language search                   |         ✗         |     paid add-on     |       ✗        |    ✅    |
-  | Keyboard-first speed UX                   |         ✗         |          ✗          |       ✗        |    ✅    |
-  | EU AI Act compliance-ready                |         ✗         |          ✗          |       ✗        |    ✅    |
-  | Boutique-friendly pricing                 |         ✗         |          ✗          |       ✗        |    ✅    |
-  | Full lifecycle: source → offer            |      partial      |       partial       |       ✅       |    ✅    |
-
-- [x] **HP-040:** Style the `Cura` column with indigo header and checkmarks in indigo — visually dominant; other columns greyed out
-- [x] **HP-041:** Add footnote: `"*Based on publicly documented product capabilities as of Q1 2026. 'Talent Intelligence' Basic plan starts at $169/seat/month; AI features require Professional (custom pricing)."`
-
-#### Story HP-6.2: Compliance Moat Callout
-
-- [x] **HP-042:** Build `<ComplianceBadge>` — small section or sidebar card: `"EU AI Act compliant by design. Built-in audit trails, transparent decision logic, and bias safeguards — before the August 2026 deadline."` with a shield icon
-- [x] **HP-043:** Link to a `/compliance` page placeholder (can be empty for now)
+- [ ] **HP-075:** Bottom callout: mini approval-queue mockup showing:
+  ```
+  Today's Outreach (15 of 43 candidates)
+  #1  Sarah Chen — CFO, Series B fintech — 94% match
+  #2  James Park — VP Finance, growth stage — 91% match
+  ...
+  [Approve All]  [Edit Selection]
+  ```
+  Caption: `"You approve everything. Cura handles the rest."`
 
 ---
 
-### EPIC-HP-007: 🗣️ Social Proof
+### EPIC-HP-012: Auto CRM Section — "Your CRM Updates Itself"
 
-#### Story HP-7.1: Testimonials
+#### Story HP-12.1: Zero-Admin CRM
 
-- [x] **HP-044:** Build `<TestimonialsSection>` — horizontal scroll of 3–4 quote cards on desktop, stacked on mobile
-- [x] **HP-045:** Each card: large open-quote glyph (indigo), 2–3 sentence quote, avatar circle + name + firm (placeholders OK for launch)
-  - Example: `"We moved 40% more candidates to second interview in month one. Cura found the context I always lost between meetings."` — _Sarah K., MD, boutique search firm_
-- [x] **HP-046:** Add `"Trusted by"` logo row above testimonials — 5–6 placeholder agency names in muted white; update with real logos post-beta
-- [x] **HP-047:** Add star rating micro-element (5 stars, `"4.9 / 5 across beta cohort"`) beneath logo row
+- [ ] **HP-076:** Build `<AutoCRMSection>` — light background (`#FAFAF8`). Section eyebrow: `"Zero admin"` (indigo). Headline: `"Your CRM updates itself."` (display sans, dark text). Subline: `"Every email, LinkedIn reply, call transcript, and pipeline change — captured automatically. Walk into every conversation knowing exactly where things stand."` (muted, centred).
 
----
+- [ ] **HP-077:** Animated event-feed visual (single column, centred). A CRM timeline mockup showing events appearing in sequence (staggered 600ms, Intersection Observer triggered):
+  - `"📧 Email from Sarah Chen — interested in CFO role"` (just now)
+  - `"💬 LinkedIn reply — James Park accepted connection"` (2 min ago)
+  - `"📞 Call with Ana Costa — transcript & notes added"` (1 hr ago)
+  - `"📋 Pipeline — moved 3 candidates to Interview stage"` (3 hrs ago)
+  - `"🔍 Sourcing run — 12 new candidates enriched"` (yesterday)
+  - Each entry has a source icon, text, and timestamp. Dark frosted-glass card.
 
-### EPIC-HP-008: 📬 Conversion & Footer
-
-#### Story HP-8.1: Early Access Waitlist
-
-- [x] **HP-048:** Build `<WaitlistSection id="waitlist">` — full-width, indigo-to-violet gradient background (`from-indigo-900 to-violet-950`)
-- [x] **HP-049:** Headline: `"Your pipeline won't move itself."` (serif, white, 64 px) / subline: `"Join the waitlist. Be first when we open the doors."` (muted white, 18 px)
-- [x] **HP-050:** Email capture form: single input (`"Your work email"`) + submit button (`"Request Early Access"`); success state shows `"You're on the list. We'll be in touch."` with a checkmark animation
-- [x] **HP-051:** Connect form to a backend endpoint `POST /api/waitlist` that persists email + timestamp to DB (or a simple table; can use Prisma `WaitlistEntry` model)
-- [x] **HP-052:** Add form validation: email format, required; rate-limit client-side (disable button for 5 s after submit)
-- [x] **HP-053:** Show social-proof beneath form: `"Join 200+ agency leaders already on the list"` — update number manually as list grows
-
-#### Story HP-8.2: Pricing Teaser
-
-- [x] **HP-054:** Build `<PricingTeaser>` — simple two-column card layout above the waitlist:
-  - **Boutique** (`"For teams of 1–5"`) — price TBD, key features list
-  - **Agency** (`"For growing firms"`) — price TBD, key features list
-- [x] **HP-055:** Both cards show `"Pricing announced at launch"` placeholder with an email-notify CTA linking to the waitlist
-- [x] **HP-056:** Add `"No contracts. No per-seat traps."` subline beneath pricing cards — direct shot at Gem's `$4,000/seat` positioning
-
-#### Story HP-8.3: Footer
-
-- [x] **HP-057:** Build `<Footer>` — dark `#0A0A0A`, three-column: brand (logo + tagline), links (Product, Company, Legal), social icons (LinkedIn, X/Twitter)
-- [x] **HP-058:** Add `"© 2026 Cura. Built for the humans who build careers."` copyright line — small, muted
-- [x] **HP-059:** Add GDPR cookie-consent banner component (minimal, bottom-bar, dark-styled); consent state stored in `localStorage`
+- [ ] **HP-078:** Pull-quote below the visual: `"Stop updating your CRM. Start using it."` — large, serif italic, centred.
 
 ---
 
-## 🎯 Section Map (Scroll Order)
+### EPIC-HP-013: AI Showcase — Source Tab
+
+#### Story HP-13.1: Sourcing Tab
+
+- [ ] **HP-079:** Add a fourth tab to `<AIShowcase>`: `"🔍 Source"` — positioned first in tab order (before Match, Draft, Brief). Shows a mock sourcing results panel:
+  - Search bar: `"CFO, Series B fintech, London"` (pre-filled, terminal style)
+  - 4 candidate result cards: name, title, company, match %, source badge (`LinkedIn` / `PDL` / `Internal DB`)
+  - Footer: `"23 found · 4 channels · 12 seconds"`
+  - Staggered appear animation (200ms per card).
+
+---
+
+### EPIC-HP-014: Comparison Table — New Rows
+
+#### Story HP-14.1: Outcome-Focused Rows
+
+- [ ] **HP-080:** Add 4 new rows to `<ComparisonSection>` CAPABILITIES array, focused on outcomes:
+
+  | Capability                      | Legacy Enterprise | AI Recruiting Platform | Agency All-in-One | **Cura** |
+  | ------------------------------- | :---------------: | :--------------------: | :---------------: | :------: |
+  | AI-powered candidate sourcing   |         ✗         |        partial         |         ✗         |    ✅    |
+  | Automated personalised outreach |         ✗         |           ✗            |         ✗         |    ✅    |
+  | LinkedIn-safe execution         |         ✗         |           ✗            |         ✗         |    ✅    |
+  | Self-updating CRM (zero admin)  |         ✗         |           ✗            |         ✗         |    ✅    |
+
+- [ ] **HP-081:** Update comparison section subtitle to reflect 13 capabilities.
+
+- [ ] **HP-082:** Update footnote to add: `"'LinkedIn-safe execution' means outreach runs from the recruiter's own browser and IP address, not from data centre infrastructure."`
+
+---
+
+### EPIC-HP-015: Pricing Tier Alignment
+
+#### Story HP-15.1: Match North Star Tiers
+
+- [ ] **HP-083:** Align `<PricingTeaser>` tier names with north star: Free (Solo Recruiter) / Starter (Boutique) / Pro (Scaling Agency) / Enterprise. Update feature bullets to emphasise outreach and auto-CRM features per tier.
+
+---
+
+### EPIC-HP-016: Competitive Intelligence Update
+
+#### Story HP-16.1: Updated Gaps Table
+
+- [ ] **HP-084:** Verify the 4 new rows added to the "New Competitive Gaps" table (above) are accurate against latest product docs and competitor research.
+
+---
+
+## Section Map (Scroll Order — V2)
 
 ```
-1.  [NAV]           Sticky nav — logo · links · "Get Early Access" CTA
-2.  [HERO]          "Stop Clicking. Start Connecting." — pipeline animation · 4 micro-stats · waitlist CTA
-3.  [PROBLEM]       "Your competitors close deals while you're updating spreadsheets."
-                    4 pain cards: Endless Click · Context Amnesia · Slow=Lost · Tool Tax
-4.  [VALUE PROP 1]  "AI that moves the deal." — autonomous pipeline
-    [SPEED BANNER]  "3 hours reclaimed per day."
-5.  [VALUE PROP 2]  "Every signal. One timeline." — zero-loss memory
-6.  [VALUE PROP 3]  "AI drafts. You decide." — human-in-the-loop
-7.  [REPLACE STACK] "One brain. Not five tools." — stack consolidation visual + NLP search demo
-8.  [AI SHOWCASE]   Match · Draft · Brief tabs · keyboard shortcuts
-9.  [COMPARISON]    Feature table (9 rows) · compliance badge
-10. [SOCIAL PROOF]  Testimonials · logos · rating
-11. [PRICING]       Plan teaser — "No per-seat traps" · "Pricing at launch"
-12. [WAITLIST]      "Your pipeline won't move itself." — email capture
-13. [FOOTER]        Links · copyright
+ 1. [NAV]              Sticky nav — logo · links · "Get Early Access" CTA
+ 2. [HERO]             REWORKED — "Your AI Recruiter. Ready in 5 Minutes."
+                       AI-at-work dashboard visual · 4 micro-stats · waitlist CTA
+ 3. [PROBLEM]          "Your competitors close deals while you're updating spreadsheets."
+                       4 pain cards: Endless Click · Context Amnesia · Slow=Lost · Tool Tax
+ 4. [HOW IT WORKS]     NEW — "Set up. Let it work. Close deals."
+                       3-step: Connect accounts → AI sources & outreaches → You approve & close deals
+ 5. [OUTREACH]         NEW — "Outreach that actually gets replies."
+                       Smart targeting (25-40% response) · LinkedIn-safe · approval queue
+ 6. [AUTO CRM]         NEW — "Your CRM updates itself."
+                       Animated event feed · zero admin · full context for every conversation
+ 7. [VALUE PROP 1]     "AI that moves the deal." — autonomous pipeline
+    [SPEED BANNER]     "3 hours reclaimed per day."
+ 8. [VALUE PROP 2]     "Every signal. One timeline." — zero-loss memory
+ 9. [VALUE PROP 3]     "AI drafts. You decide." — human-in-the-loop
+10. [REPLACE STACK]    "One brain. Not five tools." — stack consolidation visual + NLP search demo
+11. [AI SHOWCASE]      Source · Match · Draft · Brief tabs · keyboard shortcuts
+12. [COMPARISON]       Feature table (13 rows) · compliance badge
+13. [SOCIAL PROOF]     Testimonials · logos · rating
+14. [PRICING]          4-tier grid — Free · Starter · Pro · Enterprise
+15. [WAITLIST]         "Your pipeline won't move itself." — email capture
+16. [FOOTER]           Links · copyright
 ```
 
 ---
 
-## 🔗 Dependencies & Notes
+## Implementation Order
 
-- **Font loading:** Use `next/font` for zero-CLS; subset to Latin only
-- **Animations:** Prefer `CSS @keyframes` + Intersection Observer over heavy animation libraries; keep bundle lean
-- **Images:** All visuals are CSS/code-driven mock UIs — no stock photography; reduces asset overhead and keeps the Superhuman aesthetic
-- **Forms:** Waitlist endpoint wired to NestJS `apps/api` — add `WaitlistEntry` to Prisma schema
-- **Responsive:** All sections must work at 320 px (mobile) through 1440 px (desktop); hero visual hides on < 768 px
-- **Performance target:** Lighthouse score ≥ 90 on Performance, 100 on Accessibility
-- **Analytics:** Add Plausible or Vercel Analytics for waitlist conversion tracking (privacy-first, no cookie consent required for basic analytics)
+**Phase A (P0, sequential):** HP-009 → HP-010 → HP-011 → HP-012
+**Phase B (P1, parallel):** HP-013 / HP-014
+**Phase C (P2):** HP-015 / HP-016
+
+---
+
+## Dependencies & Notes
+
+- All V1 design philosophy, tokens, fonts, and patterns still apply (see `home-page-v1-archived.md`)
+- New sections follow dark/light alternation: Hero (dark) → Problem (light) → How It Works (light) → Outreach (dark) → Auto CRM (light)
+- All animations use CSS `@keyframes` + Intersection Observer (consistent with V1)
+- New components: `HowItWorksSection.tsx`, `OutreachSection.tsx`, `AutoCRMSection.tsx`
+- Modified components: `HeroSection.tsx`, `AIShowcase.tsx`, `ComparisonSection.tsx`, `PricingTeaser.tsx`
+- `page.tsx` needs updated imports and section composition for the new scroll order

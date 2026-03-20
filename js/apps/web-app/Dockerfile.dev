@@ -7,6 +7,7 @@ WORKDIR /app
 # Copy workspace manifests so pnpm can resolve the workspace
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY tsconfig.base.json ./
+COPY patches/ ./patches/
 COPY apps/web-app/package.json ./apps/web-app/package.json
 
 # Install Linux-native node_modules inside the container

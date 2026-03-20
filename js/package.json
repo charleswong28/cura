@@ -33,7 +33,7 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "@nestjs/graphql@12.2.2": "patches/@nestjs__graphql@12.2.2.patch"
+      "@nestjs/graphql@13.2.4": "patches/@nestjs__graphql@13.2.4.patch"
     }
   }
 }
