@@ -6,24 +6,24 @@ export class UserModel {
   @Field(() => ID)
   id!: string;
 
-  @Field()
+  @Field(() => String)
   tenantId!: string;
 
-  @Field()
+  @Field(() => String)
   email!: string;
 
-  @Field()
+  @Field(() => String)
   firstName!: string;
 
-  @Field()
+  @Field(() => String)
   lastName!: string;
 
   @Field(() => UserRole)
   role!: UserRole;
 
-  @Field()
+  @Field(() => Date)
   createdAt!: Date;
 
-  @Field()
+  @Field(() => Date)
   updatedAt!: Date;
 }

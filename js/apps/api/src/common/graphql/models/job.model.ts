@@ -6,13 +6,13 @@ export class JobModel {
   @Field(() => ID)
   id!: string;
 
-  @Field()
+  @Field(() => String)
   tenantId!: string;
 
-  @Field()
+  @Field(() => String)
   clientId!: string;
 
-  @Field()
+  @Field(() => String)
   title!: string;
 
   @Field(() => String, { nullable: true })
@@ -27,10 +27,10 @@ export class JobModel {
   @Field(() => String, { nullable: true })
   assignedToId!: string | null;
 
-  @Field()
+  @Field(() => Date)
   createdAt!: Date;
 
-  @Field()
+  @Field(() => Date)
   updatedAt!: Date;
 
   // client: resolved via @ResolveField in JobResolver using DataLoader

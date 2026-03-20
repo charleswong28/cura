@@ -2,6 +2,98 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+enum ActivityAction {
+  USER_INVITATION_REVOKED
+  USER_INVITED
+  USER_ROLE_CHANGED
+  USER_UPDATED_PROFILE
+}
+
+type ActivityLogModel {
+  action: ActivityAction!
+  createdAt: DateTime!
+  entityId: String
+  entityType: String!
+  id: ID!
+  metadata: JSON
+  tenantId: String!
+  userId: String
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type InvitationModel {
+  createdAt: DateTime!
+  emailAddress: String!
+  id: ID!
+  role: String!
+  status: String!
+}
+
+input InviteUserInput {
+  email: String!
+  role: UserRole!
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+type Mutation {
+  """Invite a user to the organization"""
+  inviteUser(input: InviteUserInput!): InvitationModel!
+
+  """Revoke a pending invitation"""
+  revokeInvitation(invitationId: String!): InvitationModel!
+
+  """Update own profile"""
+  updateMyProfile(input: UpdateProfileInput!): UserModel!
+
+  """Update a user's role (admin only)"""
+  updateUserRole(input: UpdateRoleInput!): UserModel!
+}
+
 type Query {
+  """Recent activity log entries"""
+  activityLog(limit: Int! = 50, offset: Int! = 0): [ActivityLogModel!]!
+
+  """Current user's profile"""
+  me: UserModel!
+
+  """List pending invitations"""
+  pendingInvitations: [InvitationModel!]!
   ping: String!
+
+  """All team members in tenant"""
+  users: [UserModel!]!
+}
+
+input UpdateProfileInput {
+  firstName: String
+  lastName: String
+}
+
+input UpdateRoleInput {
+  role: UserRole!
+  userId: String!
+}
+
+type UserModel {
+  createdAt: DateTime!
+  email: String!
+  firstName: String!
+  id: ID!
+  lastName: String!
+  role: UserRole!
+  tenantId: String!
+  updatedAt: DateTime!
+}
+
+enum UserRole {
+  ADMIN
+  RECRUITER
 }

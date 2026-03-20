@@ -3,13 +3,16 @@ import { Module } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { GraphQLModule } from "@nestjs/graphql";
 import { ApolloDriver, ApolloDriverConfig } from "@nestjs/apollo";
-import { ClerkAuthGuard } from "./auth";
+import { ClerkAuthGuard, RolesGuard } from "./auth";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { WaitlistModule } from "./waitlist/waitlist.module";
 import { WebhookModule } from "./webhook/webhook.module";
 import { DataLoaderModule } from "./dataloader";
 import { GraphqlExceptionFilter } from "./common/filters";
+import { UserModule } from "./user/user.module";
+import { InvitationModule } from "./invitation/invitation.module";
+import { ActivityModule } from "./activity/activity.module";
 
 @Module({
   imports: [
@@ -25,11 +28,18 @@ import { GraphqlExceptionFilter } from "./common/filters";
     HealthModule,
     WaitlistModule,
     WebhookModule,
+    ActivityModule,
+    UserModule,
+    InvitationModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
       useClass: ClerkAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
     {
       provide: APP_FILTER,

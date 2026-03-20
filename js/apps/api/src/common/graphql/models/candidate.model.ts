@@ -6,13 +6,13 @@ export class CandidateModel {
   @Field(() => ID)
   id!: string;
 
-  @Field()
+  @Field(() => String)
   tenantId!: string;
 
-  @Field()
+  @Field(() => String)
   firstName!: string;
 
-  @Field()
+  @Field(() => String)
   lastName!: string;
 
   @Field(() => String, { nullable: true })
@@ -36,9 +36,9 @@ export class CandidateModel {
   @Field(() => String, { nullable: true })
   notes!: string | null;
 
-  @Field()
+  @Field(() => Date)
   createdAt!: Date;
 
-  @Field()
+  @Field(() => Date)
   updatedAt!: Date;
 }

@@ -1,21 +1,21 @@
-import { Prisma } from '../generated/prisma/client';
+import { Prisma } from "../generated/prisma/client";
 
 /**
  * Models that carry a tenantId column.
  * Tenant itself is the root entity — it IS the tenant, so it is never scoped.
  */
-export const TENANT_SCOPED_MODELS = new Set(['User', 'Candidate', 'Client', 'Job']);
+export const TENANT_SCOPED_MODELS = new Set(["User", "Candidate", "Client", "Job", "ActivityLog"]);
 
 const READ_OPS = new Set([
-  'findMany',
-  'findFirst',
-  'findFirstOrThrow',
-  'count',
-  'aggregate',
-  'groupBy',
+  "findMany",
+  "findFirst",
+  "findFirstOrThrow",
+  "count",
+  "aggregate",
+  "groupBy",
 ]);
 
-const WRITE_WHERE_OPS = new Set(['update', 'updateMany', 'delete', 'deleteMany']);
+const WRITE_WHERE_OPS = new Set(["update", "updateMany", "delete", "deleteMany"]);
 
 type Args = Record<string, unknown>;
 
@@ -36,22 +36,22 @@ export function scopeArgsForTenant(
   model: string,
   operation: string,
   args: Args,
-  tenantId: string,
+  tenantId: string
 ): Args | null {
   if (!TENANT_SCOPED_MODELS.has(model)) return args;
 
   // findUnique / findUniqueOrThrow must be rewritten by the caller
-  if (operation === 'findUnique' || operation === 'findUniqueOrThrow') return null;
+  if (operation === "findUnique" || operation === "findUniqueOrThrow") return null;
 
   if (READ_OPS.has(operation) || WRITE_WHERE_OPS.has(operation)) {
     return { ...args, where: { ...(args.where as object), tenantId } };
   }
 
-  if (operation === 'create' || operation === 'createManyAndReturn') {
+  if (operation === "create" || operation === "createManyAndReturn") {
     return { ...args, data: { ...(args.data as object), tenantId } };
   }
 
-  if (operation === 'createMany') {
+  if (operation === "createMany") {
     return {
       ...args,
       data: Array.isArray(args.data)
@@ -60,7 +60,7 @@ export function scopeArgsForTenant(
     };
   }
 
-  if (operation === 'upsert') {
+  if (operation === "upsert") {
     return {
       ...args,
       where: { ...(args.where as object), tenantId },
@@ -90,12 +90,12 @@ export function tenantExtension(tenantId: string) {
             // so the extra tenantId filter doesn't violate Prisma's unique-key validation.
             if (
               TENANT_SCOPED_MODELS.has(model) &&
-              (operation === 'findUnique' || operation === 'findUniqueOrThrow')
+              (operation === "findUnique" || operation === "findUniqueOrThrow")
             ) {
               const accessor = (model.charAt(0).toLowerCase() +
                 model.slice(1)) as keyof typeof client;
-              const scopedWhere = { ...(args as Args).where as object, tenantId };
-              return operation === 'findUnique'
+              const scopedWhere = { ...((args as Args).where as object), tenantId };
+              return operation === "findUnique"
                 ? (client[accessor] as any).findFirst({ ...(args as Args), where: scopedWhere })
                 : (client[accessor] as any).findFirstOrThrow({
                     ...(args as Args),
@@ -108,6 +108,6 @@ export function tenantExtension(tenantId: string) {
           },
         },
       },
-    }),
+    })
   );
 }

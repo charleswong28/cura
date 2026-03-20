@@ -39,3 +39,11 @@ export enum UserRole {
   RECRUITER = "RECRUITER",
 }
 registerEnumType(UserRole, { name: "UserRole" });
+
+export enum ActivityAction {
+  USER_UPDATED_PROFILE = "USER_UPDATED_PROFILE",
+  USER_ROLE_CHANGED = "USER_ROLE_CHANGED",
+  USER_INVITED = "USER_INVITED",
+  USER_INVITATION_REVOKED = "USER_INVITATION_REVOKED",
+}
+registerEnumType(ActivityAction, { name: "ActivityAction" });

@@ -1,0 +1,13 @@
+diff --git a/dist/utils/reflection.utilts.js b/dist/utils/reflection.utilts.js
+index 59132506e93b600bfbc26bd3e0a3e4099e21e801..27f9cce22a96737f2a5976f9a349161f18e0e617 100644
+--- a/dist/utils/reflection.utilts.js
++++ b/dist/utils/reflection.utilts.js
+@@ -39,7 +39,7 @@ function reflectTypeFromMetadata(reflectOptions) {
+ }
+ function extractTypeIfArray(metadataKey, reflectedType, index) {
+     if (metadataKey === 'design:paramtypes') {
+-        return reflectedType[index];
++        return reflectedType == null ? undefined : reflectedType[index];
+     }
+     return reflectedType;
+ }

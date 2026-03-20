@@ -6,10 +6,10 @@ export class ClientModel {
   @Field(() => ID)
   id!: string;
 
-  @Field()
+  @Field(() => String)
   tenantId!: string;
 
-  @Field()
+  @Field(() => String)
   name!: string;
 
   @Field(() => String, { nullable: true })
@@ -27,10 +27,10 @@ export class ClientModel {
   @Field(() => ClientStatus)
   status!: ClientStatus;
 
-  @Field()
+  @Field(() => Date)
   createdAt!: Date;
 
-  @Field()
+  @Field(() => Date)
   updatedAt!: Date;
 
   // jobs: resolved via @ResolveField in ClientResolver using DataLoader
