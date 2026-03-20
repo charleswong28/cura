@@ -1,5 +1,5 @@
 /**
- * HeroSection — HP-011 through HP-017
+ * HeroSection — HP-011 through HP-017 (V1), HP-064 through HP-066 (V2 rework)
  *
  * Full-viewport opening section. Vertically centred within the space below
  * the fixed NavBar. Two-column layout on desktop:
@@ -9,11 +9,12 @@
 import HeroVisual from "@/components/HeroVisual";
 import WatchDemoButton from "@/components/WatchDemoButton";
 
+/* HP-066: Reworked stat bar — reinforces speed, always-on, outcome, trust */
 const HERO_STATS = [
-  { value: "3 hrs", label: "saved / day" },
-  { value: "5 tools", label: "replaced" },
-  { value: "Zero", label: "lost context" },
-  { value: "Human", label: "always in control" },
+  { value: "5 min", label: "setup" },
+  { value: "24/7", label: "sourcing & outreach" },
+  { value: "Zero", label: "manual CRM updates" },
+  { value: "Your rules", label: "AI follows" },
 ] as const;
 
 export default function HeroSection() {
@@ -21,19 +22,19 @@ export default function HeroSection() {
     <section className="relative min-h-screen flex flex-col justify-center section-padding-hero">
       <div className="container-page">
         {/* HP-011: Two-column grid — text left, visual right */}
-        <div className="grid lg:grid-cols-2 gap-12 xl:gap-20 items-center">
+        <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-10 xl:gap-16 items-center">
           {/* Text column */}
           <div className="max-w-140">
-            {/* HP-012: Two-line display headline */}
+            {/* HP-064: Reworked two-line display headline — AI recruiter positioning */}
             <h1 className="font-sans font-semibold leading-[1.1] tracking-tight mb-8 text-hero">
-              <span className="block text-cura-white">AI Runs the ATS.</span>
-              <span className="block text-gradient-accent">You Close the Deal.</span>
+              <span className="block text-cura-white">Your AI Recruiter.</span>
+              <span className="block text-gradient-accent">Ready in 5 Minutes.</span>
             </h1>
 
-            {/* HP-013: Subheadline */}
-            <p className="text-lg xl:text-xl leading-relaxed mb-10 text-cura-white/65">
-              Cura handles the heavy lifting admin work so you can focus on the only thing that
-              closes deals: <em>human connection.</em>
+            {/* HP-065: Reworked subheadline — full value loop */}
+            <p className="text-lg xl:text-xl leading-relaxed mb-10 text-cura-white/65 max-w-135">
+              Connect your LinkedIn. Cura sources candidates, drafts personalised outreach, and
+              follows up — automatically. You focus on the conversations that close deals.
             </p>
 
             {/* HP-014: Stat bar — four micro-stats */}
@@ -70,10 +71,11 @@ export default function HeroSection() {
                   { name: "Reed", domain: "reed.co.uk" },
                   { name: "Adecco", domain: "adecco.com" },
                   { name: "Randstad", domain: "randstad.com" },
-                ].map(({ name, domain }) => (
+                ].map(({ name, domain }, i) => (
                   <div
                     key={domain}
-                    className="w-7 h-7 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-[0_0_0_2px_var(--color-cura-base)]"
+                    className="w-7 h-7 rounded-full bg-cura-accent/15 flex items-center justify-center overflow-hidden shadow-[0_0_0_2px_var(--color-cura-base)]"
+                    style={{ zIndex: i + 1 }}
                     title={name}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -82,7 +84,7 @@ export default function HeroSection() {
                       alt={name}
                       width={28}
                       height={28}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-contain grayscale invert brightness-[0.7] opacity-60"
                     />
                   </div>
                 ))}

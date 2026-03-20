@@ -74,14 +74,14 @@
 
 #### Story HP-9.1: Reworked Hero Copy
 
-- [ ] **HP-064:** Rework `<HeroSection>` headline:
+- [x] **HP-064:** Rework `<HeroSection>` headline:
   - Line 1: `"Your AI Recruiter."` (display sans, white, `text-hero` size)
   - Line 2: `"Ready in 5 Minutes."` (display sans, indigo gradient)
   - Mirrors Nume's "Onboard Your AI CFO In 5 Minutes" — positions Cura as a team member, not software. The speed promise is the hook.
 
-- [ ] **HP-065:** Rework subheadline: `"Connect your LinkedIn and email. Cura sources candidates, drafts personalised outreach, and follows up — automatically. You focus on the conversations that close deals."` (~20 px, muted white, max-width 540 px). Communicates the full value loop: setup → AI works → you do relationship work.
+- [x] **HP-065:** Rework subheadline: `"Connect your LinkedIn and email. Cura sources candidates, drafts personalised outreach, and follows up — automatically. You focus on the conversations that close deals."` (~20 px, muted white, max-width 540 px). Communicates the full value loop: setup → AI works → you do relationship work.
 
-- [ ] **HP-066:** Rework stat bar. Replace current 4 micro-stats with:
+- [x] **HP-066:** Rework stat bar. Replace current 4 micro-stats with:
   - `"5 min"` / `"setup"` — speed promise reinforcement
   - `"24/7"` / `"sourcing & outreach"` — always-on
   - `"25-40%"` / `"reply rate"` — concrete, quantifiable outcome
@@ -89,7 +89,7 @@
 
 #### Story HP-9.2: Reworked Hero Visual
 
-- [ ] **HP-067:** Replace `<HeroVisual>` pipeline Kanban with an "AI recruiter at work" dashboard mockup. Dark frosted-glass card showing:
+- [x] **HP-067:** Replace `<HeroVisual>` pipeline Kanban with an "AI recruiter at work" dashboard mockup. Dark frosted-glass card showing:
   - Top bar: `"Cura AI — Working"` with a green pulse dot
   - Activity feed (3 lines, typewriter animation staggered):
     - `"✓ Found 23 CFO candidates in London"` (fade in at 0s)
@@ -98,7 +98,7 @@
   - Bottom: mini avatar row of sourced candidates with match % badges
   - Shows the AI doing work and waiting for human approval — the core value loop.
 
-- [ ] **HP-068:** Add a subtle `"Set up once. It never stops working."` caption below the visual — muted, italic, small.
+- [x] **HP-068:** Add a subtle `"Set up once. It never stops working."` caption below the visual — muted, italic, small.
 
 ---
 

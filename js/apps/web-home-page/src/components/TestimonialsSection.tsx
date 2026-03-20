@@ -8,6 +8,7 @@
  *
  * Light cream background to contrast the surrounding dark sections.
  */
+import Image from "next/image";
 
 /** HP-046: real executive search & recruitment firms via logo.dev */
 const AGENCIES = [
@@ -71,14 +72,19 @@ export default function TestimonialsSection() {
         {/* HP-046: Agency logo row — real logos via logo.dev */}
         <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-5 mb-5">
           {AGENCIES.map(({ name, domain }) => (
-            <img
+            <div
               key={domain}
-              src={`https://icon.horse/icon/${domain}`}
-              alt={name}
-              width={80}
-              height={24}
-              className="h-6 w-auto object-contain opacity-40 grayscale hover:opacity-70 hover:grayscale-0 transition-all duration-200"
-            />
+              className="w-7 h-7 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-[0_0_0_2px_var(--color-cura-base)]"
+              title={name}
+            >
+              <Image
+                src="/images/logos/heidrick-and-struggles.svg"
+                alt={name}
+                width={28}
+                height={28}
+                className="w-full h-full object-contain"
+              />
+            </div>
           ))}
         </div>
 

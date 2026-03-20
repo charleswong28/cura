@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useScrollSpy } from "@/hooks/useScrollSpy";
 import { useClickOutside } from "@/hooks/useClickOutside";
 
@@ -39,30 +40,17 @@ export default function NavBar() {
       }`}
     >
       <div className="container-page">
-        <nav
-          className="flex items-center justify-between h-16"
-          aria-label="Main navigation"
-        >
+        <nav className="flex items-center justify-between h-16" aria-label="Main navigation">
           {/* Logo */}
-          <a
-            href="/"
-            className="flex items-center gap-2 select-none"
-            aria-label="Cura home"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 20 20"
-              fill="none"
-              aria-hidden="true"
-            >
+          <Link href="/" className="flex items-center gap-2 select-none" aria-label="Cura home">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <circle cx="10" cy="10" r="10" fill="#6366F1" />
               <circle cx="10" cy="10" r="4" fill="#F5F5F3" />
             </svg>
             <span className="font-sans font-medium text-[15px] text-cura-white tracking-[-0.01em] leading-none">
               Cura
             </span>
-          </a>
+          </Link>
 
           {/* Centre links — desktop only */}
           <ul className="hidden md:flex items-center gap-8 list-none m-0 p-0">
@@ -82,9 +70,7 @@ export default function NavBar() {
                     }`}
                   >
                     {label}
-                    {isActive && (
-                      <span className="block h-px bg-cura-accent mt-0.5 rounded-full" />
-                    )}
+                    {isActive && <span className="block h-px bg-cura-accent mt-0.5 rounded-full" />}
                   </a>
                 </li>
               );
@@ -144,9 +130,7 @@ export default function NavBar() {
                 onClick={closeDrawer}
                 aria-current={isActive ? "true" : undefined}
                 className={`py-3 text-base border-b border-white/5 transition-colors duration-200 ${
-                  isActive
-                    ? "text-cura-white font-medium"
-                    : "text-cura-muted hover:text-cura-white"
+                  isActive ? "text-cura-white font-medium" : "text-cura-muted hover:text-cura-white"
                 }`}
               >
                 {label}

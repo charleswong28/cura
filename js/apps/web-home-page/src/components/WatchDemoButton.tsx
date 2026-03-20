@@ -39,8 +39,7 @@ export default function WatchDemoButton() {
         onClick={() => setOpen(true)}
         className="text-sm font-medium text-cura-white/50 hover:text-cura-white transition-colors duration-200 cursor-pointer bg-transparent border-0 p-0"
       >
-        Watch 90-second demo{" "}
-        <span aria-hidden="true">▶</span>
+        Watch 90-second demo <span aria-hidden="true">▶</span>
       </button>
 
       {/* Modal — HP-016 */}
@@ -68,10 +67,7 @@ export default function WatchDemoButton() {
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
               {/* Play icon */}
               <div className="flex items-center justify-center w-20 h-20 rounded-full bg-cura-accent/15 border border-cura-accent/40">
-                <span
-                  className="text-3xl leading-none text-cura-accent pl-1"
-                  aria-hidden="true"
-                >
+                <span className="text-3xl leading-none text-cura-accent pl-1" aria-hidden="true">
                   ▶
                 </span>
               </div>
@@ -82,8 +78,9 @@ export default function WatchDemoButton() {
           </div>
 
           {/* Caption */}
-          <div className="px-8 py-5 text-center text-sm text-cura-white/40 border-t border-cura-white/[6%]">
-            A 90-second walkthrough of Cura moving a candidate from sourced to offer — without a single manual click.
+          <div className="px-8 py-5 text-center text-sm text-cura-white/40 border-t border-cura-white/6">
+            A 90-second walkthrough of Cura moving a candidate from sourced to offer — without a
+            single manual click.
           </div>
         </div>
       </dialog>

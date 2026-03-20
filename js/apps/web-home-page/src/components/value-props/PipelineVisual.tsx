@@ -97,7 +97,7 @@ export function PipelineVisual() {
 
       {/* Tooltip — appears when card moves (HP-026 visual) */}
       <div
-        className="mt-[0.9rem] py-[0.6rem] px-[0.85rem] bg-cura-accent/10 border border-cura-accent/22 rounded-lg text-mock-lg text-cura-white/75 transition-opacity duration-[400ms]"
+        className="mt-[0.9rem] py-[0.6rem] px-[0.85rem] bg-cura-accent/10 border border-cura-accent/22 rounded-lg text-mock-lg text-cura-white/75 transition-opacity duration-400"
         style={{ opacity: phase === "done" ? 1 : 0 }}
       >
         💡 Your Cura AI meeting notes are ready.
