@@ -286,11 +286,11 @@ LinkedIn has expanded bot detection significantly since 2024–2025. It now oper
 
 | Deployment | IP type | LinkedIn survival | Session handling | Operational effort | Cost |
 |------------|---------|------------------|------------------|-------------------|------|
-| **Cloud VM + recruiter's home/work exit proxy** ✓ recommended | Home/office residential (tunnelled) | Highest — identical to manual use | Chrome profile on VM disk | One-time Tailscale or WireGuard setup | ~$5–10/mo VM + $0 proxy |
+| **EC2 + recruiter's home/work exit proxy** ✓ recommended | Home/office residential (tunnelled) | Highest — identical to manual use | Chrome profile on EBS | One-time Tailscale or WireGuard setup | ~$15–35/mo EC2+EBS + $0 proxy |
 | Recruiter's own machine (Phase 3 fallback) | Home/office residential | Highest — identical to manual use | Chrome profile on machine | One-time Python + Playwright setup | ~$0 infra |
-| Dedicated cloud VM per recruiter + Elastic IP | Datacenter | **Blocked at login** — LinkedIn detects at ASN level | Chrome profile on VM | Medium — one VM per recruiter | ~$20–50/mo per recruiter |
-| Cloud VM + shared residential proxy | Shared residential | ~50% survival | Chrome profile on VM | High — proxy management, IP rotation | ~$50–100/mo per recruiter |
-| Cloud VM + mobile proxy (4G/5G) | Mobile CGNAT | ~85% survival | Chrome profile on VM | High — mobile proxy subscriptions | ~$100–200/mo per recruiter |
+| Dedicated EC2 per recruiter + Elastic IP | Datacenter | **Blocked at login** — LinkedIn detects at ASN level | Chrome profile on EBS | Medium — one EC2 per recruiter | ~$20–50/mo per recruiter |
+| EC2 + shared residential proxy | Shared residential | ~50% survival | Chrome profile on EBS | High — proxy management, IP rotation | ~$50–100/mo per recruiter |
+| EC2 + mobile proxy (4G/5G) | Mobile CGNAT | ~85% survival | Chrome profile on EBS | High — mobile proxy subscriptions | ~$100–200/mo per recruiter |
 | **browser-use Cloud** | Datacenter (likely) | **Blocked at login** | 15-min session cap; cloud profiles | None — managed service | Usage-based + blocked |
 
 ### Why browser-use Cloud is not viable for LinkedIn
@@ -319,7 +319,7 @@ When running on the recruiter's machine, there are two session strategies:
 | **Portability** | Any machine with vault access | Tied to this machine's Chrome install |
 | **Recommended for** | Cloud deployment, session portability | Recruiter's primary machine |
 
-**Recommended default:** Chrome profile (`user_data_dir`) on a persistent cloud VM, with Tailscale or WireGuard routing all browser traffic out through the recruiter's home/work network. If the home network is unavailable, fall back to a third-party mobile proxy (see Section 5.5).
+**Recommended default:** Chrome profile (`user_data_dir`) on an EC2 instance with EBS volume, with Tailscale or WireGuard routing all browser traffic out through the recruiter's home/work network. If the home network is unavailable, fall back to a third-party mobile proxy (see Section 5.5).
 
 ### IP detection handling
 
@@ -331,35 +331,70 @@ This is detection, not prevention. The real mitigation is deployment. IP consist
 
 ---
 
-## 5.4 Deployment: Cloud VM + Home/Work Exit Proxy (Phase 3 Primary)
+## 5.4 Deployment: EC2 + Home/Work Exit Proxy (Phase 3 Primary)
 
-Talon runs as a persistent service on a cloud VM. All browser traffic exits via the recruiter's home or work network. The cloud VM provides 24/7 reliability; the recruiter's network provides the genuine residential IP that LinkedIn trusts — identical to their manual usage.
+Talon runs as a persistent service on an EC2 instance. All browser traffic exits via the recruiter's home or work network. EC2 provides 24/7 reliability and persistent EBS storage; the recruiter's network provides the genuine residential IP that LinkedIn trusts — identical to their manual usage.
+
+### AWS infrastructure
+
+| Component | Service | Spec | Purpose |
+|-----------|---------|------|---------|
+| Talon process | EC2 | t3.medium (2 vCPU / 4 GB RAM) | Runs browser-use + Playwright + Chromium |
+| Chrome profiles | EBS gp3 | 100 GB, attached to instance | Persistent Chrome user data directories |
+| Credential vault | AWS Secrets Manager | — | Stores LinkedIn credentials; single-use fetch tokens |
+| Session state fallback | S3 | — | Only if Talon ever runs without persistent EBS |
+| Networking | Security Group | See below | Restrict inbound; allow Tailscale UDP outbound |
+
+**EC2 instance sizing:** Chromium is memory-heavy. t3.medium (4 GB) handles one browser context comfortably. t3.large (8 GB) recommended if running concurrent contexts for multiple recruiters on one instance.
+
+**Security Group rules:**
+
+| Direction | Port / Protocol | Source / Destination | Purpose |
+|-----------|----------------|----------------------|---------|
+| Inbound | 8001 TCP | CRM API security group only | A2A task dispatch |
+| Inbound | 22 TCP | Admin IP only | SSH access |
+| Outbound | 41641 UDP | 0.0.0.0/0 | Tailscale relay (DERP fallback) |
+| Outbound | 51820 UDP | 0.0.0.0/0 | WireGuard (if using Option B) |
+| Outbound | All | 0.0.0.0/0 | Browser traffic (exits via home tunnel) |
 
 ### Architecture
 
 ```
-[Cloud VM — always on]                        [Recruiter's home/work network]
+[EC2 instance — always on]                    [Recruiter's home/work network]
   Talon (Python + browser-use)             ┌─ Option A: Tailscale exit node (laptop/NAS)
-  Chrome profiles on VM disk      ─────────┤─ Option B: WireGuard on router (always-on)
+  Chrome profiles on EBS volume   ─────────┤─ Option B: WireGuard on router (always-on)
   All outbound traffic tunnelled           └─ Option C: SSH SOCKS5 (from laptop)
 
 LinkedIn sees: recruiter's home/work IP (identical to their manual use)
 ```
 
-**Why this model over running on the recruiter's machine:**
-- Cloud VM is always on — no dependency on the recruiter's laptop being awake
-- LinkedIn sees the exact same residential IP used for all manual activity
-- Detection risk is identical to recruiter's-machine deployment (Section 5.3)
-- Chrome profile persists on VM disk — no S3 session state needed
-- One cloud VM can serve multiple sessions sequentially; cost is ~$5–10/mo
+**Why EC2 over ECS/Fargate/Lambda:**
+- Chromium requires persistent disk for Chrome profiles (ECS Fargate has no persistent local disk)
+- Talon is a long-running process (A2A server on port 8001) — Lambda's 15-min timeout is incompatible
+- EC2 with EBS gives the same Chrome profile persistence as running on the recruiter's own machine
 
-**Per-recruiter IP isolation:** Each LinkedIn account must exit via its own IP. Never tunnel multiple recruiter accounts through the same home network — LinkedIn correlates shared IPs across accounts and links them. One home network = one recruiter account.
+**Per-recruiter IP isolation:** Each LinkedIn account must exit via its own IP. Never tunnel multiple recruiter accounts through the same home network — LinkedIn correlates shared IPs across accounts. One home network = one recruiter account.
+
+---
+
+### Tunnel options: why AWS has no native equivalent
+
+AWS does not have a managed service for routing EC2 outbound traffic through a specific home network. The two AWS-native VPN services go the **wrong direction** or are **too complex** for home use:
+
+| Option | Direction | Cost | Verdict |
+|--------|-----------|------|---------|
+| **AWS Client VPN** | Client → AWS (wrong way) | ~$72/mo endpoint + $0.05/hr per connection | ❌ Routes recruiter's device into AWS, not EC2 traffic out through home |
+| **AWS Site-to-Site VPN** | AWS VPC ↔ customer network | ~$36/mo per VPN connection | ❌ Requires static IP at home + Customer Gateway device; overkill for home setup |
+| **Tailscale on EC2** | EC2 → home machine | Free (1 exit node) | ✅ Right tool — install on EC2 like any Linux machine |
+| **WireGuard on EC2** | EC2 → home router | $0 | ✅ Right tool — config-only, no managed service needed |
+
+**Decision: Tailscale is the right tool even on AWS.** It installs on EC2 in two commands and requires no AWS-specific configuration.
 
 ---
 
 ### Option A: Tailscale Exit Node (recommended — 30 min setup)
 
-The recruiter's home machine (or any always-on device: NAS, Raspberry Pi, spare laptop) advertises itself as a Tailscale exit node. The cloud VM routes all traffic through it.
+The recruiter's home machine (or any always-on device: NAS, Raspberry Pi, spare laptop) advertises itself as a Tailscale exit node. The EC2 instance routes all traffic through it.
 
 **Home machine (one-time setup):**
 ```bash
@@ -368,19 +403,21 @@ tailscale up --advertise-exit-node
 # Approve in Tailscale admin console: app.tailscale.com → Machines → Edit route settings
 ```
 
-**Cloud VM (one-time setup):**
+**EC2 instance (one-time setup, via user-data or SSH):**
 ```bash
-# Install Tailscale, set home machine as exit node
-tailscale up --exit-node=<home-machine-tailscale-ip>
+# Install Tailscale on Amazon Linux 2 / Ubuntu
+curl -fsSL https://tailscale.com/install.sh | sh
+tailscale up --exit-node=<home-machine-tailscale-ip> --authkey=<tskey-...>
 
-# Verify exit IP matches recruiter's home ISP
-curl https://ipinfo.io/ip   # must return home IP, not VM datacenter IP
+# Verify exit IP matches recruiter's home ISP — must NOT be an AWS IP
+curl https://ipinfo.io/ip
 ```
 
 **browser-use config — no proxy settings required.** Tailscale handles OS-level routing. All browser traffic exits via home automatically.
 
 ```python
-PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "/home/ubuntu/chrome-profiles")
+import os
+PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "/mnt/ebs/chrome-profiles")
 
 profile = BrowserProfile(
     user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
@@ -389,68 +426,62 @@ profile = BrowserProfile(
 session = BrowserSession(browser_profile=profile)
 ```
 
-**Tailscale free tier:** supports 1 exit node — sufficient for Phase 3 (one recruiter per Tailscale account). Scale plan ($6/mo) adds multiple exit nodes for multi-recruiter setups.
+**Tailscale free tier:** supports 1 exit node — sufficient for Phase 3 (one recruiter per Tailscale account). Scale plan ($6/mo) adds multiple exit nodes.
 
-**Limitation:** The exit-node machine must stay on and connected. Disable sleep/hibernate on the exit-node device, or use Option B (router-level WireGuard) for always-on reliability without leaving a laptop running.
+**Limitation:** The exit-node machine must stay on and connected. Disable sleep/hibernate on the exit-node device, or use Option B (router-level WireGuard) for always-on reliability without keeping a laptop running.
 
 ---
 
 ### Option B: WireGuard on Home Router (most robust — always on)
 
-WireGuard configured directly on the router survives laptop sleep/restart — the router is always on. Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense, and most modern prosumer routers.
+WireGuard on the router survives laptop sleep/restart — the router is always on. Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense, and most prosumer routers.
 
 ```
-[Cloud VM] --WireGuard peer (UDP 51820)--> [Home router] --> internet (home ISP IP)
+[EC2] --WireGuard peer (UDP 51820)--> [Home router] --> internet (home ISP IP)
 ```
 
-**Router:** Enable WireGuard server in the router UI. Generate a peer config file for the cloud VM. Most routers with WireGuard support expose this via a GUI — no CLI required.
+**Router:** Enable WireGuard server in the router UI. Generate a peer config file for the EC2 instance.
 
-**Cloud VM:**
+**EC2 instance:**
 ```bash
-# Install WireGuard, load the peer config from the router
 apt install wireguard
-# Paste peer config into /etc/wireguard/wg0.conf
+# Paste peer config from router into /etc/wireguard/wg0.conf
+# Add to /etc/systemd/system/wg0.service for auto-start
 wg-quick up wg0
-
-# Verify exit IP
 curl https://ipinfo.io/ip   # must return home ISP IP
 ```
 
 **browser-use config — identical to Tailscale (no proxy settings).** WireGuard handles OS-level routing.
 
-**When to use:** Recruiter has a compatible router and wants 24/7 reliability without any home machine staying on. Best for production Phase 3 deployments.
+**When to use:** Recruiter has a compatible router and wants 24/7 reliability without any home machine staying on.
 
 ---
 
 ### Option C: SSH SOCKS5 (simple, less reliable)
 
-If the recruiter's home machine exposes SSH (via port forward on the router), the cloud VM can create a SOCKS5 tunnel on demand. Unlike Options A and B, this requires explicit proxy configuration in browser-use.
-
 ```bash
-# Cloud VM — create SOCKS5 proxy on localhost:1080 via home machine
-# autossh auto-reconnects on drop
+# EC2 — create SOCKS5 proxy on localhost:1080 via home machine
 autossh -N -D 1080 -M 0 user@home-ddns-hostname
 ```
 
 ```python
 from playwright.async_api import ProxySettings
-
 profile = BrowserProfile(
     user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
     proxy=ProxySettings(server="socks5://localhost:1080"),
 )
 ```
 
-**Limitations:** SSH drops require autossh or systemd restart. Home IP must be reachable from the internet (port-forward port 22 on the router; use a DDNS service if home IP is dynamic). Less reliable than Tailscale or WireGuard for always-on operation.
+**Limitations:** SSH drops require autossh or systemd restart. Home IP must be port-forwarded. Less reliable than Tailscale or WireGuard.
 
 ---
 
-### Chrome profile persistence on cloud VM
+### Chrome profile persistence on EBS
 
-Since the cloud VM has persistent disk storage, browser state is kept in a Chrome profile directory. The profile persists across Talon restarts with no export/import cycle. This is the simplest session strategy and has the lowest detection risk — the full browser fingerprint (fonts, extensions, canvas) is preserved across sessions.
+Chrome profiles are stored on the EBS volume mounted to the EC2 instance. The EBS volume persists independently of the EC2 instance lifecycle — profiles survive instance stops, restarts, and even instance replacement (detach + reattach EBS to new instance).
 
 ```
-/home/ubuntu/chrome-profiles/
+/mnt/ebs/chrome-profiles/
   {tenantId}/
     {userId}/            ← one directory per recruiter
       Default/
@@ -461,27 +492,30 @@ Since the cloud VM has persistent disk storage, browser state is kept in a Chrom
 
 ```python
 import os
-
-PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "/home/ubuntu/chrome-profiles")
+PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "/mnt/ebs/chrome-profiles")
 
 profile = BrowserProfile(
     user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
 )
 ```
 
-**S3 session state (Section 5.2) is not required for this deployment model.** S3 is retained as a fallback for ephemeral deployments (e.g., stateless container without persistent disk). For the cloud VM model, VM disk is the session store.
+**EBS mount (fstab entry for auto-mount on instance restart):**
+```
+/dev/nvme1n1  /mnt/ebs  ext4  defaults,nofail  0  2
+```
+
+**S3 session state (Section 5.2) is not required for this deployment model.** S3 is retained as a fallback for ephemeral deployments without EBS. For EC2 + EBS, the EBS volume is the session store.
 
 **Profile conflict:** Chrome's lock file prevents two processes opening the same profile simultaneously. Talon must run tasks for a given recruiter sequentially — already enforced by the task queue design (one `IN_PROGRESS` task per `userId` at a time).
 
-| | Chrome profile on VM (Tailscale/WG) | S3 storage_state | Chrome profile on recruiter's machine |
+| | Chrome profile on EBS (Tailscale/WG) | S3 storage_state | Chrome profile on recruiter's machine |
 |-|------------------------------------|-----------------|--------------------------------------|
 | **Detection risk** | Lowest — persisted fingerprint | Low — real cookies | Lowest — indistinguishable from manual |
 | **Always-on** | Yes | Yes | No — machine must be awake |
-| **Session continuity** | Profile survives restart | Export/import per run | Profile survives restart |
-| **Setup** | One-time Tailscale/WG | Vault + S3 IAM | One-time on each machine |
+| **Session continuity** | EBS persists independently of EC2 | Export/import per run | Profile survives restart |
+| **Instance replacement** | Detach + reattach EBS | No change | N/A |
 | **Recommended for** | Phase 3 primary | Ephemeral containers | Phase 3 fallback |
 
----
 
 ## 5.5 Phase 4 Fallback: Third-Party Proxy (No Home Network Available)
 
@@ -930,9 +964,9 @@ enum TalonAuditEvent {
 
 ---
 
-### 9.8 Deployment model: cloud VM + recruiter's home/work exit proxy (Phase 3)
+### 9.8 Deployment model: EC2 + recruiter's home/work exit proxy (Phase 3)
 
-**Decision:** Talon runs on a cloud VM (self-hosted browser-use) with all browser traffic routed through the recruiter's home or work network via Tailscale exit node or WireGuard on their home router.
+**Decision:** Talon runs on an EC2 instance (t3.medium, self-hosted browser-use) with Chrome profiles on EBS, and all browser traffic routed through the recruiter's home or work network via Tailscale exit node or WireGuard on their home router.
 
 **Rationale (research-backed):**
 
@@ -945,7 +979,7 @@ Session state is stored as a Chrome profile directory on the VM's persistent dis
 
 | Deployment | LinkedIn viable? | Why |
 |------------|-----------------|-----|
-| **Cloud VM + home/work exit proxy (Tailscale/WG)** | ✅ Yes — recommended | Real residential IP tunnelled through home; cloud reliability; Chrome profile on VM |
+| **EC2 + home/work exit proxy (Tailscale/WG)** | ✅ Yes — recommended | Real residential IP tunnelled through home; EC2 reliability; Chrome profile on EBS |
 | Recruiter's own machine (fallback) | ✅ Yes | Real residential IP, same as manual use; machine must be awake |
 | browser-use Cloud | ❌ No | Datacenter IPs blocked at LinkedIn login; 15-min session cap; custom proxy requires Enterprise |
 | Cloud VM + Elastic IP | ❌ No | Datacenter ASN — blocked at LinkedIn login |
@@ -956,9 +990,9 @@ Session state is stored as a Chrome profile directory on the VM's persistent dis
 - Recruiter's home network must be available (router on, internet connected) during task execution — reasonable assumption for Phase 3
 - One-time Tailscale or WireGuard setup on the recruiter's home machine/router (~30 min)
 - One home network = one LinkedIn account (IP isolation constraint)
-- Cloud VM costs ~$5–10/mo per tenant
+- EC2 t3.medium + 100 GB EBS costs ~$30–35/mo per tenant
 
-**Phase 4 trigger:** If home networks prove unavailable (recruiter travels, moves, ISP outage), switch that account to a dedicated third-party ISP IP (Webshare ~$1.47/IP) as fallback. This is an operational config change per recruiter, not a code change. See Section 5.5.
+**Phase 4 trigger:** If home networks prove unavailable (recruiter travels, moves, ISP outage), switch that account to a dedicated third-party ISP IP (Webshare ~$1.47/IP) as fallback. This is an operational config change per recruiter, not a code change. See Section 5.5. AWS Site-to-Site VPN is not used — it costs ~$36/mo per VPN connection and requires Customer Gateway hardware at the recruiter's home.
 
 ---
 
@@ -1157,8 +1191,8 @@ Each `TalonTask` carries a `coworkTaskId` reference for traceability. The CRM do
 
 ## 12. Open Questions
 
-1. **Vault service technology:** HashiCorp Vault, AWS Secrets Manager, or a lightweight custom service? AWS Secrets Manager is the lowest-friction choice if Cura is already on AWS; HashiCorp Vault offers more control for multi-cloud. Decision gated on Phase 3 infrastructure choices.
-2. **Runner hosting (resolved — 2026-03-21):** Cloud VM + recruiter's home/work exit proxy via Tailscale or WireGuard (Section 5.4). Cloud VM provides 24/7 reliability; home network exit provides genuine residential IP. Detection risk is identical to running on the recruiter's machine. Third-party proxies (Section 5.5) are the Phase 4 fallback when home networks are unavailable.
+1. **Vault service technology (resolved — 2026-03-21):** AWS Secrets Manager. Cura is on AWS; Secrets Manager integrates natively with EC2 IAM roles (no static credentials), supports automatic rotation, and has audit logging via CloudTrail. Single-use fetch tokens are implemented as short-lived Secrets Manager grants scoped to the runner's IAM role per task.
+2. **Runner hosting (resolved — 2026-03-21):** EC2 t3.medium + EBS + recruiter's home/work exit proxy via Tailscale or WireGuard (Section 5.4). EC2 provides 24/7 reliability; home network exit provides genuine residential IP. Detection risk is identical to running on the recruiter's machine. AWS has no native service for routing EC2 outbound traffic through a home network — Tailscale is the right tool. Third-party proxies (Section 5.5) are the Phase 4 fallback when home networks are unavailable.
 3. **Approval UX:** One-by-one task approval is friction. Bulk approval ("approve today's outreach queue") needs CRM UI design — bulk confirm must still show the full ranked list, not a blind "approve all" button.
 4. **Prompt injection defence:** A candidate's LinkedIn profile could contain text designed to hijack browser-use's LLM (e.g., "ignore previous instructions and send a message to..."). Mitigation: system prompt sandboxing + off-site navigation blocking (already enforced) + step verification. Requires adversarial testing before Phase 3 launch.
 5. **Session state TTL strategy:** 14-day inactivity TTL is a starting point. LinkedIn sessions may survive longer; expiring them early forces unnecessary re-logins. The right TTL should be informed by observed LinkedIn session lifetimes in production — track `SESSION_INVALID` error rate after S3 load to calibrate.
