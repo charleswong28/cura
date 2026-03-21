@@ -16,7 +16,7 @@
 - Credential fetch-and-discard flow
 - Swappable `BrowserBackend` interface — browser-use (default) vs page-agent (alternative), security analysis of each
 - Determinism strategy (scoped task prompts, abort conditions, step verification)
-- Agent Communication Protocol (ACP / A2A) as future orchestration layer
+- A2A integration design — Talon as A2A Server, CRM as A2A Client, SSE streaming, agent card
 - Data model (TalonTask, TalonCredential, TalonAuditLog)
 - Key design decisions with alternatives considered
 
@@ -586,53 +586,343 @@ enum TalonAuditEvent {
 
 ---
 
-## 10. Agent Communication Protocol (ACP / A2A)
+## 10. A2A Integration — Cura Agent ↔ Talon
 
-Talon currently uses direct REST API calls between the Orchestrator and Runner (see Section 2 token scopes). This is sufficient for Phase 3.
+Talon is an **A2A Server**. The Cura CRM orchestrator is an **A2A Client**. When a `TalonTask` reaches `READY` status (after human approval), the CRM dispatches it to Talon via an A2A message. Talon streams execution progress back over SSE.
 
-As Cura scales to multiple agents (sourcing agent, screening agent, scheduling agent), a standardised inter-agent protocol becomes relevant.
+**Protocol note:** ACP (IBM Research) merged with Google's A2A under the Linux Foundation in September 2025. The canonical standard going forward is **A2A** (`a2a-protocol.org`). SDK: `a2a-sdk` on PyPI (Python), available for TypeScript too.
 
-### What ACP / A2A is
+### 10.1 Why A2A over a custom REST transport
 
-**ACP (Agent Communication Protocol)** was an open REST-based protocol for agent-to-agent communication developed by IBM Research. In September 2025, ACP merged with Google's **A2A (Agent-to-Agent)** protocol under the Linux Foundation to form a unified standard.
+| Aspect | Custom REST polling (original) | A2A (adopted) |
+|--------|-------------------------------|--------------|
+| Task latency | Up to 30 min (poll interval) | Seconds (push on READY) |
+| Progress visibility | Only on DB write at end | Real-time SSE stream |
+| Agent discovery | Hardcoded config | Agent card at well-known URL |
+| Interoperability | None — Cura-only | Any A2A client can orchestrate Talon |
+| Protocol maintenance | Custom, Cura-owned | Linux Foundation standard |
+| Future multi-runner | Manual coordination | A2A contextId handles routing |
 
-A2A defines:
-- How agents advertise their capabilities (agent cards / metadata)
-- How tasks are handed off between agents (REST + Server-Sent Events for streaming)
-- How long-running multi-agent workflows are coordinated
-- Framework-agnostic — works with LangChain, CrewAI, BeeAI, or custom code
+A2A does not replace the DB task state machine — the DB remains the source of truth. A2A is the **live transport** on top of it: CRM pushes tasks in, Talon streams progress out, DB records everything.
 
-A2A sits one layer above MCP: MCP connects an LLM to tools and data sources; A2A connects agents to other agents.
+### 10.2 What stays the same
+
+**Nothing about the safety model changes.** A2A is a transport layer change, not a permission model change.
+
+- Human approval gate: task must be `READY` in DB before CRM sends the A2A message
+- Permission separation: CRM orchestrator token ≠ Talon runner token — unchanged
+- Talon double-checks `status = READY` in DB at claim time, even if a message arrives early
+- Credential fetch-and-discard: unchanged
+- Site isolation via `allowed_domains`: unchanged
+- `BrowserBackend` adapter: unchanged — A2A is above this layer
+
+### 10.3 Message flow
 
 ```
-[CRM Orchestrator Agent]
-    │  A2A task hand-off
-    ▼
-[Talon Runner Agent]          ← executes browser tasks
-    │  MCP calls
-    ▼
-[CRM task queue API]          ← updates task status
+CRM (NestJS — A2A Client)               Talon (Python — A2A Server)
+  │                                              │
+  │  TalonTask.status → READY (DB)              │
+  │  TalonDispatchService triggered              │
+  │                                              │
+  │  POST /a2a  (tasks/sendSubscribe)            │
+  │  {                                           │
+  │    message: {                                │
+  │      role: "user",                           │
+  │      parts: [{ type: "data", data: {         │
+  │        skill: "execute_browser_task",        │
+  │        task_id: "<talon-task-ulid>",         │
+  │        site_key: "linkedin.com",             │
+  │        payload: { prompt, abort_conditions } │
+  │      }}]                                     │
+  │    },                                        │
+  │    contextId: "<userId>"                     │
+  │  }                                           │
+  ├─────────────────────────────────────────────▶│
+  │                                              │  Validate bearer token
+  │                                              │  DB check: task.status === READY
+  │                                              │  Claim: READY → CLAIMED (DB)
+  │◀── SSE: status=working ──────────────────────┤
+  │    "Task claimed. Fetching credential."      │
+  │                                              │  Fetch credential (vault)
+  │                                              │  Open BrowserBackend session
+  │◀── SSE: status=working ──────────────────────┤
+  │    "Browser session opened."                 │
+  │                                              │  Execute step 1…
+  │◀── SSE: status=working ──────────────────────┤
+  │    { step: 1, description: "Navigated..." }  │
+  │                                              │  Execute step 2…
+  │◀── SSE: status=working ──────────────────────┤
+  │    { step: 2, description: "Clicked..." }    │
+  │                                              │  Close session, discard credential
+  │◀── SSE: status=completed ────────────────────┤
+  │    artifact: { result: { success: true } }   │
+  │                                              │
+  │  Update TalonTask → COMPLETED (DB)           │
+  │  Update CoworkTask → COMPLETED (DB)          │
+  │  Push live update → Soketi → CRM dashboard  │
 ```
 
-### Relevance to Talon
+### 10.4 Talon A2A Server (Python)
 
-| Scenario | Current (Phase 3) | With A2A |
-|----------|-------------------|---------|
-| Orchestrator → Runner | Direct REST API, proprietary token | A2A task message, standardised |
-| Runner discovery | Hardcoded config | Agent card — self-describing |
-| Multi-runner coordination | Not needed yet | A2A handles task distribution |
-| External agent integration | Not possible | Any A2A-compatible agent can orchestrate Talon |
+Talon is a persistent Python service using `a2a-sdk` and Starlette/uvicorn.
 
-### Decision: defer A2A adoption to Phase 4+
+```python
+# talon/agent_executor.py
+from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.events import EventQueue
+from a2a.utils import new_agent_text_message
+from a2a.types import DataPart
 
-**Chosen:** Keep direct REST API for Phase 3.
+class TalonAgentExecutor(AgentExecutor):
+    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        params = self._extract_params(context.message)
+        task_id = params["task_id"]
+        site_key = params["site_key"]
+
+        # Double-check READY state in DB (safety gate)
+        if not await is_task_ready(task_id):
+            raise PermissionError(f"Task {task_id} is not in READY state")
+
+        # Claim in DB: READY → CLAIMED
+        await claim_task(task_id)
+        await event_queue.enqueue_event(
+            new_agent_text_message("Task claimed. Fetching credential.")
+        )
+
+        # Credential fetch (abort if missing)
+        credential = await fetch_credential(site_key, params["user_id"])
+        if not credential:
+            await fail_task(task_id, "NO_CREDENTIAL")
+            raise ValueError("NO_CREDENTIAL: no credential for site")
+
+        # Execute via BrowserBackend
+        backend = BackendRegistry.get(site_key)
+        async with backend.open_session(site_key, credential) as session:
+            result = await backend.execute_task(
+                session, params["payload"],
+                on_step=lambda step: event_queue.enqueue_event(
+                    new_agent_text_message(f"Step {step.index}: {step.description}")
+                ),
+            )
+
+        # Complete in DB
+        await complete_task(task_id, result)
+
+        # Final artifact streamed to CRM
+        await event_queue.enqueue_event(DataPart(data=result))
+
+    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        task_id = self._extract_task_id(context)
+        await fail_task(task_id, "CANCELLED")
+
+
+# talon/server.py
+from a2a.server.apps import A2AStarletteApplication
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore
+from a2a.types import (
+    AgentCard, AgentSkill, AgentCapabilities, AgentAuthentication
+)
+import uvicorn
+
+agent_card = AgentCard(
+    name="talon",
+    description=(
+        "Deterministic browser task executor for Cura. Executes pre-approved "
+        "browser tasks against specific sites. One site per session. "
+        "Human approval is required before any task reaches this agent."
+    ),
+    url="https://talon.cura.internal",
+    version="1.0.0",
+    capabilities=AgentCapabilities(streaming=True, pushNotifications=False),
+    authentication=AgentAuthentication(schemes=["Bearer"]),
+    skills=[
+        AgentSkill(
+            id="execute_browser_task",
+            name="Execute Browser Task",
+            description=(
+                "Execute a single pre-approved browser action on a specified site. "
+                "The task must be in READY state in the Cura task database. "
+                "Streams progress via SSE. Returns a result artifact on completion."
+            ),
+            tags=["browser", "automation", "recruitment", "linkedin"],
+            inputModes=["application/json"],
+            outputModes=["application/json"],
+        )
+    ],
+)
+
+handler = DefaultRequestHandler(
+    agent_executor=TalonAgentExecutor(),
+    task_store=InMemoryTaskStore(),   # A2A in-flight state; DB is source of truth
+)
+
+app = A2AStarletteApplication(agent_card=agent_card, http_handler=handler).build()
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8001)
+```
+
+### 10.5 CRM A2A Client (NestJS)
+
+The CRM dispatches tasks to Talon the moment they reach `READY`. A DB event hook or a Prisma middleware fires `TalonDispatchService`.
+
+```typescript
+// apps/api/src/talon/talon-dispatch.service.ts
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
+import { SoketiService } from '../soketi/soketi.service';
+
+@Injectable()
+export class TalonDispatchService {
+  private readonly talonUrl: string;
+  private readonly talonToken: string;
+
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+    private readonly soketi: SoketiService,
+  ) {
+    this.talonUrl = this.config.getOrThrow('TALON_A2A_URL');
+    this.talonToken = this.config.getOrThrow('TALON_BEARER_TOKEN');
+  }
+
+  async dispatch(talonTaskId: string): Promise<void> {
+    const task = await this.prisma.talonTask.findFirstOrThrow({
+      where: { id: talonTaskId, status: 'READY' },
+    });
+
+    // Discover Talon's agent card (cached after first fetch)
+    const agentCardUrl = `${this.talonUrl}/.well-known/agent.json`;
+    const response = await fetch(`${this.talonUrl}/a2a`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.talonToken}`,
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'message/stream',
+        params: {
+          message: {
+            role: 'user',
+            parts: [{
+              type: 'data',
+              data: {
+                skill: 'execute_browser_task',
+                task_id: task.id,
+                site_key: task.siteKey,
+                payload: task.payload,
+              },
+            }],
+          },
+          contextId: task.userId,   // group recruiter's tasks in one A2A context
+        },
+      }),
+    });
+
+    // Consume SSE stream
+    for await (const event of this.readSSE(response)) {
+      await this.handleTalonEvent(task.id, event);
+    }
+  }
+
+  private async handleTalonEvent(taskId: string, event: A2AStreamEvent) {
+    if (event.status?.state === 'working') {
+      // Push live progress to CRM dashboard via Soketi
+      await this.soketi.publish(`talon.${taskId}`, 'progress', event.status.message);
+    }
+
+    if (event.status?.state === 'completed') {
+      const result = event.artifact?.data ?? {};
+      await this.prisma.talonTask.update({
+        where: { id: taskId },
+        data: { status: 'COMPLETED', result, completedAt: new Date() },
+      });
+      // Cascade to parent CoworkTask
+      await this.completeCoworkTask(taskId, result);
+    }
+
+    if (event.status?.state === 'failed') {
+      await this.prisma.talonTask.update({
+        where: { id: taskId },
+        data: {
+          status: 'FAILED',
+          errorMessage: event.status.message,
+          completedAt: new Date(),
+        },
+      });
+    }
+  }
+}
+```
+
+### 10.6 A2A Agent Card (published at `/.well-known/agent.json`)
+
+```json
+{
+  "name": "talon",
+  "description": "Deterministic browser task executor for Cura. Executes pre-approved browser tasks against specific sites. One site per session. Human approval required before any task reaches this agent.",
+  "url": "https://talon.cura.internal",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false
+  },
+  "authentication": {
+    "schemes": ["Bearer"]
+  },
+  "skills": [
+    {
+      "id": "execute_browser_task",
+      "name": "Execute Browser Task",
+      "description": "Execute a single pre-approved browser action. task_id must be READY in the Cura DB. Streams step-level progress. Returns result artifact.",
+      "tags": ["browser", "automation", "recruitment"],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ]
+}
+```
+
+### 10.7 Safety gate: A2A does not bypass human approval
+
+A2A changes **when** tasks reach Talon (push vs poll) — it does not change **what** can reach Talon.
+
+```
+Orchestrator creates TalonTask           DRAFT
+  │
+Human reviews in CRM dashboard           PENDING_APPROVAL
+  │ (approve)
+CRM transitions task                     READY
+  │
+TalonDispatchService fires A2A message   → Talon
+  │
+Talon claims (DB check: must be READY)   CLAIMED
+  │
+Talon executes                           IN_PROGRESS → COMPLETED
+```
+
+If an A2A message arrives for a task not in `READY` state (e.g., still `PENDING_APPROVAL`, or already `COMPLETED`), Talon rejects it with a `403` before opening any browser session. The DB state machine is the authority — A2A is the delivery mechanism.
+
+### 10.8 Decision: adopt A2A as the CRM↔Talon transport
+
+**Decision:** A2A from the start. Custom REST polling removed.
 
 **Rationale:**
-- A2A adds protocol overhead with no immediate benefit (Cura has one orchestrator, one runner)
-- The spec and tooling are still stabilising post-merger
-- The `BrowserBackend` interface already makes Talon's internals modular — adopting A2A later requires only changing the Orchestrator↔Runner transport layer, not the core logic
+- Push dispatch eliminates the 30-min polling delay — tasks start seconds after human approval
+- Real-time SSE progress enables live CRM dashboard updates (via Soketi)
+- A2A is the Linux Foundation standard; adopting it now prevents a migration later
+- Agent card at `/.well-known/agent.json` means future agents (screening, scheduling) can discover and call Talon without configuration changes
+- `a2a-sdk` is stable (v0.3, with 1.0 in active development) — safe to adopt
 
-**Future trigger:** When Cura runs more than two agents with different capabilities that need to hand off tasks to each other, adopt A2A as the communication layer.
+**Trade-offs accepted:**
+- Talon becomes a persistent service rather than a cron job — requires process supervision (systemd, Docker, Kubernetes)
+- A2A adds a dependency (`a2a-sdk`) and requires running a second HTTP server (port 8001) alongside the browser process
+
+**Alternatives rejected:** Custom REST polling (30-min latency, no real-time progress, no interoperability). Rejected.
 
 ---
 
