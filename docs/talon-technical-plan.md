@@ -374,12 +374,25 @@ def proxy_for_recruiter(recruiter_id: str) -> ProxySettings:
 
 ### Provider comparison
 
-| Provider | Type | Sticky duration | Pool size | Pricing model | LinkedIn track record |
-|----------|------|----------------|-----------|---------------|----------------------|
-| **Bright Data** | Mobile 4G/5G + residential | Up to 24h (mobile), 30 min (residential) | 7M+ mobile IPs | Per-GB (~$8–15/GB residential, ~$10–18/GB mobile) | Best in class; explicit LinkedIn proxy product |
-| **IPRoyal** | Residential + mobile | Up to 7 days (configurable in password field) | 2M+ residential | Per-GB (~$2–7/GB) + fixed plans | Good; cheaper than Bright Data |
-| **Oxylabs** | Residential + mobile | Up to 10 min rolling (session ID re-assigned) | 100M+ residential | Per-GB (~$8–12/GB) | Enterprise-grade; pricier |
-| **Mullvad (WireGuard)** | Residential ISP exit nodes | Permanent (static WG peer) | ~100 residential exit nodes | Flat-rate (~$5/mo per peer) | Not LinkedIn-specific; but genuine ISP IPs |
+**Sticky session providers (shared pool, per-GB billing):**
+
+| Provider | Type | Sticky duration | Pool size | Pricing | Notes |
+|----------|------|----------------|-----------|---------|-------|
+| **SOAX** | Mobile 4G/5G | Up to **60 min** (best in class) | 33M+ mobile | $6.60/GB PAYG or $139/mo 150GB | 99.55% success rate; KYC required |
+| **Bright Data** | Mobile 4G/5G | Up to 30 min | 7M+ mobile | ~$14–24/GB mobile | Explicit LinkedIn product; 99%+ success |
+| **Oxylabs** | Mobile + residential | Up to 30 min | 175M+ total | ~$15/GB mobile | 99.9% uptime; 1.1s avg response |
+| **IPRoyal** | Residential | Up to 7 days | 60M+ | ~$2–7/GB | Lifetime encoded in password field |
+
+**Dedicated IP providers (exclusively yours, flat-rate billing):**
+
+| Provider | Type | Monthly cost | Notes |
+|----------|------|-------------|-------|
+| **Webshare** | Dedicated ISP/residential | ~$1.47/IP | Cheapest; static residential, no pool sharing |
+| **IPRoyal Static** | Dedicated residential ISP | ~$5.50/IP | 60M+ pool; permanent assignment |
+| **Proxy-Seller** | Dedicated 4G/5G mobile | ~$10/IP | Real carrier; on-demand rotation link |
+| **PROXY.father** | Dedicated 4G/5G (real SIM) | $49–59/mo | One SIM per IP; EU-focused |
+
+**Key insight:** For Playwright automation, dedicated flat-rate IPs are almost always cheaper than per-GB sticky sessions. Playwright renders full pages — 10–50x more bandwidth than bare HTTP scraping. A single recruiter doing 2 hours of LinkedIn automation per day can easily burn 5–10 GB/month, making per-GB proxies ($30–150/mo) far more expensive than a dedicated ISP IP at $1.47–5.50/mo.
 
 **Sticky session format by provider:**
 
@@ -409,7 +422,38 @@ host: pr.oxylabs.io:7777
 | **Operational model** | One token per recruiter | One IP per recruiter |
 | **Recommended for** | Phase 4 default | High-value accounts if survival degrades |
 
-**Recommended Phase 4 default:** Bright Data mobile sticky with `lifetime-24h`. Upgrade specific accounts to dedicated residential ISP IPs if survival degrades.
+**Revised Phase 4 recommendation:** Dedicated ISP/static residential IP per recruiter account (Webshare at ~$1.47/IP or IPRoyal Static at ~$5.50/IP). The flat-rate model is almost certainly cheaper than per-GB sticky sessions given Playwright's bandwidth consumption. Only use sticky mobile sessions for accounts that need re-activation after a flag event (SOAX 60-min sticky).
+
+**Account → proxy registry:** Store the `proxy_endpoint` alongside the recruiter's LinkedIn account in the database. Never reassign an IP to a different LinkedIn account — LinkedIn detects IP sharing across accounts and links them. This mapping must be permanent until the IP is explicitly burned.
+
+```python
+# Retrieve per-recruiter proxy from DB at task claim time
+recruiter = await db.get_recruiter(task.recruiter_id)
+proxy = ProxySettings(
+    server=recruiter.proxy_endpoint,       # e.g. "http://p.webshare.io:80"
+    username=recruiter.proxy_username,     # stored encrypted in vault
+    password=recruiter.proxy_password,
+)
+```
+
+**Multi-recruiter in one process — context-level proxy isolation:**
+
+```python
+# One browser, multiple recruiter contexts — each with its own dedicated IP
+browser = await p.chromium.launch()
+
+context_alice = await browser.new_context(proxy={
+    "server": "http://p.webshare.io:80",
+    "username": "alice_proxy_user",
+    "password": "alice_proxy_pass",
+})
+context_bob = await browser.new_context(proxy={
+    "server": "http://p.webshare.io:80",
+    "username": "bob_proxy_user",
+    "password": "bob_proxy_pass",
+})
+# Alice and Bob are isolated: different IPs, different cookies, different sessions
+```
 
 ### WireGuard/Wireproxy architecture (50+ recruiters)
 
