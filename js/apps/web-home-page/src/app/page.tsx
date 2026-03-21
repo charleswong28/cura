@@ -2,8 +2,8 @@
  * Home page — HP-008
  *
  * Scroll order (matches Section Map in home-page-project-management.md):
- *  1. HeroSection          — "AI Runs the ATS. You Close the Deal."
- *  2. ProblemSection       — "Your competitors close deals…"          #why-cura
+ *  1. HeroSection          — "Your AI Recruiter. Ready in 5 Minutes."
+ *  2. HowItWorksSection    — "Set up. Let it work. Close deals."      #how-it-works
  *  3. ValuePropsSection    — Three-pillar AI features + speed banner  #product
  *  4. ReplaceStackSection  — "One brain. Not five tools."
  *  5. AIShowcase           — Match · Draft · Brief tabs + keyboard
@@ -16,7 +16,7 @@
  * NavBar (sticky, with scroll-spy) is rendered in layout.tsx.
  */
 import HeroSection from "@/components/HeroSection";
-import ProblemSection from "@/components/ProblemSection";
+import HowItWorksSection from "@/components/HowItWorksSection";
 import ValuePropsSection from "@/components/ValuePropsSection";
 import ReplaceStackSection from "@/components/ReplaceStackSection";
 import AIShowcase from "@/components/AIShowcase";
@@ -30,7 +30,7 @@ export default function HomePage() {
   return (
     <main>
       <HeroSection />
-      <ProblemSection />
+      <HowItWorksSection />
       <ValuePropsSection />
       <ReplaceStackSection />
       <AIShowcase />

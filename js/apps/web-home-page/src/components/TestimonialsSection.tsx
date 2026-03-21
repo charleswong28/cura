@@ -8,7 +8,6 @@
  *
  * Light cream background to contrast the surrounding dark sections.
  */
-import Image from "next/image";
 
 /** HP-046: real executive search & recruitment firms via logo.dev */
 const AGENCIES = [
@@ -77,8 +76,9 @@ export default function TestimonialsSection() {
               className="w-7 h-7 rounded-full bg-white flex items-center justify-center overflow-hidden shadow-[0_0_0_2px_var(--color-cura-base)]"
               title={name}
             >
-              <Image
-                src="/images/logos/heidrick-and-struggles.svg"
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://img.logo.dev/${domain}?token=${process.env.LOGO_DEV_TOKEN}&size=60&format=png`}
                 alt={name}
                 width={28}
                 height={28}

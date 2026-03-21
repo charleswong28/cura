@@ -6,7 +6,7 @@ import { useScrollSpy } from "@/hooks/useScrollSpy";
 import { useClickOutside } from "@/hooks/useClickOutside";
 
 const NAV_LINKS = [
-  { label: "Why Cura", href: "#why-cura" },
+  { label: "How It Works", href: "#how-it-works" },
   { label: "Product", href: "#product" },
   { label: "Pricing", href: "#pricing" },
 ];

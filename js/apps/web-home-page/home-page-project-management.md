@@ -106,9 +106,9 @@
 
 #### Story HP-10.1: Three-Step Flow
 
-- [ ] **HP-069:** Build `<HowItWorksSection>` — light background (`#FAFAF8`). Section eyebrow: `"How it works"` (indigo, uppercase). Headline: `"Set up. Let it work. Close deals."` (display sans, dark text). Subline: `"Three steps between you and an AI recruiter that sources, outreaches, and follows up around the clock."` (muted, centred).
+- [x] **HP-069:** Build `<HowItWorksSection>` — light background (`#FAFAF8`). Section eyebrow: `"How it works"` (indigo, uppercase). Headline: `"Set up. Let it work. Close deals."` (display sans, dark text). Subline: `"Three steps between you and an AI recruiter that sources, outreaches, and follows up around the clock."` (muted, centred).
 
-- [ ] **HP-070:** Three numbered step cards (horizontal on desktop, stacked on mobile), each with an icon, title, and description:
+- [x] **HP-070:** Three numbered step cards (horizontal on desktop, stacked on mobile), each with an icon, title, and description:
   - **Step 1 — "Connect your accounts"** (link/plug icon)
     `"Link your LinkedIn and email. Import your existing candidates or start fresh. Cura syncs everything in under 5 minutes."`
   - **Step 2 — "AI goes to work"** (robot/zap icon)
@@ -117,7 +117,7 @@
     `"Review the AI's work. Approve outreach with one click. Enter every candidate conversation with full context. Focus on the human connection that actually wins placements."`
   - Each card has a top number badge (01, 02, 03) in indigo. Connecting dotted line between cards on desktop.
 
-- [ ] **HP-071:** Below the steps, add a trust line: `"Every AI action requires your approval. No autonomous sending. No surprises."` — centred, muted italic.
+- [x] **HP-071:** Below the steps, add a trust line: `"You choose which steps need your approval. Full control, no surprises."` — centred, muted italic.
 
 ---
 
@@ -219,25 +219,23 @@
  1. [NAV]              Sticky nav — logo · links · "Get Early Access" CTA
  2. [HERO]             REWORKED — "Your AI Recruiter. Ready in 5 Minutes."
                        AI-at-work dashboard visual · 4 micro-stats · waitlist CTA
- 3. [PROBLEM]          "Your competitors close deals while you're updating spreadsheets."
-                       4 pain cards: Endless Click · Context Amnesia · Slow=Lost · Tool Tax
- 4. [HOW IT WORKS]     NEW — "Set up. Let it work. Close deals."
+ 3. [HOW IT WORKS]     NEW — "Set up. Let it work. Close deals."
                        3-step: Connect accounts → AI sources & outreaches → You approve & close deals
- 5. [OUTREACH]         NEW — "Outreach that actually gets replies."
+ 4. [OUTREACH]         NEW — "Outreach that actually gets replies."
                        Smart targeting (25-40% response) · LinkedIn-safe · approval queue
- 6. [AUTO CRM]         NEW — "Your CRM updates itself."
+ 5. [AUTO CRM]         NEW — "Your CRM updates itself."
                        Animated event feed · zero admin · full context for every conversation
- 7. [VALUE PROP 1]     "AI that moves the deal." — autonomous pipeline
+ 6. [VALUE PROP 1]     "AI that moves the deal." — autonomous pipeline
     [SPEED BANNER]     "3 hours reclaimed per day."
- 8. [VALUE PROP 2]     "Every signal. One timeline." — zero-loss memory
- 9. [VALUE PROP 3]     "AI drafts. You decide." — human-in-the-loop
-10. [REPLACE STACK]    "One brain. Not five tools." — stack consolidation visual + NLP search demo
-11. [AI SHOWCASE]      Source · Match · Draft · Brief tabs · keyboard shortcuts
-12. [COMPARISON]       Feature table (13 rows) · compliance badge
-13. [SOCIAL PROOF]     Testimonials · logos · rating
-14. [PRICING]          4-tier grid — Free · Starter · Pro · Enterprise
-15. [WAITLIST]         "Your pipeline won't move itself." — email capture
-16. [FOOTER]           Links · copyright
+ 7. [VALUE PROP 2]     "Every signal. One timeline." — zero-loss memory
+ 8. [VALUE PROP 3]     "AI drafts. You decide." — human-in-the-loop
+ 9. [REPLACE STACK]    "One brain. Not five tools." — stack consolidation visual + NLP search demo
+10. [AI SHOWCASE]      Source · Match · Draft · Brief tabs · keyboard shortcuts
+11. [COMPARISON]       Feature table (13 rows) · compliance badge
+12. [SOCIAL PROOF]     Testimonials · logos · rating
+13. [PRICING]          4-tier grid — Free · Starter · Pro · Enterprise
+14. [WAITLIST]         "Your pipeline won't move itself." — email capture
+15. [FOOTER]           Links · copyright
 ```
 
 ---

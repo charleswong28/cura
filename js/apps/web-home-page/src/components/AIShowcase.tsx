@@ -405,20 +405,6 @@ export default function AIShowcase() {
         <p className="text-center text-cura-white/35 italic text-body-fluid mt-8 mb-14">
           AI does the thinking. You make the call.
         </p>
-
-        {/* HP-036 + HP-037 — KeyboardBadge inside speed callout box */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-8 px-8 py-8 rounded-2xl border border-white/8 bg-white/2">
-          <div className="text-center sm:text-left flex-1 max-w-sm">
-            <div className="text-cura-white/85 font-semibold text-body-fluid mb-2">
-              Built for speed. Every action has a shortcut.
-            </div>
-            <div className="text-cura-white/40 text-sm leading-[1.7]">
-              Every action has a keyboard shortcut. Navigate the entire platform without lifting
-              your hands from the keys.
-            </div>
-          </div>
-          <KeyboardBadge />
-        </div>
       </div>
     </section>
   );
