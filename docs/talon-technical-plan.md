@@ -14,7 +14,7 @@
 - Task lifecycle and human approval gate
 - Site isolation design
 - Credential fetch-and-discard flow
-- Browser session persistence — S3 encrypted state, session lifecycle, IP consistency design
+- Browser session persistence — Chrome profile on VM disk (primary), S3 encrypted state (fallback), session lifecycle, IP consistency design
 - Swappable `BrowserBackend` interface — browser-use (default) vs page-agent (alternative), security analysis of each
 - Determinism strategy (scoped task prompts, abort conditions, step verification)
 - A2A integration design — Talon as A2A Server, CRM as A2A Client, SSE streaming, agent card
@@ -286,10 +286,11 @@ LinkedIn has expanded bot detection significantly since 2024–2025. It now oper
 
 | Deployment | IP type | LinkedIn survival | Session handling | Operational effort | Cost |
 |------------|---------|------------------|------------------|-------------------|------|
-| **Recruiter's own machine** ✓ recommended | Home/office residential | Highest — identical to manual use | S3 or local Chrome profile | One-time setup on recruiter's machine | ~$0 infra |
-| Dedicated cloud VM per recruiter + Elastic IP | Datacenter | **Blocked at login** — LinkedIn detects at ASN level | S3 | Medium — one VM per recruiter | ~$20–50/mo per recruiter |
-| Cloud VM + shared residential proxy | Shared residential | ~50% survival | S3 | High — proxy management, IP rotation | ~$50–100/mo per recruiter |
-| Cloud VM + mobile proxy (4G/5G) | Mobile CGNAT | ~85% survival | S3 | High — mobile proxy subscriptions | ~$100–200/mo per recruiter |
+| **Cloud VM + recruiter's home/work exit proxy** ✓ recommended | Home/office residential (tunnelled) | Highest — identical to manual use | Chrome profile on VM disk | One-time Tailscale or WireGuard setup | ~$5–10/mo VM + $0 proxy |
+| Recruiter's own machine (Phase 3 fallback) | Home/office residential | Highest — identical to manual use | Chrome profile on machine | One-time Python + Playwright setup | ~$0 infra |
+| Dedicated cloud VM per recruiter + Elastic IP | Datacenter | **Blocked at login** — LinkedIn detects at ASN level | Chrome profile on VM | Medium — one VM per recruiter | ~$20–50/mo per recruiter |
+| Cloud VM + shared residential proxy | Shared residential | ~50% survival | Chrome profile on VM | High — proxy management, IP rotation | ~$50–100/mo per recruiter |
+| Cloud VM + mobile proxy (4G/5G) | Mobile CGNAT | ~85% survival | Chrome profile on VM | High — mobile proxy subscriptions | ~$100–200/mo per recruiter |
 | **browser-use Cloud** | Datacenter (likely) | **Blocked at login** | 15-min session cap; cloud profiles | None — managed service | Usage-based + blocked |
 
 ### Why browser-use Cloud is not viable for LinkedIn
@@ -318,7 +319,7 @@ When running on the recruiter's machine, there are two session strategies:
 | **Portability** | Any machine with vault access | Tied to this machine's Chrome install |
 | **Recommended for** | Cloud deployment, session portability | Recruiter's primary machine |
 
-**Recommended default for recruiter's machine:** Chrome profile (`user_data_dir`). If the recruiter's machine is not available, fall back to S3 storage_state with a cloud VM + mobile proxy.
+**Recommended default:** Chrome profile (`user_data_dir`) on a persistent cloud VM, with Tailscale or WireGuard routing all browser traffic out through the recruiter's home/work network. If the home network is unavailable, fall back to a third-party mobile proxy (see Section 5.5).
 
 ### IP detection handling
 
@@ -330,9 +331,161 @@ This is detection, not prevention. The real mitigation is deployment. IP consist
 
 ---
 
-## 5.4 Phase 4 Remote Proxy Setup (cloud-hosted Talon)
+## 5.4 Deployment: Cloud VM + Home/Work Exit Proxy (Phase 3 Primary)
 
-This section documents the proxy architecture for when Talon runs on a cloud VM rather than the recruiter's machine. This is not Phase 3 — it is the design for when 24/7 availability becomes a requirement. Documented here so the architecture is clear before committing to the infra investment.
+Talon runs as a persistent service on a cloud VM. All browser traffic exits via the recruiter's home or work network. The cloud VM provides 24/7 reliability; the recruiter's network provides the genuine residential IP that LinkedIn trusts — identical to their manual usage.
+
+### Architecture
+
+```
+[Cloud VM — always on]                        [Recruiter's home/work network]
+  Talon (Python + browser-use)             ┌─ Option A: Tailscale exit node (laptop/NAS)
+  Chrome profiles on VM disk      ─────────┤─ Option B: WireGuard on router (always-on)
+  All outbound traffic tunnelled           └─ Option C: SSH SOCKS5 (from laptop)
+
+LinkedIn sees: recruiter's home/work IP (identical to their manual use)
+```
+
+**Why this model over running on the recruiter's machine:**
+- Cloud VM is always on — no dependency on the recruiter's laptop being awake
+- LinkedIn sees the exact same residential IP used for all manual activity
+- Detection risk is identical to recruiter's-machine deployment (Section 5.3)
+- Chrome profile persists on VM disk — no S3 session state needed
+- One cloud VM can serve multiple sessions sequentially; cost is ~$5–10/mo
+
+**Per-recruiter IP isolation:** Each LinkedIn account must exit via its own IP. Never tunnel multiple recruiter accounts through the same home network — LinkedIn correlates shared IPs across accounts and links them. One home network = one recruiter account.
+
+---
+
+### Option A: Tailscale Exit Node (recommended — 30 min setup)
+
+The recruiter's home machine (or any always-on device: NAS, Raspberry Pi, spare laptop) advertises itself as a Tailscale exit node. The cloud VM routes all traffic through it.
+
+**Home machine (one-time setup):**
+```bash
+# Install Tailscale, advertise as exit node
+tailscale up --advertise-exit-node
+# Approve in Tailscale admin console: app.tailscale.com → Machines → Edit route settings
+```
+
+**Cloud VM (one-time setup):**
+```bash
+# Install Tailscale, set home machine as exit node
+tailscale up --exit-node=<home-machine-tailscale-ip>
+
+# Verify exit IP matches recruiter's home ISP
+curl https://ipinfo.io/ip   # must return home IP, not VM datacenter IP
+```
+
+**browser-use config — no proxy settings required.** Tailscale handles OS-level routing. All browser traffic exits via home automatically.
+
+```python
+PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "/home/ubuntu/chrome-profiles")
+
+profile = BrowserProfile(
+    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
+    # No proxy= — Tailscale exit node routes at OS level
+)
+session = BrowserSession(browser_profile=profile)
+```
+
+**Tailscale free tier:** supports 1 exit node — sufficient for Phase 3 (one recruiter per Tailscale account). Scale plan ($6/mo) adds multiple exit nodes for multi-recruiter setups.
+
+**Limitation:** The exit-node machine must stay on and connected. Disable sleep/hibernate on the exit-node device, or use Option B (router-level WireGuard) for always-on reliability without leaving a laptop running.
+
+---
+
+### Option B: WireGuard on Home Router (most robust — always on)
+
+WireGuard configured directly on the router survives laptop sleep/restart — the router is always on. Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense, and most modern prosumer routers.
+
+```
+[Cloud VM] --WireGuard peer (UDP 51820)--> [Home router] --> internet (home ISP IP)
+```
+
+**Router:** Enable WireGuard server in the router UI. Generate a peer config file for the cloud VM. Most routers with WireGuard support expose this via a GUI — no CLI required.
+
+**Cloud VM:**
+```bash
+# Install WireGuard, load the peer config from the router
+apt install wireguard
+# Paste peer config into /etc/wireguard/wg0.conf
+wg-quick up wg0
+
+# Verify exit IP
+curl https://ipinfo.io/ip   # must return home ISP IP
+```
+
+**browser-use config — identical to Tailscale (no proxy settings).** WireGuard handles OS-level routing.
+
+**When to use:** Recruiter has a compatible router and wants 24/7 reliability without any home machine staying on. Best for production Phase 3 deployments.
+
+---
+
+### Option C: SSH SOCKS5 (simple, less reliable)
+
+If the recruiter's home machine exposes SSH (via port forward on the router), the cloud VM can create a SOCKS5 tunnel on demand. Unlike Options A and B, this requires explicit proxy configuration in browser-use.
+
+```bash
+# Cloud VM — create SOCKS5 proxy on localhost:1080 via home machine
+# autossh auto-reconnects on drop
+autossh -N -D 1080 -M 0 user@home-ddns-hostname
+```
+
+```python
+from playwright.async_api import ProxySettings
+
+profile = BrowserProfile(
+    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
+    proxy=ProxySettings(server="socks5://localhost:1080"),
+)
+```
+
+**Limitations:** SSH drops require autossh or systemd restart. Home IP must be reachable from the internet (port-forward port 22 on the router; use a DDNS service if home IP is dynamic). Less reliable than Tailscale or WireGuard for always-on operation.
+
+---
+
+### Chrome profile persistence on cloud VM
+
+Since the cloud VM has persistent disk storage, browser state is kept in a Chrome profile directory. The profile persists across Talon restarts with no export/import cycle. This is the simplest session strategy and has the lowest detection risk — the full browser fingerprint (fonts, extensions, canvas) is preserved across sessions.
+
+```
+/home/ubuntu/chrome-profiles/
+  {tenantId}/
+    {userId}/            ← one directory per recruiter
+      Default/
+        Cookies
+        Local Storage/
+        ...
+```
+
+```python
+import os
+
+PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "/home/ubuntu/chrome-profiles")
+
+profile = BrowserProfile(
+    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
+)
+```
+
+**S3 session state (Section 5.2) is not required for this deployment model.** S3 is retained as a fallback for ephemeral deployments (e.g., stateless container without persistent disk). For the cloud VM model, VM disk is the session store.
+
+**Profile conflict:** Chrome's lock file prevents two processes opening the same profile simultaneously. Talon must run tasks for a given recruiter sequentially — already enforced by the task queue design (one `IN_PROGRESS` task per `userId` at a time).
+
+| | Chrome profile on VM (Tailscale/WG) | S3 storage_state | Chrome profile on recruiter's machine |
+|-|------------------------------------|-----------------|--------------------------------------|
+| **Detection risk** | Lowest — persisted fingerprint | Low — real cookies | Lowest — indistinguishable from manual |
+| **Always-on** | Yes | Yes | No — machine must be awake |
+| **Session continuity** | Profile survives restart | Export/import per run | Profile survives restart |
+| **Setup** | One-time Tailscale/WG | Vault + S3 IAM | One-time on each machine |
+| **Recommended for** | Phase 3 primary | Ephemeral containers | Phase 3 fallback |
+
+---
+
+## 5.5 Phase 4 Fallback: Third-Party Proxy (No Home Network Available)
+
+When the recruiter's home/work network cannot act as the exit proxy (e.g., recruiter moves, network unavailable, multi-recruiter agency without per-recruiter home networks), a third-party proxy is the fallback. LinkedIn survival rates are lower than a genuine home IP but acceptable for agencies at scale.
 
 ### Proxy integration with browser-use
 
@@ -343,6 +496,7 @@ from browser_use import BrowserProfile, BrowserSession
 from playwright.async_api import ProxySettings
 
 profile = BrowserProfile(
+    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
     proxy=ProxySettings(
         server="http://brd.superproxy.io:33335",
         username="brd-customer-C1234-zone-mobile_residential-session-randABC12345",
@@ -352,49 +506,51 @@ profile = BrowserProfile(
 session = BrowserSession(browser_profile=profile)
 ```
 
-The proxy is set at browser launch and applies to all contexts in that session. Use **HTTP CONNECT** (`http://`) for LinkedIn — it is pure HTTPS traffic so SOCKS5's protocol-agnosticism adds no value. SOCKS5 only applies if routing through Wireproxy (see below).
+### Per-recruiter deterministic proxy token
 
-### Sticky session format — per-recruiter deterministic token
-
-Each LinkedIn account must have its own stable IP. Never share a session token across accounts. Generate a deterministic session token from the recruiter ID so it survives Talon restarts without changing the pinned IP:
+Each LinkedIn account must have its own stable IP. Generate a deterministic session token from the recruiter ID so it survives Talon restarts without changing the pinned IP:
 
 ```python
 import hashlib
 from playwright.async_api import ProxySettings
 
-def proxy_for_recruiter(recruiter_id: str) -> ProxySettings:
-    """Deterministic sticky session proxy — same recruiter always gets same IP."""
+def proxy_for_recruiter(recruiter_id: str, zone_password: str) -> ProxySettings:
+    """Deterministic sticky session — same recruiter always gets same IP."""
     session_token = hashlib.sha256(recruiter_id.encode()).hexdigest()[:8]
     return ProxySettings(
         server="http://brd.superproxy.io:33335",
         username=f"brd-customer-C1234-zone-mobile_residential-session-rand{session_token}",
-        password="zone_password"
+        password=zone_password,
     )
 ```
+
+**Account → proxy registry:** Store the `proxy_endpoint` alongside the recruiter's LinkedIn account in the database. Never reassign an IP to a different LinkedIn account — LinkedIn detects IP sharing across accounts. This mapping is permanent until the IP is explicitly burned.
 
 ### Provider comparison
 
 **Sticky session providers (shared pool, per-GB billing):**
 
-| Provider | Type | Sticky duration | Pool size | Pricing | Notes |
-|----------|------|----------------|-----------|---------|-------|
-| **SOAX** | Mobile 4G/5G | Up to **60 min** (best in class) | 33M+ mobile | $6.60/GB PAYG or $139/mo 150GB | 99.55% success rate; KYC required |
-| **Bright Data** | Mobile 4G/5G | Up to 30 min | 7M+ mobile | ~$14–24/GB mobile | Explicit LinkedIn product; 99%+ success |
-| **Oxylabs** | Mobile + residential | Up to 30 min | 175M+ total | ~$15/GB mobile | 99.9% uptime; 1.1s avg response |
-| **IPRoyal** | Residential | Up to 7 days | 60M+ | ~$2–7/GB | Lifetime encoded in password field |
+| Provider | Type | Sticky duration | LinkedIn survival | Pricing | Notes |
+|----------|------|----------------|-----------------|---------|-------|
+| **SOAX** | Mobile 4G/5G | Up to **60 min** (best in class) | ~85% | $6.60/GB PAYG or $139/mo 150GB | 99.55% success rate; KYC required |
+| **Bright Data** | Mobile 4G/5G | Up to 30 min | ~85% | ~$14–24/GB mobile | Explicit LinkedIn product; 99%+ success |
+| **Oxylabs** | Mobile + residential | Up to 30 min | ~85% | ~$15/GB mobile | 99.9% uptime; 1.1s avg response |
+| **IPRoyal** | Residential | Up to 7 days | ~50% | ~$2–7/GB | Lower survival post-2025 detection expansion |
 
 **Dedicated IP providers (exclusively yours, flat-rate billing):**
 
-| Provider | Type | Monthly cost | Notes |
-|----------|------|-------------|-------|
-| **Webshare** | Dedicated ISP/residential | ~$1.47/IP | Cheapest; static residential, no pool sharing |
-| **IPRoyal Static** | Dedicated residential ISP | ~$5.50/IP | 60M+ pool; permanent assignment |
-| **Proxy-Seller** | Dedicated 4G/5G mobile | ~$10/IP | Real carrier; on-demand rotation link |
-| **PROXY.father** | Dedicated 4G/5G (real SIM) | $49–59/mo | One SIM per IP; EU-focused |
+| Provider | Type | Monthly cost | LinkedIn survival | Notes |
+|----------|------|-------------|-----------------|-------|
+| **Webshare** | Dedicated ISP/residential | ~$1.47/IP | ~90–95% | Cheapest; static residential, no pool sharing |
+| **IPRoyal Static** | Dedicated residential ISP | ~$5.50/IP | ~90–95% | Permanent assignment |
+| **Proxy-Seller** | Dedicated 4G/5G mobile | ~$10/IP | ~85% | Real carrier; on-demand rotation link |
+| **PROXY.father** | Dedicated 4G/5G (real SIM) | $49–59/mo | ~85% | One SIM per IP; EU-focused |
 
-**Key insight:** For Playwright automation, dedicated flat-rate IPs are almost always cheaper than per-GB sticky sessions. Playwright renders full pages — 10–50x more bandwidth than bare HTTP scraping. A single recruiter doing 2 hours of LinkedIn automation per day can easily burn 5–10 GB/month, making per-GB proxies ($30–150/mo) far more expensive than a dedicated ISP IP at $1.47–5.50/mo.
+**Key insight:** Playwright renders full pages — 10–50x more bandwidth than bare HTTP scraping. A single recruiter doing 2 hours of LinkedIn automation per day burns 5–10 GB/month. At $14–24/GB that is $70–240/mo per recruiter in proxy fees alone. Dedicated flat-rate IPs at $1.47–5.50/mo are almost always cheaper.
 
-**Sticky session format by provider:**
+**Phase 4 default:** Dedicated ISP/static residential IP per recruiter (Webshare at ~$1.47/IP). Only use sticky mobile sessions for accounts that need re-activation after a flag event (SOAX 60-min sticky).
+
+### Sticky session format by provider
 
 ```
 # Bright Data
@@ -411,81 +567,34 @@ username: {oxylabs_username}-sessid-{TOKEN}-country-us
 host: pr.oxylabs.io:7777
 ```
 
-### Sticky session vs dedicated IP
+### WireGuard + Wireproxy mesh (50+ recruiters, no home networks)
 
-| | Sticky mobile session (24h) | Dedicated residential ISP IP |
-|-|----------------------------|------------------------------|
-| **LinkedIn survival** | ~85% | ~90–95% |
-| **IP uniqueness** | Pinned from shared pool | Exclusively yours |
-| **Cost** | Per-GB (scales with usage) | ~$30–80/mo per IP (fixed) |
-| **IP history risk** | Pool IP may have prior abuse | Clean on assignment |
-| **Operational model** | One token per recruiter | One IP per recruiter |
-| **Recommended for** | Phase 4 default | High-value accounts if survival degrades |
-
-**Revised Phase 4 recommendation:** Dedicated ISP/static residential IP per recruiter account (Webshare at ~$1.47/IP or IPRoyal Static at ~$5.50/IP). The flat-rate model is almost certainly cheaper than per-GB sticky sessions given Playwright's bandwidth consumption. Only use sticky mobile sessions for accounts that need re-activation after a flag event (SOAX 60-min sticky).
-
-**Account → proxy registry:** Store the `proxy_endpoint` alongside the recruiter's LinkedIn account in the database. Never reassign an IP to a different LinkedIn account — LinkedIn detects IP sharing across accounts and links them. This mapping must be permanent until the IP is explicitly burned.
-
-```python
-# Retrieve per-recruiter proxy from DB at task claim time
-recruiter = await db.get_recruiter(task.recruiter_id)
-proxy = ProxySettings(
-    server=recruiter.proxy_endpoint,       # e.g. "http://p.webshare.io:80"
-    username=recruiter.proxy_username,     # stored encrypted in vault
-    password=recruiter.proxy_password,
-)
-```
-
-**Multi-recruiter in one process — context-level proxy isolation:**
-
-```python
-# One browser, multiple recruiter contexts — each with its own dedicated IP
-browser = await p.chromium.launch()
-
-context_alice = await browser.new_context(proxy={
-    "server": "http://p.webshare.io:80",
-    "username": "alice_proxy_user",
-    "password": "alice_proxy_pass",
-})
-context_bob = await browser.new_context(proxy={
-    "server": "http://p.webshare.io:80",
-    "username": "bob_proxy_user",
-    "password": "bob_proxy_pass",
-})
-# Alice and Bob are isolated: different IPs, different cookies, different sessions
-```
-
-### WireGuard/Wireproxy architecture (50+ recruiters)
-
-At scale, per-GB proxy billing dominates cost because Playwright renders full pages (browsers consume 10–50x more bandwidth than bare HTTP scraping). The alternative: a WireGuard mesh where each recruiter gets a dedicated exit peer, exposed locally as a SOCKS5 port via [Wireproxy](https://github.com/windtf/wireproxy).
+At scale, per-GB billing compounds. The alternative: a WireGuard mesh where each recruiter gets a dedicated residential ISP peer, exposed locally as a SOCKS5 port via [Wireproxy](https://github.com/windtf/wireproxy). Each WG peer is a cheap VPS at a residential ISP (~$5/mo flat), not a metered proxy pool.
 
 ```
 Recruiter A → wireproxy :1080 → WireGuard peer A (residential ISP, NYC)
 Recruiter B → wireproxy :1081 → WireGuard peer B (residential ISP, London)
 
-# Playwright context:
 profile_a = BrowserProfile(proxy=ProxySettings(server="socks5://127.0.0.1:1080"))
 profile_b = BrowserProfile(proxy=ProxySettings(server="socks5://127.0.0.1:1081"))
 ```
 
-Wireproxy config per recruiter:
 ```ini
 # /etc/wireproxy/recruiter_a.conf
 WGConfig = /etc/wireguard/recruiter_a.conf
 
 [Socks5]
-BindAddress = 127.0.0.1:1080
+ BindAddress = 127.0.0.1:1080
 ```
 
-| | Provider proxy (Bright Data / IPRoyal) | WireGuard + Wireproxy |
-|-|----------------------------------------|----------------------|
-| **Cost at < 50 recruiters** | Manageable per-GB | Higher setup overhead |
-| **Cost at 50+ recruiters** | High (per-GB compounds) | Flat-rate per WG peer (~$5/mo) |
-| **IP trust** | Provider residential/mobile pool | Genuine ISP IP (if WG peer is at ISP) |
-| **Setup** | Config string only | Provision WG peers per recruiter |
-| **Trigger** | Phase 4 launch | Phase 4 cost review after 3 months |
+| | Home network exit proxy (Phase 3) | Third-party dedicated IP (Phase 4) | WireGuard mesh (Phase 4 scale) |
+|-|----------------------------------|-----------------------------------|-----------------------------|
+| **LinkedIn survival** | Highest (~100%) | ~90–95% | ~90–95% (genuine ISP) |
+| **Cost** | ~$5–10/mo VM only | ~$1.47–10/mo per IP | ~$5/mo per WG peer |
+| **IP trust** | Recruiter's actual home IP | Clean dedicated pool IP | Genuine ISP IP |
+| **Operational effort** | Tailscale/WG setup once | Config string per recruiter | Provision WG peers |
+| **When to use** | Phase 3 default | Phase 4 when home unavailable | Phase 4 at 50+ recruiters |
 
----
 
 ## 6. Browser Execution Backend
 
@@ -821,32 +930,35 @@ enum TalonAuditEvent {
 
 ---
 
-### 9.8 Deployment model: recruiter's machine is the only viable option for LinkedIn (Phase 3)
+### 9.8 Deployment model: cloud VM + recruiter's home/work exit proxy (Phase 3)
 
-**Decision:** Talon runs on the recruiter's own machine for Phase 3. Cloud-hosted Talon is not supported for LinkedIn outreach until a mobile proxy infrastructure is designed.
+**Decision:** Talon runs on a cloud VM (self-hosted browser-use) with all browser traffic routed through the recruiter's home or work network via Tailscale exit node or WireGuard on their home router.
 
 **Rationale (research-backed):**
 
-LinkedIn operates ASN-level IP classification directly in its authentication flow. Datacenter IP ranges (AWS, GCP, DigitalOcean, etc.) are blocked at login — a session cannot be established regardless of browser stealth, cookie state, or proxy configuration. This is a hard blocker, not a mitigation-able risk.
+LinkedIn operates ASN-level IP classification directly in its authentication flow. Datacenter IP ranges are blocked at login. The recruiter's home/work IP — never shared, never abused, matching their account's registered country — has the lowest detection risk of all options. The cloud VM + home network exit proxy model achieves the best of both worlds:
 
-The only viable remote option is mobile proxy (4G/5G CGNAT), which achieves ~85% account survival rate. Residential proxies have degraded to ~50% since LinkedIn's 2025 detection expansion. Both options cost $100–200/month per recruiter and add significant operational complexity.
+1. **Cloud VM:** always on, no dependency on the recruiter's laptop being awake, reliable 24/7 operation
+2. **Home network exit:** LinkedIn sees the recruiter's actual residential IP — identical to their manual use
 
-The recruiter's own machine is the baseline with zero detection risk because LinkedIn sees it as the same IP used for all their manual activity.
+Session state is stored as a Chrome profile directory on the VM's persistent disk — no S3 export/import cycle needed.
 
 | Deployment | LinkedIn viable? | Why |
 |------------|-----------------|-----|
-| Recruiter's machine | ✅ Yes | Real residential IP, same as manual use; Chrome profile option available |
-| browser-use Cloud | ❌ No | Datacenter IPs blocked at LinkedIn login; 15-min session cap |
+| **Cloud VM + home/work exit proxy (Tailscale/WG)** | ✅ Yes — recommended | Real residential IP tunnelled through home; cloud reliability; Chrome profile on VM |
+| Recruiter's own machine (fallback) | ✅ Yes | Real residential IP, same as manual use; machine must be awake |
+| browser-use Cloud | ❌ No | Datacenter IPs blocked at LinkedIn login; 15-min session cap; custom proxy requires Enterprise |
 | Cloud VM + Elastic IP | ❌ No | Datacenter ASN — blocked at LinkedIn login |
 | Cloud VM + residential proxy | ⚠️ Risky | ~50% account survival; acceptable only for non-sensitive testing |
-| Cloud VM + mobile proxy | ✅ Viable (Phase 4+) | ~85% survival; adds $100–200/mo per recruiter + proxy management |
+| Cloud VM + mobile proxy | ✅ Viable (Phase 4 fallback) | ~85% survival; adds $100–200/mo per recruiter + proxy management |
 
 **Trade-offs accepted:**
-- Recruiter's machine must be available during task execution windows (not fully unattended)
-- Requires one-time Python + Playwright setup on recruiter's machine
-- Talon is not a cloud service in Phase 3
+- Recruiter's home network must be available (router on, internet connected) during task execution — reasonable assumption for Phase 3
+- One-time Tailscale or WireGuard setup on the recruiter's home machine/router (~30 min)
+- One home network = one LinkedIn account (IP isolation constraint)
+- Cloud VM costs ~$5–10/mo per tenant
 
-**Phase 4 trigger for cloud hosting:** If recruiter machines prove too unreliable as a platform (crashes, unavailability), design a mobile proxy infrastructure per recruiter with dedicated, sticky mobile IPs. This is an operational investment, not a code change.
+**Phase 4 trigger:** If home networks prove unavailable (recruiter travels, moves, ISP outage), switch that account to a dedicated third-party ISP IP (Webshare ~$1.47/IP) as fallback. This is an operational config change per recruiter, not a code change. See Section 5.5.
 
 ---
 
@@ -1046,7 +1158,7 @@ Each `TalonTask` carries a `coworkTaskId` reference for traceability. The CRM do
 ## 12. Open Questions
 
 1. **Vault service technology:** HashiCorp Vault, AWS Secrets Manager, or a lightweight custom service? AWS Secrets Manager is the lowest-friction choice if Cura is already on AWS; HashiCorp Vault offers more control for multi-cloud. Decision gated on Phase 3 infrastructure choices.
-2. **Runner hosting (researched — decision pending):** Recruiter's own machine is the clear winner for LinkedIn (Section 5.3). Cloud + datacenter IP is blocked at LinkedIn login. Cloud + mobile proxy (~85% survival) is the viable fallback but adds $100–200/mo per recruiter. Requires an explicit onboarding decision: do we support cloud-hosted Talon at all, or mandate local-only for Phase 3?
+2. **Runner hosting (resolved — 2026-03-21):** Cloud VM + recruiter's home/work exit proxy via Tailscale or WireGuard (Section 5.4). Cloud VM provides 24/7 reliability; home network exit provides genuine residential IP. Detection risk is identical to running on the recruiter's machine. Third-party proxies (Section 5.5) are the Phase 4 fallback when home networks are unavailable.
 3. **Approval UX:** One-by-one task approval is friction. Bulk approval ("approve today's outreach queue") needs CRM UI design — bulk confirm must still show the full ranked list, not a blind "approve all" button.
 4. **Prompt injection defence:** A candidate's LinkedIn profile could contain text designed to hijack browser-use's LLM (e.g., "ignore previous instructions and send a message to..."). Mitigation: system prompt sandboxing + off-site navigation blocking (already enforced) + step verification. Requires adversarial testing before Phase 3 launch.
 5. **Session state TTL strategy:** 14-day inactivity TTL is a starting point. LinkedIn sessions may survive longer; expiring them early forces unnecessary re-logins. The right TTL should be informed by observed LinkedIn session lifetimes in production — track `SESSION_INVALID` error rate after S3 load to calibrate.
