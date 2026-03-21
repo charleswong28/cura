@@ -14,6 +14,7 @@
 - Task lifecycle and human approval gate
 - Site isolation design
 - Credential fetch-and-discard flow
+- Browser session persistence — S3 encrypted state, session lifecycle, IP consistency design
 - Swappable `BrowserBackend` interface — browser-use (default) vs page-agent (alternative), security analysis of each
 - Determinism strategy (scoped task prompts, abort conditions, step verification)
 - A2A integration design — Talon as A2A Server, CRM as A2A Client, SSE streaming, agent card
@@ -45,11 +46,12 @@ That is the complete scope. Talon does not discover tasks, does not decide what 
 
 | Invariant | Enforcement |
 |-----------|-------------|
-| **No task, no action** | Runner process exits cleanly if task queue returns empty |
+| **No task, no action** | Runner exits cleanly if queue is empty — no browser session, no credential fetch |
 | **No credential, no session** | Session open is blocked; task moves to `FAILED(NO_CREDENTIAL)` |
-| **One site per session** | `allowed_domains` set at browser session creation; off-site navigation throws |
+| **One site per session** | `allowed_domains` set at session creation; off-site navigation throws and fails the task |
 | **Human approval required** | `PENDING_APPROVAL → READY` transition requires Approver-role JWT; no system path exists |
 | **Roles never overlap** | Orchestrator token has no runner API access; runner token has no task-write access |
+| **Session persists across spawns** | Browser state (cookies, localStorage) encrypted and stored in S3; next spawn resumes without re-login |
 
 ---
 
@@ -133,13 +135,7 @@ If a session could navigate freely, a task approved for LinkedIn could — by ac
 
 ### Enforcement
 
-```python
-session = BrowserSession(
-    allowed_domains=[task.site_key],  # e.g. ["linkedin.com"]
-    # Subdomains included: www.linkedin.com, mail.linkedin.com
-    # Cross-domain navigation raises NavigationBlockedError → task fails
-)
-```
+browser-use enforces site isolation via `allowed_domains` at session creation time. Subdomains of the declared key are included (e.g., `www.linkedin.com`, `mail.linkedin.com`). Any navigation attempt outside those domains raises `NavigationBlockedError`, which Talon treats as a task failure — the session is closed and the task is marked `FAILED(OFF_SITE_NAVIGATION)`.
 
 Tasks with different `siteKey` values never share a session:
 
@@ -197,47 +193,112 @@ The vault is a separate service, not embedded in the runner or the CRM API.
 
 ---
 
+## 5.2 Browser Session Persistence
+
+### The problem
+
+Talon is designed to be **ephemeral** — it spawns per task batch, runs, then exits. Without session persistence, every Talon spawn requires a full login to the target site. For LinkedIn this is actively harmful:
+
+1. Frequent fresh logins are a strong automation signal — human users maintain long-lived sessions
+2. Login may require 2FA, breaking the unattended flow
+3. LinkedIn tracks session age as a trust indicator; a session that has existed for weeks looks like a human
+
+The root goal is: **session continuity across Talon spawns, without keeping a long-lived process alive**.
+
+### The solution: encrypted session state in S3
+
+At the end of each Talon run, export the browser's storage state (cookies + localStorage — the minimal set needed to resume an authenticated session) and persist it encrypted to S3. On the next spawn, load and resume. Login is only required when the stored session has expired or been invalidated.
+
+### Session lifecycle
+
+```
+Talon spawns for (tenantId, userId, siteKey)
+  │
+  ├── Fetch session key from vault (per-user, per-site encryption key)
+  │
+  ├── Check S3: s3://cura-talon/sessions/{tenantId}/{userId}/{siteKey}.enc
+  │     │
+  │     ├── Found → decrypt → load into browser context (storage_state)
+  │     │     └── Health check: is session still active?
+  │     │           ├── Healthy → skip login entirely, proceed to tasks
+  │     │           └── Expired/invalid → full login, then continue
+  │     │
+  │     └── Not found → full login
+  │
+  ├── Execute approved tasks
+  │
+  ├── Export browser storage state (cookies, localStorage)
+  │     └── Encrypt with session key → upload to S3 (overwrite previous)
+  │
+  └── Exit — credential reference and session key discarded from memory
+```
+
+### What is stored vs not stored
+
+| Data | Storage | Rationale |
+|------|---------|-----------|
+| Browser storage state (cookies, localStorage) | S3 (encrypted) | The session resumption payload |
+| Last-seen IP | S3 session metadata | IP change detection (see 5.3) |
+| Estimated session expiry | S3 session metadata | Avoid unnecessary health-check round trips |
+| Login credentials (username, password, 2FA secret) | Vault only | Never go near S3; only fetched on full login |
+| Task payloads | CRM DB | Nothing task-related belongs in S3 |
+| Audit events | Audit service | S3 is not an audit destination |
+
+**Stored session state is a credential.** It grants access to the recruiter's authenticated site session. The encryption and access controls in Section 5.2.1 treat it as such.
+
+### 5.2.1 Encryption design
+
+Two independent encryption layers:
+
+1. **Talon-side (AES-256-GCM):** Before upload, Talon encrypts the session state with a per-user, per-site key fetched from the vault. The plaintext never reaches S3. The vault key is never written to S3.
+2. **AWS-side (SSE-KMS):** S3 bucket is configured with SSE-KMS. Even if someone bypasses the vault, they face a second encryption layer managed by AWS KMS.
+
+Access controls:
+- S3 bucket policy restricts `GetObject` / `PutObject` on `sessions/*` to Talon's IAM role only
+- 14-day inactivity TTL via S3 lifecycle policy — stale states auto-delete
+- Every S3 access logged to CloudTrail
+
+**Security trade-off accepted:** Storing session state externally means a fully compromised AWS account could yield encrypted session blobs. This is accepted because: (a) the vault key is not in S3, so blobs without the vault are useless ciphertext; (b) a full AWS account compromise also gives access to the CRM database, vault, and all recruiter data — the session state is not the incremental risk. The threat model for Cura does not include complete AWS account compromise as a realistic attacker scenario for Phase 3.
+
+---
+
+## 5.3 IP Consistency
+
+Browser sessions on sites like LinkedIn are bound to the IP that established them. A session created from IP A that suddenly appears from IP B is a detection signal — it looks like cookie theft. Frequent IP changes also trigger step-up authentication challenges.
+
+### Talon's approach
+
+Talon stores the `last_ip` in session metadata (alongside the encrypted browser state in S3). On each spawn, before using a stored session:
+
+1. Talon resolves its current outbound IP
+2. Compares to `last_ip` in session metadata
+3. If they match → proceed normally
+4. If they differ → run a more conservative health check; if the site shows a security prompt, discard stored state and do a full login, updating `last_ip` with the new value
+
+This is detection, not prevention. The real mitigation is **deployment**: Talon must run from a consistent IP.
+
+### Deployment options for IP consistency
+
+| Deployment | IP consistency | Operational effort | Detection risk |
+|------------|---------------|-------------------|----------------|
+| **Recruiter's own machine** (recommended) | Natural — recruiter's home/office IP | None — Talon runs where the person works | Lowest — same IP as all manual LinkedIn use |
+| **Dedicated per-recruiter cloud instance + Elastic IP** | Fixed IP per recruiter | Medium — one instance per recruiter | Low — consistent IP, but data centre origin |
+| **Shared cloud + residential proxy per recruiter** | Fixed residential IP | High — proxy management | Low — residential IP, but proxy provider risk |
+| **Shared cloud, no sticky IP** | Changes per spawn | None | High — IP churn is an automation signal |
+
+**Recommended default:** recruiter's own machine. This gives the lowest detection risk because LinkedIn sees the same IP as the recruiter's manual usage. If recruiter's machine is unavailable, a dedicated per-recruiter cloud instance with an Elastic IP is the next safest option.
+
+IP consistency is a deployment constraint, not a code-level solution. Talon detects mismatches and reacts conservatively, but it cannot manufacture IP consistency.
+
+---
+
 ## 6. Browser Execution Backend
 
 Talon abstracts the browser execution layer behind a `BrowserBackend` interface. This makes the underlying execution library swappable per site without changing Talon's task lifecycle, permission model, or determinism rules.
 
 ### 6.1 BrowserBackend interface
 
-```python
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-
-@dataclass
-class TaskResult:
-    success: bool
-    abort_condition_met: bool
-    output: dict
-    error: str | None
-
-class BrowserBackend(ABC):
-    @abstractmethod
-    async def open_session(
-        self,
-        site_key: str,
-        allowed_domains: list[str],
-        credential: Credential,
-    ) -> Session: ...
-
-    @abstractmethod
-    async def health_check(self, session: Session) -> bool: ...
-
-    @abstractmethod
-    async def execute_task(
-        self,
-        session: Session,
-        task: TalonTask,
-    ) -> TaskResult: ...
-
-    @abstractmethod
-    async def close_session(self, session: Session) -> None: ...
-```
-
-No code outside the backend implementations may call browser APIs directly. The runner speaks only to the interface.
+`BrowserBackend` is a four-method protocol: `open_session`, `health_check`, `execute_task`, and `close_session`. Every runner call goes through this interface — no code outside a backend implementation ever touches browser APIs directly. A new backend is a single new class plus a one-line config entry. Switching backends for a site requires no changes to the task lifecycle, permission model, or A2A transport.
 
 ### 6.2 Backend selection
 
@@ -257,62 +318,24 @@ Swapping a backend for a site requires a config change only — no task, runner,
 
 ### 6.3 backend: browser-use (default)
 
-[browser-use](https://github.com/browser-use/browser-use) is a Python library that wraps Playwright with an LLM agent. It controls the browser via Chrome DevTools Protocol (CDP) from an external Python process.
-
-```python
-from browser_use import Agent, BrowserSession
-
-class BrowserUseBackend(BrowserBackend):
-    async def open_session(self, site_key, allowed_domains, credential):
-        session = BrowserSession(
-            allowed_domains=allowed_domains,   # site isolation enforced here
-            headless=False,
-            session_id=credential.session_id,  # resume existing session if alive
-        )
-        await session.start()
-        return session
-
-    async def execute_task(self, session, task):
-        agent = Agent(
-            task=task.payload.prompt,
-            browser_session=session,
-            max_steps=task.payload.max_steps,  # hard cap, default 10
-        )
-        result = await agent.run()
-        return TaskResult(success=result.is_done, ...)
-```
+[browser-use](https://github.com/browser-use/browser-use) wraps Playwright with an LLM agent. It controls the browser via Chrome DevTools Protocol (CDP) from an external Python process — it never touches the page source or injects scripts.
 
 **Characteristics:**
-- External process, Python — does not touch the page source
-- Uses CDP (Chrome DevTools Protocol) — same mechanism as Playwright
-- LLM adapts to DOM changes without code updates
+- External process — all browser control is over CDP, not in-page
+- LLM adapts to DOM changes without code updates — no selector maintenance
+- `allowed_domains` enforced natively — site isolation built into the session constructor
+- `storage_state` parameter accepts Playwright's exported session state — S3 session persistence (Section 5.2) works out of the box
 - Does not require JavaScript injection into the target page
 
 ### 6.4 backend: page-agent (alternative)
 
-[page-agent](https://github.com/alibaba/page-agent) by Alibaba is a JavaScript in-page DOM agent. Unlike browser-use, it lives **inside** the web page. It parses the DOM directly (no screenshots, no OCR, text-only) and executes actions through JavaScript. Its DOM processing components are derived from browser-use (MIT licence).
-
-```typescript
-// PageAgentBackend would inject the page-agent script into the loaded page
-// and communicate via CDP's Runtime.evaluate to pass tasks and receive results
-
-class PageAgentBackend(BrowserBackend):
-    async def execute_task(self, session, task):
-        result = await session.cdp.evaluate("""
-            window.__talonAgent.run({
-                prompt: {{ task.payload.prompt }},
-                allowedDomains: {{ allowed_domains }},
-                maxSteps: {{ task.payload.max_steps }}
-            })
-        """)
-        return TaskResult(...)
-```
+[page-agent](https://github.com/alibaba/page-agent) by Alibaba is a JavaScript in-page DOM agent. Unlike browser-use, it lives **inside** the web page — injected as a script tag, parsing the DOM directly via JavaScript. No screenshots, no OCR; text-only DOM interaction. Its DOM processing layer is derived from browser-use under MIT licence.
 
 **Characteristics:**
-- In-page JavaScript injection — the agent runs as a script tag inside the target page
-- DOM-native (no screenshots needed) — potentially faster and cheaper per step
+- In-page JavaScript injection — executes inside the target page's JavaScript context
+- DOM-native text parsing — potentially faster and cheaper per step than vision-based approaches
 - Multi-tab support via optional Chrome extension
-- Derived from browser-use DOM components; conceptually compatible with Talon's determinism rules
+- Conceptually compatible with Talon's determinism rules; `allowed_domains` constraint must be re-enforced at the Talon adapter level (not natively in page-agent)
 
 #### Security assessment: page-agent
 
@@ -384,15 +407,7 @@ RIGHT: "Navigate to https://linkedin.com/in/johndoe and send a connection reques
 
 ## 7. No-Task, No-Error Guarantee
 
-A runner with no approved tasks does nothing. This is the idle-safe property.
-
-```python
-task = await get_next_task(site_key="linkedin.com", runner_id=runner_id)
-
-if task is None:
-    log("No tasks available. Exiting cleanly.")
-    return  # no browser session opened, no credentials fetched
-```
+A runner with no approved tasks does nothing. When the A2A task queue returns empty for a given `siteKey`, Talon exits cleanly. No browser session is opened, no credential is fetched, no S3 session state is touched.
 
 The chain of consequences:
 
@@ -573,7 +588,32 @@ enum TalonAuditEvent {
 
 ---
 
-### 9.6 One site per session (strict isolation)
+### 9.6 S3 encrypted session state for ephemeral process model
+
+**Decision:** Browser session state (cookies + localStorage) encrypted and stored in S3, keyed by `{tenantId}/{userId}/{siteKey}`. Talon remains ephemeral — spawns per batch, exits after tasks complete.
+
+**Rationale:**
+- LinkedIn treats session continuity as a trust signal. A fresh login on every Talon spawn looks like automation — a session that has existed for weeks looks like a human.
+- An always-on Talon process (the alternative that avoids S3) holds a live browser and LinkedIn session 24/7. A crash loses the session, leak detection is harder, and the process has a continuous attack surface.
+- S3 is the natural fit for binary blob storage. Playwright's `context.storage_state()` and `storage_state` parameter provide the exact API needed for export/import with zero custom serialisation.
+
+**Security trade-off accepted:** Stored session state is effectively a session credential. Mitigated by: Talon-side AES-256-GCM before upload (vault-derived key, never in S3); AWS SSE-KMS as a second layer; strict IAM (Talon's runtime role only); 14-day inactivity TTL. The threat of a compromised S3 bucket yielding usable session tokens is accepted — a full AWS compromise gives access to far more than session state.
+
+| Option | Re-login frequency | Always-on process | Security exposure | Portability |
+|--------|------------------|-------------------|-------------------|-------------|
+| **S3 encrypted state (chosen)** | Only on expiry (~weeks) | No | Encrypted blobs; vault-gated key | High — any Talon instance |
+| Persistent process | Never | Yes | Session in memory; crash = lost | Low — single machine |
+| Local filesystem | Only on expiry | No | Unencrypted by default | Low — single machine |
+| PostgreSQL binary column | Only on expiry | No | DB encryption | High |
+| No persistence | Every spawn | No | None — no stored state | N/A |
+
+**Why not PostgreSQL:** Binary session blobs (1–5 MB) are a poor fit for a relational DB row. S3 lifecycle policies, IAM, and SSE-KMS are the right controls for binary artifact storage.
+
+**Why not always-on process:** Operational overhead disproportionate to the 30-min-per-session workload. Crash recovery complexity, no benefit over S3 persistence for session continuity.
+
+---
+
+### 9.7 One site per session (strict isolation)
 
 **Decision:** `allowed_domains` set at browser session creation to exactly `[task.site_key]`.
 
@@ -664,200 +704,27 @@ CRM (NestJS — A2A Client)               Talon (Python — A2A Server)
 
 ### 10.4 Talon A2A Server (Python)
 
-Talon is a persistent Python service using `a2a-sdk` and Starlette/uvicorn.
+Talon is a persistent Python service built on `a2a-sdk` + Starlette/uvicorn. The `a2a-sdk` `AgentExecutor` interface has two methods: `execute` (handle an incoming task) and `cancel` (handle a cancellation request). Talon's `execute` implementation does exactly eight things in order:
 
-```python
-# talon/agent_executor.py
-from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.events import EventQueue
-from a2a.utils import new_agent_text_message
-from a2a.types import DataPart
+1. Extract `task_id`, `site_key`, and `payload` from the A2A message
+2. DB check: reject with 403 if `task.status ≠ READY` (safety gate)
+3. Claim: transition `READY → CLAIMED` atomically; stream "Task claimed" event
+4. Fetch session state from S3 (decrypt); if valid, skip login
+5. Fetch credential from vault (only if full login required)
+6. Open `BrowserBackend` session for `site_key`; stream "Session ready" event
+7. Execute task via backend; stream a progress event per step
+8. On completion: export browser state → encrypt → upload to S3; stream `completed` artifact; update DB
 
-class TalonAgentExecutor(AgentExecutor):
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        params = self._extract_params(context.message)
-        task_id = params["task_id"]
-        site_key = params["site_key"]
-
-        # Double-check READY state in DB (safety gate)
-        if not await is_task_ready(task_id):
-            raise PermissionError(f"Task {task_id} is not in READY state")
-
-        # Claim in DB: READY → CLAIMED
-        await claim_task(task_id)
-        await event_queue.enqueue_event(
-            new_agent_text_message("Task claimed. Fetching credential.")
-        )
-
-        # Credential fetch (abort if missing)
-        credential = await fetch_credential(site_key, params["user_id"])
-        if not credential:
-            await fail_task(task_id, "NO_CREDENTIAL")
-            raise ValueError("NO_CREDENTIAL: no credential for site")
-
-        # Execute via BrowserBackend
-        backend = BackendRegistry.get(site_key)
-        async with backend.open_session(site_key, credential) as session:
-            result = await backend.execute_task(
-                session, params["payload"],
-                on_step=lambda step: event_queue.enqueue_event(
-                    new_agent_text_message(f"Step {step.index}: {step.description}")
-                ),
-            )
-
-        # Complete in DB
-        await complete_task(task_id, result)
-
-        # Final artifact streamed to CRM
-        await event_queue.enqueue_event(DataPart(data=result))
-
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
-        task_id = self._extract_task_id(context)
-        await fail_task(task_id, "CANCELLED")
-
-
-# talon/server.py
-from a2a.server.apps import A2AStarletteApplication
-from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import (
-    AgentCard, AgentSkill, AgentCapabilities, AgentAuthentication
-)
-import uvicorn
-
-agent_card = AgentCard(
-    name="talon",
-    description=(
-        "Deterministic browser task executor for Cura. Executes pre-approved "
-        "browser tasks against specific sites. One site per session. "
-        "Human approval is required before any task reaches this agent."
-    ),
-    url="https://talon.cura.internal",
-    version="1.0.0",
-    capabilities=AgentCapabilities(streaming=True, pushNotifications=False),
-    authentication=AgentAuthentication(schemes=["Bearer"]),
-    skills=[
-        AgentSkill(
-            id="execute_browser_task",
-            name="Execute Browser Task",
-            description=(
-                "Execute a single pre-approved browser action on a specified site. "
-                "The task must be in READY state in the Cura task database. "
-                "Streams progress via SSE. Returns a result artifact on completion."
-            ),
-            tags=["browser", "automation", "recruitment", "linkedin"],
-            inputModes=["application/json"],
-            outputModes=["application/json"],
-        )
-    ],
-)
-
-handler = DefaultRequestHandler(
-    agent_executor=TalonAgentExecutor(),
-    task_store=InMemoryTaskStore(),   # A2A in-flight state; DB is source of truth
-)
-
-app = A2AStarletteApplication(agent_card=agent_card, http_handler=handler).build()
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8001)
-```
+`cancel` marks the task `FAILED(CANCELLED)` in DB. The A2A server publishes the agent card at `/.well-known/agent.json` (Section 10.6).
 
 ### 10.5 CRM A2A Client (NestJS)
 
-The CRM dispatches tasks to Talon the moment they reach `READY`. A DB event hook or a Prisma middleware fires `TalonDispatchService`.
+`TalonDispatchService` is a NestJS service triggered whenever a `TalonTask` transitions to `READY` (via Prisma middleware or DB event). It:
 
-```typescript
-// apps/api/src/talon/talon-dispatch.service.ts
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
-import { SoketiService } from '../soketi/soketi.service';
+1. Sends a `message/stream` JSON-RPC request to Talon's A2A endpoint with `skill: "execute_browser_task"`, `task_id`, `site_key`, `payload`, and `contextId: userId`
+2. Consumes the SSE stream: `working` events are forwarded to the CRM dashboard via Soketi; `completed` and `failed` events update the `TalonTask` record in DB and cascade to the parent `CoworkTask`
 
-@Injectable()
-export class TalonDispatchService {
-  private readonly talonUrl: string;
-  private readonly talonToken: string;
-
-  constructor(
-    private readonly config: ConfigService,
-    private readonly prisma: PrismaService,
-    private readonly soketi: SoketiService,
-  ) {
-    this.talonUrl = this.config.getOrThrow('TALON_A2A_URL');
-    this.talonToken = this.config.getOrThrow('TALON_BEARER_TOKEN');
-  }
-
-  async dispatch(talonTaskId: string): Promise<void> {
-    const task = await this.prisma.talonTask.findFirstOrThrow({
-      where: { id: talonTaskId, status: 'READY' },
-    });
-
-    // Discover Talon's agent card (cached after first fetch)
-    const agentCardUrl = `${this.talonUrl}/.well-known/agent.json`;
-    const response = await fetch(`${this.talonUrl}/a2a`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.talonToken}`,
-        Accept: 'text/event-stream',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'message/stream',
-        params: {
-          message: {
-            role: 'user',
-            parts: [{
-              type: 'data',
-              data: {
-                skill: 'execute_browser_task',
-                task_id: task.id,
-                site_key: task.siteKey,
-                payload: task.payload,
-              },
-            }],
-          },
-          contextId: task.userId,   // group recruiter's tasks in one A2A context
-        },
-      }),
-    });
-
-    // Consume SSE stream
-    for await (const event of this.readSSE(response)) {
-      await this.handleTalonEvent(task.id, event);
-    }
-  }
-
-  private async handleTalonEvent(taskId: string, event: A2AStreamEvent) {
-    if (event.status?.state === 'working') {
-      // Push live progress to CRM dashboard via Soketi
-      await this.soketi.publish(`talon.${taskId}`, 'progress', event.status.message);
-    }
-
-    if (event.status?.state === 'completed') {
-      const result = event.artifact?.data ?? {};
-      await this.prisma.talonTask.update({
-        where: { id: taskId },
-        data: { status: 'COMPLETED', result, completedAt: new Date() },
-      });
-      // Cascade to parent CoworkTask
-      await this.completeCoworkTask(taskId, result);
-    }
-
-    if (event.status?.state === 'failed') {
-      await this.prisma.talonTask.update({
-        where: { id: taskId },
-        data: {
-          status: 'FAILED',
-          errorMessage: event.status.message,
-          completedAt: new Date(),
-        },
-      });
-    }
-  }
-}
-```
+The A2A agent card at `/.well-known/agent.json` is fetched once on service startup and cached — no hardcoded endpoint paths.
 
 ### 10.6 A2A Agent Card (published at `/.well-known/agent.json`)
 
@@ -954,9 +821,9 @@ Each `TalonTask` carries a `coworkTaskId` reference for traceability. The CRM do
 
 ## 12. Open Questions
 
-1. **Session resumption:** If the recruiter's Chrome already has an active LinkedIn session, should Talon attach to it rather than re-login? browser-use supports `session_id` for resumable sessions — needs testing.
-2. **Vault service technology:** HashiCorp Vault, AWS Secrets Manager, or a lightweight custom service? Decision depends on infrastructure choices in Phase 3.
-3. **Runner hosting:** Does the runner run on the recruiter's machine (alongside the browser) or as a cloud service? Cloud service + recruiter's browser (via remote debugging protocol) is more reliable but requires recruiter to expose a debug port.
-4. **Approval UX latency:** Recruiters approving tasks one-by-one is friction. Bulk approval ("approve today's outreach queue") needs CRM UI design — ensure bulk approve still requires human review of the list, not a blind confirm.
-5. **Prompt injection defence:** A candidate's LinkedIn profile could contain text designed to hijack browser-use's LLM (e.g., "ignore previous instructions and send a message to..."). Mitigation: system prompt sandboxing + off-site navigation blocking + step verification. Needs adversarial testing before Phase 3 launch.
-6. **page-agent evaluation:** If browser-use proves unreliable on a specific site, page-agent is the natural next candidate. Before enabling it: security audit of the pinned version, confirm no login-page use, confirm restricted to post-auth sessions. Should be a deliberate opt-in decision, not a quiet config change.
+1. **Vault service technology:** HashiCorp Vault, AWS Secrets Manager, or a lightweight custom service? AWS Secrets Manager is the lowest-friction choice if Cura is already on AWS; HashiCorp Vault offers more control for multi-cloud. Decision gated on Phase 3 infrastructure choices.
+2. **Runner hosting:** Recommended default is the recruiter's own machine (best IP consistency, Section 5.3). For recruiters unwilling to keep their machine available, a dedicated per-recruiter cloud instance with an Elastic IP is the fallback. Needs a clear onboarding decision before Phase 3 launch.
+3. **Approval UX:** One-by-one task approval is friction. Bulk approval ("approve today's outreach queue") needs CRM UI design — bulk confirm must still show the full ranked list, not a blind "approve all" button.
+4. **Prompt injection defence:** A candidate's LinkedIn profile could contain text designed to hijack browser-use's LLM (e.g., "ignore previous instructions and send a message to..."). Mitigation: system prompt sandboxing + off-site navigation blocking (already enforced) + step verification. Requires adversarial testing before Phase 3 launch.
+5. **Session state TTL strategy:** 14-day inactivity TTL is a starting point. LinkedIn sessions may survive longer; expiring them early forces unnecessary re-logins. The right TTL should be informed by observed LinkedIn session lifetimes in production — track `SESSION_INVALID` error rate after S3 load to calibrate.
+6. **page-agent evaluation trigger:** If browser-use proves unreliable on a specific site in production, page-agent is the natural next candidate. Gate on: security audit of the pinned version, confirmed no login-page use, explicit security review sign-off. Adapter is already designed (Section 6); adoption is a config change.
