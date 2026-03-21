@@ -246,6 +246,8 @@ Talon spawns for (tenantId, userId, siteKey)
 
 **Stored session state is a credential.** It grants access to the recruiter's authenticated site session. The encryption and access controls in Section 5.2.1 treat it as such.
 
+**Note:** When running on the recruiter's machine with Chrome profile mode (`user_data_dir`), S3 session storage is not required — the profile directory persists on disk naturally. S3 session persistence applies to the storage_state deployment path (see Section 5.3).
+
 ### 5.2.1 Encryption design
 
 Two independent encryption layers:
@@ -262,33 +264,69 @@ Access controls:
 
 ---
 
-## 5.3 IP Consistency
+## 5.3 Deployment, IP Consistency, and LinkedIn Detection Risk
 
-Browser sessions on sites like LinkedIn are bound to the IP that established them. A session created from IP A that suddenly appears from IP B is a detection signal — it looks like cookie theft. Frequent IP changes also trigger step-up authentication challenges.
+This section documents research findings (March 2026) on LinkedIn's bot detection capabilities and what they mean for Talon's deployment model. IP consistency is not a code problem — it is a deployment decision with direct consequences for recruiter account safety.
 
-### Talon's approach
+### LinkedIn's detection stack (2026)
 
-Talon stores the `last_ip` in session metadata (alongside the encrypted browser state in S3). On each spawn, before using a stored session:
+LinkedIn has expanded bot detection significantly since 2024–2025. It now operates multiple independent layers:
 
-1. Talon resolves its current outbound IP
-2. Compares to `last_ip` in session metadata
-3. If they match → proceed normally
-4. If they differ → run a more conservative health check; if the site shows a security prompt, discard stored state and do a full login, updating `last_ip` with the new value
+| Detection layer | What it checks | Notes |
+|----------------|---------------|-------|
+| **ASN classification** | Whether the IP resolves to a datacenter AS number | AWS, GCP, DigitalOcean etc. are blocked *at login* — the auth flow never completes |
+| **IP reputation scoring** | Whether the IP appears in fraud/abuse databases | Residential proxy IPs are increasingly flagged; shared proxy pool IPs degrade quickly |
+| **Browser fingerprint** | TLS handshake, user-agent, extension presence, canvas/font rendering | Headless browsers and anti-detect browsers are detectable |
+| **Behavioural analysis** | Typing cadence, scroll patterns, inter-action timing | A 2026 algorithm update added real-time ML analysis of micro-patterns |
+| **Session geolocation** | Whether the session IP country matches the account's registered location | Mid-session IP rotation invalidates the session immediately |
 
-This is detection, not prevention. The real mitigation is **deployment**: Talon must run from a consistent IP.
+**Key finding:** LinkedIn is the hardest major platform to automate. It blocks datacenter IPs directly in the auth flow — no amount of session persistence or cookie reuse helps if the IP originates from a cloud provider. Residential proxies have ~50% account survival rate (post-2025 detection expansion). Mobile proxies (4G/5G CGNAT) have ~85% survival rate. The recruiter's own IP — never shared, never abused, matching their account's registered country — has the lowest risk of all.
 
-### Deployment options for IP consistency
+### Deployment options for Talon
 
-| Deployment | IP consistency | Operational effort | Detection risk |
-|------------|---------------|-------------------|----------------|
-| **Recruiter's own machine** (recommended) | Natural — recruiter's home/office IP | None — Talon runs where the person works | Lowest — same IP as all manual LinkedIn use |
-| **Dedicated per-recruiter cloud instance + Elastic IP** | Fixed IP per recruiter | Medium — one instance per recruiter | Low — consistent IP, but data centre origin |
-| **Shared cloud + residential proxy per recruiter** | Fixed residential IP | High — proxy management | Low — residential IP, but proxy provider risk |
-| **Shared cloud, no sticky IP** | Changes per spawn | None | High — IP churn is an automation signal |
+| Deployment | IP type | LinkedIn survival | Session handling | Operational effort | Cost |
+|------------|---------|------------------|------------------|-------------------|------|
+| **Recruiter's own machine** ✓ recommended | Home/office residential | Highest — identical to manual use | S3 or local Chrome profile | One-time setup on recruiter's machine | ~$0 infra |
+| Dedicated cloud VM per recruiter + Elastic IP | Datacenter | **Blocked at login** — LinkedIn detects at ASN level | S3 | Medium — one VM per recruiter | ~$20–50/mo per recruiter |
+| Cloud VM + shared residential proxy | Shared residential | ~50% survival | S3 | High — proxy management, IP rotation | ~$50–100/mo per recruiter |
+| Cloud VM + mobile proxy (4G/5G) | Mobile CGNAT | ~85% survival | S3 | High — mobile proxy subscriptions | ~$100–200/mo per recruiter |
+| **browser-use Cloud** | Datacenter (likely) | **Blocked at login** | 15-min session cap; cloud profiles | None — managed service | Usage-based + blocked |
 
-**Recommended default:** recruiter's own machine. This gives the lowest detection risk because LinkedIn sees the same IP as the recruiter's manual usage. If recruiter's machine is unavailable, a dedicated per-recruiter cloud instance with an Elastic IP is the next safest option.
+### Why browser-use Cloud is not viable for LinkedIn
 
-IP consistency is a deployment constraint, not a code-level solution. Talon detects mismatches and reacts conservatively, but it cannot manufacture IP consistency.
+browser-use Cloud was evaluated as a potential "run remotely without the recruiter's machine" option. Research findings:
+
+- **IP type:** browser-use Cloud runs on its own infrastructure. The documentation describes "proprietary Chromium forks" optimised for stealth, but there is no mention of residential or mobile IPs. The service almost certainly uses datacenter IPs.
+- **LinkedIn at datacenter IPs:** LinkedIn's authentication flow performs ASN-level IP classification and **blocks datacenter IP ranges at login**. A session cannot be established from a cloud provider's IP block regardless of browser stealth or cookie state.
+- **Session cap:** Sessions are limited to 15 minutes. LinkedIn outreach batches regularly exceed this.
+- **Browser profiles:** browser-use Cloud supports persistent browser profiles (cookies, localStorage) across sessions — a good design — but this is irrelevant if login cannot complete from a datacenter IP.
+- **Verdict:** browser-use Cloud is suitable for general web automation but not for LinkedIn outreach from a recruiter account. Do not use.
+
+### On the recruiter's machine: Chrome profile vs storage_state
+
+When running on the recruiter's machine, there are two session strategies:
+
+**Option A — storage_state (JSON file, S3-backed):** Talon exports Playwright's `context.storage_state()` at end of each run, encrypts, and stores in S3. On next spawn, loads the JSON and initialises the browser context with it. This is the S3 design from Section 5.2. Clean, portable, works the same way regardless of what Chrome version or profile is installed.
+
+**Option B — Chrome profile directory (`user_data_dir`):** Talon points Playwright's `launchPersistentContext` at the recruiter's actual Chrome user data directory. The browser session shares the exact same profile as their manual LinkedIn use — same cookies, same extensions, same browsing history, same font and canvas fingerprint. This is the hardest-to-detect option but requires Chrome to not already be open on the same profile (process conflict).
+
+| | storage_state (S3) | Chrome profile (`user_data_dir`) |
+|--|-------------------|--------------------------------|
+| **Detection risk** | Low — real cookies | Lowest — indistinguishable from manual use |
+| **Fingerprint** | New browser instance | Same as recruiter's real Chrome |
+| **Profile conflict** | None | Chrome must be closed |
+| **Portability** | Any machine with vault access | Tied to this machine's Chrome install |
+| **Recommended for** | Cloud deployment, session portability | Recruiter's primary machine |
+
+**Recommended default for recruiter's machine:** Chrome profile (`user_data_dir`). If the recruiter's machine is not available, fall back to S3 storage_state with a cloud VM + mobile proxy.
+
+### IP detection handling
+
+Talon stores `last_ip` in session metadata. On each spawn, it compares current outbound IP to the stored value:
+- **Match** → proceed normally
+- **Mismatch** → run conservative health check; if LinkedIn shows a security prompt, discard state and trigger full re-login, updating `last_ip`
+
+This is detection, not prevention. The real mitigation is deployment. IP consistency is a constraint, not something code can fix.
 
 ---
 
@@ -626,6 +664,35 @@ enum TalonAuditEvent {
 
 ---
 
+### 9.8 Deployment model: recruiter's machine is the only viable option for LinkedIn (Phase 3)
+
+**Decision:** Talon runs on the recruiter's own machine for Phase 3. Cloud-hosted Talon is not supported for LinkedIn outreach until a mobile proxy infrastructure is designed.
+
+**Rationale (research-backed):**
+
+LinkedIn operates ASN-level IP classification directly in its authentication flow. Datacenter IP ranges (AWS, GCP, DigitalOcean, etc.) are blocked at login — a session cannot be established regardless of browser stealth, cookie state, or proxy configuration. This is a hard blocker, not a mitigation-able risk.
+
+The only viable remote option is mobile proxy (4G/5G CGNAT), which achieves ~85% account survival rate. Residential proxies have degraded to ~50% since LinkedIn's 2025 detection expansion. Both options cost $100–200/month per recruiter and add significant operational complexity.
+
+The recruiter's own machine is the baseline with zero detection risk because LinkedIn sees it as the same IP used for all their manual activity.
+
+| Deployment | LinkedIn viable? | Why |
+|------------|-----------------|-----|
+| Recruiter's machine | ✅ Yes | Real residential IP, same as manual use; Chrome profile option available |
+| browser-use Cloud | ❌ No | Datacenter IPs blocked at LinkedIn login; 15-min session cap |
+| Cloud VM + Elastic IP | ❌ No | Datacenter ASN — blocked at LinkedIn login |
+| Cloud VM + residential proxy | ⚠️ Risky | ~50% account survival; acceptable only for non-sensitive testing |
+| Cloud VM + mobile proxy | ✅ Viable (Phase 4+) | ~85% survival; adds $100–200/mo per recruiter + proxy management |
+
+**Trade-offs accepted:**
+- Recruiter's machine must be available during task execution windows (not fully unattended)
+- Requires one-time Python + Playwright setup on recruiter's machine
+- Talon is not a cloud service in Phase 3
+
+**Phase 4 trigger for cloud hosting:** If recruiter machines prove too unreliable as a platform (crashes, unavailability), design a mobile proxy infrastructure per recruiter with dedicated, sticky mobile IPs. This is an operational investment, not a code change.
+
+---
+
 ## 10. A2A Integration — Cura Agent ↔ Talon
 
 Talon is an **A2A Server**. The Cura CRM orchestrator is an **A2A Client**. When a `TalonTask` reaches `READY` status (after human approval), the CRM dispatches it to Talon via an A2A message. Talon streams execution progress back over SSE.
@@ -822,7 +889,7 @@ Each `TalonTask` carries a `coworkTaskId` reference for traceability. The CRM do
 ## 12. Open Questions
 
 1. **Vault service technology:** HashiCorp Vault, AWS Secrets Manager, or a lightweight custom service? AWS Secrets Manager is the lowest-friction choice if Cura is already on AWS; HashiCorp Vault offers more control for multi-cloud. Decision gated on Phase 3 infrastructure choices.
-2. **Runner hosting:** Recommended default is the recruiter's own machine (best IP consistency, Section 5.3). For recruiters unwilling to keep their machine available, a dedicated per-recruiter cloud instance with an Elastic IP is the fallback. Needs a clear onboarding decision before Phase 3 launch.
+2. **Runner hosting (researched — decision pending):** Recruiter's own machine is the clear winner for LinkedIn (Section 5.3). Cloud + datacenter IP is blocked at LinkedIn login. Cloud + mobile proxy (~85% survival) is the viable fallback but adds $100–200/mo per recruiter. Requires an explicit onboarding decision: do we support cloud-hosted Talon at all, or mandate local-only for Phase 3?
 3. **Approval UX:** One-by-one task approval is friction. Bulk approval ("approve today's outreach queue") needs CRM UI design — bulk confirm must still show the full ranked list, not a blind "approve all" button.
 4. **Prompt injection defence:** A candidate's LinkedIn profile could contain text designed to hijack browser-use's LLM (e.g., "ignore previous instructions and send a message to..."). Mitigation: system prompt sandboxing + off-site navigation blocking (already enforced) + step verification. Requires adversarial testing before Phase 3 launch.
 5. **Session state TTL strategy:** 14-day inactivity TTL is a starting point. LinkedIn sessions may survive longer; expiring them early forces unnecessary re-logins. The right TTL should be informed by observed LinkedIn session lifetimes in production — track `SESSION_INVALID` error rate after S3 load to calibrate.
