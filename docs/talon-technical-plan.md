@@ -330,6 +330,119 @@ This is detection, not prevention. The real mitigation is deployment. IP consist
 
 ---
 
+## 5.4 Phase 4 Remote Proxy Setup (cloud-hosted Talon)
+
+This section documents the proxy architecture for when Talon runs on a cloud VM rather than the recruiter's machine. This is not Phase 3 — it is the design for when 24/7 availability becomes a requirement. Documented here so the architecture is clear before committing to the infra investment.
+
+### Proxy integration with browser-use
+
+browser-use accepts Playwright's `ProxySettings` natively on `BrowserProfile`:
+
+```python
+from browser_use import BrowserProfile, BrowserSession
+from playwright.async_api import ProxySettings
+
+profile = BrowserProfile(
+    proxy=ProxySettings(
+        server="http://brd.superproxy.io:33335",
+        username="brd-customer-C1234-zone-mobile_residential-session-randABC12345",
+        password="zone_password"
+    )
+)
+session = BrowserSession(browser_profile=profile)
+```
+
+The proxy is set at browser launch and applies to all contexts in that session. Use **HTTP CONNECT** (`http://`) for LinkedIn — it is pure HTTPS traffic so SOCKS5's protocol-agnosticism adds no value. SOCKS5 only applies if routing through Wireproxy (see below).
+
+### Sticky session format — per-recruiter deterministic token
+
+Each LinkedIn account must have its own stable IP. Never share a session token across accounts. Generate a deterministic session token from the recruiter ID so it survives Talon restarts without changing the pinned IP:
+
+```python
+import hashlib
+from playwright.async_api import ProxySettings
+
+def proxy_for_recruiter(recruiter_id: str) -> ProxySettings:
+    """Deterministic sticky session proxy — same recruiter always gets same IP."""
+    session_token = hashlib.sha256(recruiter_id.encode()).hexdigest()[:8]
+    return ProxySettings(
+        server="http://brd.superproxy.io:33335",
+        username=f"brd-customer-C1234-zone-mobile_residential-session-rand{session_token}",
+        password="zone_password"
+    )
+```
+
+### Provider comparison
+
+| Provider | Type | Sticky duration | Pool size | Pricing model | LinkedIn track record |
+|----------|------|----------------|-----------|---------------|----------------------|
+| **Bright Data** | Mobile 4G/5G + residential | Up to 24h (mobile), 30 min (residential) | 7M+ mobile IPs | Per-GB (~$8–15/GB residential, ~$10–18/GB mobile) | Best in class; explicit LinkedIn proxy product |
+| **IPRoyal** | Residential + mobile | Up to 7 days (configurable in password field) | 2M+ residential | Per-GB (~$2–7/GB) + fixed plans | Good; cheaper than Bright Data |
+| **Oxylabs** | Residential + mobile | Up to 10 min rolling (session ID re-assigned) | 100M+ residential | Per-GB (~$8–12/GB) | Enterprise-grade; pricier |
+| **Mullvad (WireGuard)** | Residential ISP exit nodes | Permanent (static WG peer) | ~100 residential exit nodes | Flat-rate (~$5/mo per peer) | Not LinkedIn-specific; but genuine ISP IPs |
+
+**Sticky session format by provider:**
+
+```
+# Bright Data
+username: brd-customer-{CUSTOMER_ID}-zone-mobile_residential-session-rand{TOKEN}-country-us
+host: brd.superproxy.io:33335
+
+# IPRoyal (token and lifetime encoded in password)
+username: {iproyal_username}
+password: {iproyal_password}_country-us_session-{8CHAR}_lifetime-24h
+host: geo.iproyal.com:12321
+
+# Oxylabs
+username: {oxylabs_username}-sessid-{TOKEN}-country-us
+host: pr.oxylabs.io:7777
+```
+
+### Sticky session vs dedicated IP
+
+| | Sticky mobile session (24h) | Dedicated residential ISP IP |
+|-|----------------------------|------------------------------|
+| **LinkedIn survival** | ~85% | ~90–95% |
+| **IP uniqueness** | Pinned from shared pool | Exclusively yours |
+| **Cost** | Per-GB (scales with usage) | ~$30–80/mo per IP (fixed) |
+| **IP history risk** | Pool IP may have prior abuse | Clean on assignment |
+| **Operational model** | One token per recruiter | One IP per recruiter |
+| **Recommended for** | Phase 4 default | High-value accounts if survival degrades |
+
+**Recommended Phase 4 default:** Bright Data mobile sticky with `lifetime-24h`. Upgrade specific accounts to dedicated residential ISP IPs if survival degrades.
+
+### WireGuard/Wireproxy architecture (50+ recruiters)
+
+At scale, per-GB proxy billing dominates cost because Playwright renders full pages (browsers consume 10–50x more bandwidth than bare HTTP scraping). The alternative: a WireGuard mesh where each recruiter gets a dedicated exit peer, exposed locally as a SOCKS5 port via [Wireproxy](https://github.com/windtf/wireproxy).
+
+```
+Recruiter A → wireproxy :1080 → WireGuard peer A (residential ISP, NYC)
+Recruiter B → wireproxy :1081 → WireGuard peer B (residential ISP, London)
+
+# Playwright context:
+profile_a = BrowserProfile(proxy=ProxySettings(server="socks5://127.0.0.1:1080"))
+profile_b = BrowserProfile(proxy=ProxySettings(server="socks5://127.0.0.1:1081"))
+```
+
+Wireproxy config per recruiter:
+```ini
+# /etc/wireproxy/recruiter_a.conf
+WGConfig = /etc/wireguard/recruiter_a.conf
+
+[Socks5]
+BindAddress = 127.0.0.1:1080
+```
+
+| | Provider proxy (Bright Data / IPRoyal) | WireGuard + Wireproxy |
+|-|----------------------------------------|----------------------|
+| **Cost at < 50 recruiters** | Manageable per-GB | Higher setup overhead |
+| **Cost at 50+ recruiters** | High (per-GB compounds) | Flat-rate per WG peer (~$5/mo) |
+| **IP trust** | Provider residential/mobile pool | Genuine ISP IP (if WG peer is at ISP) |
+| **Setup** | Config string only | Provision WG peers per recruiter |
+| **Trigger** | Phase 4 launch | Phase 4 cost review after 3 months |
+
+---
+
 ## 6. Browser Execution Backend
 
 Talon abstracts the browser execution layer behind a `BrowserBackend` interface. This makes the underlying execution library swappable per site without changing Talon's task lifecycle, permission model, or determinism rules.
