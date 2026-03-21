@@ -14,7 +14,9 @@
 - Task lifecycle and human approval gate
 - Site isolation design
 - Credential fetch-and-discard flow
-- browser-use integration and determinism strategy
+- Swappable `BrowserBackend` interface — browser-use (default) vs page-agent (alternative), security analysis of each
+- Determinism strategy (scoped task prompts, abort conditions, step verification)
+- Agent Communication Protocol (ACP / A2A) as future orchestration layer
 - Data model (TalonTask, TalonCredential, TalonAuditLog)
 - Key design decisions with alternatives considered
 
@@ -195,45 +197,163 @@ The vault is a separate service, not embedded in the runner or the CRM API.
 
 ---
 
-## 6. browser-use Integration
+## 6. Browser Execution Backend
 
-Talon uses [browser-use](https://github.com/browser-use/browser-use) as the browser execution layer.
+Talon abstracts the browser execution layer behind a `BrowserBackend` interface. This makes the underlying execution library swappable per site without changing Talon's task lifecycle, permission model, or determinism rules.
 
-### Why browser-use over raw Playwright
+### 6.1 BrowserBackend interface
 
-| Aspect | browser-use | Raw Playwright |
-|--------|-------------|----------------|
-| Handles dynamic UI | Yes — LLM adapts to DOM changes | No — CSS selectors break on UI updates |
-| LinkedIn selector rot | Not a problem | High maintenance (LinkedIn updates weekly) |
-| Maintenance burden | Low | High |
-| Determinism | Controlled via scoped task prompts | Full (scripted steps) |
-| Setup complexity | Low | Medium |
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
-The trade-off: browser-use's LLM core is non-deterministic by nature. Section 6.2 explains how Talon makes it deterministic.
+@dataclass
+class TaskResult:
+    success: bool
+    abort_condition_met: bool
+    output: dict
+    error: str | None
 
-### 6.1 Session configuration
+class BrowserBackend(ABC):
+    @abstractmethod
+    async def open_session(
+        self,
+        site_key: str,
+        allowed_domains: list[str],
+        credential: Credential,
+    ) -> Session: ...
+
+    @abstractmethod
+    async def health_check(self, session: Session) -> bool: ...
+
+    @abstractmethod
+    async def execute_task(
+        self,
+        session: Session,
+        task: TalonTask,
+    ) -> TaskResult: ...
+
+    @abstractmethod
+    async def close_session(self, session: Session) -> None: ...
+```
+
+No code outside the backend implementations may call browser APIs directly. The runner speaks only to the interface.
+
+### 6.2 Backend selection
+
+Backends are configured per `siteKey` in Talon's runtime config. The default is `browser-use`.
+
+```json
+{
+  "site_backends": {
+    "linkedin.com": "browser-use",
+    "seek.com.au":  "browser-use"
+  },
+  "default_backend": "browser-use"
+}
+```
+
+Swapping a backend for a site requires a config change only — no task, runner, or API code changes.
+
+### 6.3 backend: browser-use (default)
+
+[browser-use](https://github.com/browser-use/browser-use) is a Python library that wraps Playwright with an LLM agent. It controls the browser via Chrome DevTools Protocol (CDP) from an external Python process.
 
 ```python
 from browser_use import Agent, BrowserSession
 
-session = BrowserSession(
-    allowed_domains=[task.site_key],   # site isolation enforced here
-    headless=False,                    # recruiter's own Chrome, visible
-    session_id=task.session_id,        # resumable if recruiter already logged in
-)
+class BrowserUseBackend(BrowserBackend):
+    async def open_session(self, site_key, allowed_domains, credential):
+        session = BrowserSession(
+            allowed_domains=allowed_domains,   # site isolation enforced here
+            headless=False,
+            session_id=credential.session_id,  # resume existing session if alive
+        )
+        await session.start()
+        return session
 
-agent = Agent(
-    task=task.payload.prompt,          # exact, bounded instruction
-    browser_session=session,
-    max_steps=task.payload.max_steps,  # hard cap, default 10
-)
-
-result = await agent.run()
+    async def execute_task(self, session, task):
+        agent = Agent(
+            task=task.payload.prompt,
+            browser_session=session,
+            max_steps=task.payload.max_steps,  # hard cap, default 10
+        )
+        result = await agent.run()
+        return TaskResult(success=result.is_done, ...)
 ```
 
-### 6.2 Determinism via scoped task prompts
+**Characteristics:**
+- External process, Python — does not touch the page source
+- Uses CDP (Chrome DevTools Protocol) — same mechanism as Playwright
+- LLM adapts to DOM changes without code updates
+- Does not require JavaScript injection into the target page
 
-browser-use is LLM-driven. Talon constrains it to deterministic behaviour through four rules:
+### 6.4 backend: page-agent (alternative)
+
+[page-agent](https://github.com/alibaba/page-agent) by Alibaba is a JavaScript in-page DOM agent. Unlike browser-use, it lives **inside** the web page. It parses the DOM directly (no screenshots, no OCR, text-only) and executes actions through JavaScript. Its DOM processing components are derived from browser-use (MIT licence).
+
+```typescript
+// PageAgentBackend would inject the page-agent script into the loaded page
+// and communicate via CDP's Runtime.evaluate to pass tasks and receive results
+
+class PageAgentBackend(BrowserBackend):
+    async def execute_task(self, session, task):
+        result = await session.cdp.evaluate("""
+            window.__talonAgent.run({
+                prompt: {{ task.payload.prompt }},
+                allowedDomains: {{ allowed_domains }},
+                maxSteps: {{ task.payload.max_steps }}
+            })
+        """)
+        return TaskResult(...)
+```
+
+**Characteristics:**
+- In-page JavaScript injection — the agent runs as a script tag inside the target page
+- DOM-native (no screenshots needed) — potentially faster and cheaper per step
+- Multi-tab support via optional Chrome extension
+- Derived from browser-use DOM components; conceptually compatible with Talon's determinism rules
+
+#### Security assessment: page-agent
+
+**Classified as: HIGH SUPPLY CHAIN RISK. Do not use as default.**
+
+| Risk vector | Assessment |
+|-------------|------------|
+| **Origin** | Published by Alibaba Group (Chinese company). Enterprise data governance policies in many jurisdictions restrict Chinese-origin dependencies in production automation pipelines. |
+| **In-page access** | The script runs inside the target page. It has full DOM read access — including visible form fields, session cookies stored in `document.cookie`, and any data rendered on screen. A compromised version could silently exfiltrate credentials or session tokens. |
+| **Supply chain** | npm package updates are not cryptographically signed. A malicious minor-version update could add data exfiltration to the in-page script. |
+| **Audit difficulty** | In-page JS execution is harder to observe and audit than an external Python process. Browser devtools are the only window into its behaviour. |
+| **browser-use derivation** | The DOM processing layer is MIT-licensed and derived from browser-use — meaning a custom, audited fork is technically feasible. |
+
+**If page-agent is ever adopted for a specific site:**
+- Pin to an exact version (`page-agent@1.5.4`, not `^1.5.4`)
+- Audit the full diff before any version upgrade
+- Consider vendoring the source into the Cura repo rather than installing from npm
+- Never use for sites where credentials are typed (login pages) — restrict to post-login, authenticated sessions only
+- Treat the decision as a per-site opt-in requiring explicit security review
+
+**Current recommendation:** `browser-use` is the default for all sites. `page-agent` is registered in this document as a known alternative for future evaluation, not for immediate use.
+
+### 6.5 Backend comparison
+
+| Aspect | browser-use (default) | page-agent (alternative) |
+|--------|-----------------------|--------------------------|
+| **Architecture** | External Python process → CDP | In-page JavaScript injection |
+| **DOM access** | Via CDP (external) | Direct JS access to full DOM |
+| **Screenshots needed** | Optional (LLM can use) | No — text-only DOM |
+| **Selector rot** | Not a problem (LLM adapts) | Not a problem (LLM adapts) |
+| **Maintenance burden** | Low | Low |
+| **Origin** | Open-source, grpc (Austria) | Alibaba (China) |
+| **Supply chain risk** | Low | High (see Section 6.4) |
+| **Credential exposure** | No in-page access | Full in-page DOM read |
+| **Auditability** | External process logs | CDP Runtime.evaluate — harder |
+| **Production status** | Mature, widely used | Newer (March 2026) |
+| **Swap effort** | — | Config change only (adapter ready) |
+
+### 6.6 Determinism rules (apply to all backends)
+
+The following four rules apply regardless of which backend executes a task.
 
 **Rule 1 — Atomic tasks.** One task = one action. No multi-step chaining within a single task. Sequences are multiple tasks, each approved individually.
 
@@ -396,18 +516,21 @@ enum TalonAuditEvent {
 
 ---
 
-### 9.2 browser-use over raw Playwright
+### 9.2 Swappable BrowserBackend with browser-use as default
 
-**Decision:** browser-use as the execution layer
+**Decision:** `BrowserBackend` interface with `BrowserUseBackend` as default. Backends are swappable per `siteKey` via config.
 
 **Rationale:**
-- LinkedIn, Seek, and other target sites update their UI frequently — CSS selectors break silently
-- browser-use's LLM core handles DOM changes without code changes
-- Reduces ongoing maintenance to zero for UI changes
+- LinkedIn, Seek, and other target sites update their UI frequently — CSS selectors break silently; an LLM-driven backend avoids selector rot
+- browser-use is mature, external-process architecture, low supply chain risk
+- page-agent (Alibaba) is a credible alternative but carries high supply chain risk as an in-page JavaScript injection from a Chinese-origin dependency — see Section 6.4
+- The adapter pattern means we can evaluate and adopt new backends (or swap away from a compromised one) without touching the task lifecycle, permission model, or API
 
-**Trade-offs accepted:** Non-determinism risk is mitigated by scoped task prompts (Section 6.2). The LLM executes within a bounded instruction set, not open-ended exploration.
+**Trade-offs accepted:** browser-use's LLM core is non-deterministic by nature. Mitigated by scoped task prompts, abort conditions, and step verification (Section 6.6). The LLM executes within a bounded instruction set, not open-ended exploration.
 
-**Alternative rejected:** Raw Playwright with hardcoded selectors. High maintenance, requires engineering time every time a target site updates. Rejected.
+**Alternatives rejected:**
+- Raw Playwright with hardcoded selectors — high maintenance, requires code changes on every LinkedIn UI update. Rejected.
+- page-agent as default — high supply chain risk (in-page JS, Alibaba origin). Available as opt-in per site after explicit security review. Not the default.
 
 ---
 
@@ -463,7 +586,57 @@ enum TalonAuditEvent {
 
 ---
 
-## 10. Relationship to CRM Task Queue
+## 10. Agent Communication Protocol (ACP / A2A)
+
+Talon currently uses direct REST API calls between the Orchestrator and Runner (see Section 2 token scopes). This is sufficient for Phase 3.
+
+As Cura scales to multiple agents (sourcing agent, screening agent, scheduling agent), a standardised inter-agent protocol becomes relevant.
+
+### What ACP / A2A is
+
+**ACP (Agent Communication Protocol)** was an open REST-based protocol for agent-to-agent communication developed by IBM Research. In September 2025, ACP merged with Google's **A2A (Agent-to-Agent)** protocol under the Linux Foundation to form a unified standard.
+
+A2A defines:
+- How agents advertise their capabilities (agent cards / metadata)
+- How tasks are handed off between agents (REST + Server-Sent Events for streaming)
+- How long-running multi-agent workflows are coordinated
+- Framework-agnostic — works with LangChain, CrewAI, BeeAI, or custom code
+
+A2A sits one layer above MCP: MCP connects an LLM to tools and data sources; A2A connects agents to other agents.
+
+```
+[CRM Orchestrator Agent]
+    │  A2A task hand-off
+    ▼
+[Talon Runner Agent]          ← executes browser tasks
+    │  MCP calls
+    ▼
+[CRM task queue API]          ← updates task status
+```
+
+### Relevance to Talon
+
+| Scenario | Current (Phase 3) | With A2A |
+|----------|-------------------|---------|
+| Orchestrator → Runner | Direct REST API, proprietary token | A2A task message, standardised |
+| Runner discovery | Hardcoded config | Agent card — self-describing |
+| Multi-runner coordination | Not needed yet | A2A handles task distribution |
+| External agent integration | Not possible | Any A2A-compatible agent can orchestrate Talon |
+
+### Decision: defer A2A adoption to Phase 4+
+
+**Chosen:** Keep direct REST API for Phase 3.
+
+**Rationale:**
+- A2A adds protocol overhead with no immediate benefit (Cura has one orchestrator, one runner)
+- The spec and tooling are still stabilising post-merger
+- The `BrowserBackend` interface already makes Talon's internals modular — adopting A2A later requires only changing the Orchestrator↔Runner transport layer, not the core logic
+
+**Future trigger:** When Cura runs more than two agents with different capabilities that need to hand off tasks to each other, adopt A2A as the communication layer.
+
+---
+
+## 11. Relationship to CRM Task Queue
 
 Talon is the **execution layer**. The CRM task queue (see @docs/crm-technical-plan.md Section 5) is the **brain**.
 
@@ -487,10 +660,13 @@ Each `TalonTask` carries a `coworkTaskId` reference for traceability. The CRM do
 
 ---
 
-## 11. Open Questions
+---
+
+## 12. Open Questions
 
 1. **Session resumption:** If the recruiter's Chrome already has an active LinkedIn session, should Talon attach to it rather than re-login? browser-use supports `session_id` for resumable sessions — needs testing.
 2. **Vault service technology:** HashiCorp Vault, AWS Secrets Manager, or a lightweight custom service? Decision depends on infrastructure choices in Phase 3.
 3. **Runner hosting:** Does the runner run on the recruiter's machine (alongside the browser) or as a cloud service? Cloud service + recruiter's browser (via remote debugging protocol) is more reliable but requires recruiter to expose a debug port.
 4. **Approval UX latency:** Recruiters approving tasks one-by-one is friction. Bulk approval ("approve today's outreach queue") needs CRM UI design — ensure bulk approve still requires human review of the list, not a blind confirm.
 5. **Prompt injection defence:** A candidate's LinkedIn profile could contain text designed to hijack browser-use's LLM (e.g., "ignore previous instructions and send a message to..."). Mitigation: system prompt sandboxing + off-site navigation blocking + step verification. Needs adversarial testing before Phase 3 launch.
+6. **page-agent evaluation:** If browser-use proves unreliable on a specific site, page-agent is the natural next candidate. Before enabling it: security audit of the pinned version, confirm no login-page use, confirm restricted to post-auth sessions. Should be a deliberate opt-in decision, not a quiet config change.
