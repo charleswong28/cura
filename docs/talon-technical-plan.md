@@ -15,8 +15,9 @@
 - Site isolation design
 - Credential fetch-and-discard flow
 - Browser session persistence — Chrome profile on EBS (primary), S3 encrypted state (fallback)
-- LinkedIn ban problem, IP strategy options, and final decision: recruiter home proxy (lightweight device) + EC2 + EBS
-- Phase 3 AWS architecture and Phase 4 third-party proxy fallback
+- LinkedIn ban problem, IP strategy options, and final decision: recruiter home proxy (lightweight device)
+- Compute cost model: shared EC2 stop/start (Phase 3, 2 recruiters) → ECS Fargate scale-to-zero (Phase 4, 30+ recruiters)
+- Third-party proxy fallback when home network unavailable
 - Swappable `BrowserBackend` interface — browser-use (default) vs page-agent (alternative), security analysis
 - Determinism strategy (scoped task prompts, abort conditions, step verification)
 - A2A integration design — Talon as A2A Server, CRM as A2A Client, SSE streaming, agent card
@@ -248,7 +249,7 @@ Talon spawns for (tenantId, userId, siteKey)
 
 **Stored session state is a credential.** It grants access to the recruiter's authenticated site session. The encryption and access controls in Section 5.2.1 treat it as such.
 
-**Note:** When running on the recruiter's machine with Chrome profile mode (`user_data_dir`), S3 session storage is not required — the profile directory persists on disk naturally. S3 session persistence applies to the storage_state deployment path (see Section 5.3).
+**Why not the full Chrome profile directory in S3?** Chrome's `user_data_dir` contains SQLite databases (Cookies), LevelDB databases (Local Storage, IndexedDB), and lock files. These require a real POSIX filesystem with file locking — S3 object storage cannot serve as the backing store for concurrent database writes. `storage_state` (Playwright's JSON export of cookies + localStorage, ~50–100 KB) is the correct portable format for S3. It is everything needed to resume an authenticated session without the filesystem constraints.
 
 ### 5.2.1 Encryption design
 
@@ -294,33 +295,86 @@ LinkedIn is the hardest major platform to automate. It operates multiple indepen
 
 ---
 
-## 5.4 Phase 3 Architecture: EC2 + Recruiter Home Proxy
+## 5.4 Compute Model: Cost vs Scale
 
-Talon runs on EC2. All browser traffic exits via a lightweight proxy at the recruiter's home — behind their router, always on, no laptop required.
+### The core constraint
+
+EC2 instances cost money whether or not tasks are running. At 2 recruiters, LinkedIn outreach runs in short batches (the task queue triggers every 30 min per Section 5 of crm-technical-plan.md). Between batches, compute sits idle. At 30 recruiters, the pattern is the same but multiplied — peak demand is still burst, not continuous.
+
+The right model: **start compute when tasks arrive, stop it when the queue drains.**
+
+`storage_state` in S3 (Section 5.2) is what makes this possible — session state is portable across any compute. No EBS, no persistent disk needed. Any instance that spawns can load the session and pick up where the last one left off.
+
+### Phase 3: Shared EC2 with queue-driven stop/start (2 recruiters at launch)
+
+One shared EC2 instance serves all recruiters. It starts when the CRM task queue has work, runs the batch, then stops itself. Idle cost: near zero.
 
 ```
-[AWS — always on]                          [Recruiter's home network]
-  EC2 (Talon + browser-use + Chromium)        Lightweight proxy device
-  Chrome profiles on EBS volume        ──────  (behind home router)
-  Secrets Manager (credentials)               Home ISP residential IP
+EventBridge rule (every 30 min)
+  → Lambda: check CRM queue depth for READY tasks
+      ├── Tasks present → start EC2 (ec2:StartInstances)
+      └── No tasks → do nothing
 
-LinkedIn sees: recruiter's home IP — identical to their manual use
+EC2 starts → Talon runs → processes all READY tasks
+  → queue drains → Talon calls ec2:StopInstances on itself → instance stops
 ```
 
-### AWS infrastructure
+**Why shared EC2 (not one per recruiter):** At 2–5 recruiters, tasks rarely overlap. A t3.medium (4 GB) handles one Chromium context comfortably; t3.large (8 GB) handles 2 concurrent. One instance is enough. Per-recruiter session isolation is handled by S3 keys, not by separate instances.
+
+**AWS infrastructure (Phase 3):**
 
 | Component | Service | Spec | Purpose |
 |-----------|---------|------|---------|
-| Talon process | EC2 | t3.medium (2 vCPU / 4 GB) | Runs browser-use + Playwright + Chromium |
-| Chrome profiles | EBS gp3 | 100 GB, attached to instance | Persistent Chrome user data directories per recruiter |
-| Credential vault | AWS Secrets Manager | — | LinkedIn credentials; single-use fetch tokens |
-| Networking | Security Group | Inbound: 8001 from CRM only, 22 SSH admin-only; Outbound: all (exits via home tunnel) | Least-privilege |
+| Talon process | EC2 | t3.medium → t3.large at 5+ recruiters | Runs browser-use + Playwright + Chromium |
+| Session state | S3 | ~100 KB per recruiter | storage_state JSON, encrypted (Section 5.2) |
+| Credential vault | Secrets Manager | — | LinkedIn credentials |
+| Queue poller | EventBridge + Lambda | Every 30 min | Start EC2 when tasks present |
+| IAM | Instance profile | `ec2:StopInstances` (self only), `s3:GetObject/PutObject` on sessions bucket, `secretsmanager:GetSecretValue` | Least privilege |
 
-**t3.large (8 GB)** recommended if running concurrent browser contexts for multiple recruiters on one instance.
+**Estimated cost (Phase 3, 2 recruiters):**
+- EC2 t3.medium running ~2–3 hr/day (task batches) → ~$10–15/mo
+- S3 session state → ~$0
+- Lambda + EventBridge → ~$0 (well within free tier)
+- EBS: none required (OS on root volume only)
+
+### Phase 4: ECS Fargate, scale to zero (10–30 recruiters)
+
+Above ~10 recruiters, the stop/start EC2 model adds friction — cold start latency grows, and managing instance state across many concurrent recruiters becomes messy. Switch to ECS Fargate: containers spin up per task batch and terminate when done. Zero idle cost. No EC2 instances to manage.
+
+```
+CRM task queue has READY tasks
+  → EventBridge Pipe or Lambda → ECS RunTask (Fargate, spot)
+      → Container starts (~30s cold start)
+      → Talon loads storage_state from S3
+      → Executes approved tasks
+      → Exports storage_state to S3
+      → Container exits → billing stops
+```
+
+**Fargate Chromium requirements:** `--no-sandbox` (rootless container), 2 vCPU / 4 GB task definition. No persistent disk — session state lives in S3.
+
+**Estimated cost (Phase 4, 30 recruiters, 2 hr/day automation each):**
+- 30 × 2 hr × $0.04/hr (Fargate spot) → ~$50/mo compute
+- S3 session state → ~$0
+- No idle cost
+
+### Comparison
+
+| | Phase 3: Shared EC2 stop/start | Phase 4: ECS Fargate |
+|-|-------------------------------|---------------------|
+| **Idle cost** | ~$0 (stopped) | $0 (no instances) |
+| **Running cost** | ~$10–15/mo | ~$50/mo at 30 recruiters |
+| **Cold start** | 30–60s EC2 start | ~30s container start |
+| **Concurrency** | Sequential (one instance) | Parallel (one task per container) |
+| **Operational complexity** | Low | Medium (ECS task definitions) |
+| **When to switch** | — | At ~10 recruiters or concurrency needed |
+| **Session storage** | S3 storage_state | S3 storage_state |
+
+**No EBS in either model.** EBS is only relevant if fingerprint consistency becomes a problem (same browser fingerprint across runs). If LinkedIn starts flagging sessions, add an EBS volume to EC2 (Phase 3) or an EFS mount to Fargate (Phase 4) to persist a full Chrome `user_data_dir`. That is an upgrade path, not the default.
 
 ### Home proxy setup
 
-The recruiter installs a lightweight always-on device (Raspberry Pi, mini-PC, spare box) at home and runs either Tailscale exit node or WireGuard. The device stays on and connected — the recruiter's laptop does not need to be running.
+Each recruiter installs a lightweight always-on device at home (Raspberry Pi, mini-PC, spare box) and runs a Tailscale exit node or WireGuard. The device stays on; the recruiter's laptop does not need to be running. EC2 or Fargate containers route all browser traffic through it at OS level — no proxy settings in the browser code.
 
 **Option A — Tailscale exit node (recommended, 30 min setup):**
 
@@ -329,53 +383,19 @@ The recruiter installs a lightweight always-on device (Raspberry Pi, mini-PC, sp
 tailscale up --advertise-exit-node
 # Approve in Tailscale admin console
 
-# On EC2 (one-time, via SSH or user-data)
+# On EC2 / in Fargate container startup (via user-data or entrypoint)
 curl -fsSL https://tailscale.com/install.sh | sh
 tailscale up --exit-node=<home-device-tailscale-ip> --authkey=<tskey-...>
 curl https://ipinfo.io/ip   # must return home ISP IP, not AWS
 ```
 
-No proxy settings in browser-use — Tailscale handles OS-level routing. All Chromium traffic exits via home automatically.
+**Option B — WireGuard on home router (most robust, no device needed):**
 
-**Option B — WireGuard on home router (most robust):**
+Router stays on always. Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense. EC2/container connects as a WireGuard peer.
 
-Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense. The router is always on; no separate device needed.
+**Per-recruiter IP isolation:** Each LinkedIn account must exit via its own home network. Never route multiple recruiter accounts through the same IP — LinkedIn correlates shared IPs across accounts.
 
-```bash
-# EC2 — install WireGuard and apply peer config from router
-apt install wireguard
-wg-quick up wg0
-curl https://ipinfo.io/ip   # must return home ISP IP
-```
-
-**Per-recruiter IP isolation:** Each LinkedIn account must exit via its own home network. Never tunnel multiple recruiter accounts through the same IP — LinkedIn correlates shared IPs across accounts.
-
-### Chrome profiles on EBS
-
-```
-/mnt/ebs/chrome-profiles/
-  {tenantId}/
-    {userId}/          ← one directory per recruiter
-      Default/
-        Cookies
-        Local Storage/
-```
-
-```python
-import os
-PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "/mnt/ebs/chrome-profiles")
-
-profile = BrowserProfile(
-    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
-    # No proxy= — Tailscale/WG handles routing at OS level
-)
-```
-
-EBS persists independently of EC2 lifecycle — profiles survive instance stops, restarts, and instance replacement (detach + reattach). S3 session state (Section 5.2) is retained as fallback for ephemeral deployments only.
-
----
-
-## 5.5 Phase 4: Third-Party Proxy (Home Network Unavailable)
+## 5.5 Fallback: Third-Party Proxy (Home Network Unavailable)
 
 When the recruiter's home network cannot act as exit proxy (recruiter moves, network unavailable, agency with many recruiters), a dedicated static residential IP is the fallback.
 
@@ -403,8 +423,8 @@ profile = BrowserProfile(
 
 **Account → proxy mapping is permanent.** Never reassign a proxy IP to a different LinkedIn account — LinkedIn detects IP sharing across accounts. Store `proxy_endpoint` alongside the recruiter's account record.
 
-| | Home proxy (Phase 3) | Dedicated IP (Phase 4) |
-|-|---------------------|----------------------|
+| | Home proxy (default) | Dedicated third-party IP (fallback) |
+|-|---------------------|-------------------------------------|
 | **LinkedIn survival** | Highest (~100%) | ~90–95% |
 | **Cost** | ~$0–5/mo device + EC2 | ~$1.47–10/mo per IP |
 | **Operational effort** | One-time device setup | Config string per recruiter |
