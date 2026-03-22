@@ -50,3 +50,17 @@ class TaskResult(BaseModel):
     steps: list[StepResult] = []
     error_code: TalonErrorCode | None = None
     error_message: str | None = None
+
+
+class SiteCredential:
+    """Holds login credentials for a target site. Discard after session closes."""
+
+    def __init__(self, username: str, password: str, totp_secret: str | None = None) -> None:
+        self.username = username
+        self.password = password
+        self.totp_secret = totp_secret
+
+    def __del__(self) -> None:
+        self.username = ""
+        self.password = ""
+        self.totp_secret = None

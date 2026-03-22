@@ -1,8 +1,8 @@
 """
-Talon — A2A Server entry point.
+Talon — wiring point.
 
-Publishes the agent card at /.well-known/agent.json.
-Handles A2A task execution on port 8001.
+This is the only file that knows about concrete adapters.
+To swap a dependency, change one line here — nothing else changes.
 """
 
 import logging
@@ -11,13 +11,13 @@ import uvicorn
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import (
-    AgentCapabilities,
-    AgentCard,
-    AgentSkill,
-)
+from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 
-from talon.agent import TalonAgentExecutor
+from talon.adapters.browser.browser_use_backend import BrowserUseBackend
+from talon.adapters.credentials.secrets_manager_store import SecretsManagerCredentialStore
+from talon.adapters.session.s3_session_store import S3SessionStore
+from talon.adapters.task_repository.http_task_repository import HttpTaskRepository
+from talon.application.executor import TalonAgentExecutor
 from talon.config import settings
 
 logging.basicConfig(level=settings.log_level.upper())
@@ -51,14 +51,27 @@ AGENT_CARD = AgentCard(
 
 
 def build_app() -> A2AStarletteApplication:
+    executor = TalonAgentExecutor(
+        browser_backend=BrowserUseBackend(headless=settings.headless),
+        credential_store=SecretsManagerCredentialStore(
+            region=settings.aws_region,
+            prefix=settings.secrets_manager_prefix,
+        ),
+        session_store=S3SessionStore(
+            region=settings.aws_region,
+            bucket=settings.s3_sessions_bucket,
+            secrets_prefix=settings.secrets_manager_prefix,
+        ),
+        task_repository=HttpTaskRepository(
+            base_url=settings.crm_api_url,
+            runner_token=settings.runner_token,
+        ),
+    )
     request_handler = DefaultRequestHandler(
-        agent_executor=TalonAgentExecutor(),
+        agent_executor=executor,
         task_store=InMemoryTaskStore(),
     )
-    return A2AStarletteApplication(
-        agent_card=AGENT_CARD,
-        http_handler=request_handler,
-    )
+    return A2AStarletteApplication(agent_card=AGENT_CARD, http_handler=request_handler)
 
 
 def main() -> None:

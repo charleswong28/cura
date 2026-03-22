@@ -1,4 +1,4 @@
-from talon.models import TaskPayload, TalonTaskStatus
+from talon.domain.models import TaskPayload, TalonTaskStatus
 
 
 def test_task_status_values() -> None:
