@@ -101,6 +101,28 @@ services:
       redis:
         condition: service_healthy
 
+  talon:
+    build:
+      context: ../python/apps/talon
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      TALON_HOST: "0.0.0.0"
+      TALON_PORT: "8001"
+      TALON_LOG_LEVEL: ${TALON_LOG_LEVEL:-info}
+      TALON_CRM_API_URL: http://api:8000
+      TALON_RUNNER_TOKEN: ${TALON_RUNNER_TOKEN:-dev-runner-token}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+      TALON_S3_SESSIONS_BUCKET: ${TALON_S3_SESSIONS_BUCKET:-cura-talon-sessions}
+      TALON_SECRETS_MANAGER_PREFIX: ${TALON_SECRETS_MANAGER_PREFIX:-talon}
+      TALON_HEADLESS: ${TALON_HEADLESS:-true}
+    ports:
+      - "${TALON_PORT:-8001}:8001"
+    volumes:
+      - ../python/apps/talon/src:/app/src
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
   redis_data:

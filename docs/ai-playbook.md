@@ -33,6 +33,7 @@ After making any frontend or backend change, the AI **must** verify the result i
 | Web App (`web-app`) | `http://localhost:3001` |
 | API (`api`) | `http://localhost:8000` |
 | GraphQL Playground | `http://localhost:8000/graphql` |
+| Talon A2A server (`talon`) | `http://localhost:8001` |
 
 ### Steps
 
