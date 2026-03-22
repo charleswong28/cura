@@ -59,6 +59,7 @@ Forwards all arguments directly to `docker compose up`, so any Docker Compose fl
 | Redis 7 | `6379` | password: `cura` |
 | Soketi (WebSocket) | `6001` | app-id: `cura-app` / key: `cura-key` / secret: `cura-secret` |
 | API (NestJS) | `8000` | — |
+| Talon A2A server (Python) | `8001` | — |
 | Web App (Next.js) | `3001` | — |
 | Home Page (Next.js) | `3000` | — |
 

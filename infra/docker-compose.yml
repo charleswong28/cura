@@ -107,15 +107,15 @@ services:
       dockerfile: Dockerfile.dev
     restart: unless-stopped
     environment:
-      HOST: "0.0.0.0"
-      PORT: "8001"
-      LOG_LEVEL: ${TALON_LOG_LEVEL:-info}
-      CRM_API_URL: http://api:8000
-      RUNNER_TOKEN: ${TALON_RUNNER_TOKEN:-dev-runner-token}
+      TALON_HOST: "0.0.0.0"
+      TALON_PORT: "8001"
+      TALON_LOG_LEVEL: ${TALON_LOG_LEVEL:-info}
+      TALON_CRM_API_URL: http://api:8000
+      TALON_RUNNER_TOKEN: ${TALON_RUNNER_TOKEN:-dev-runner-token}
       AWS_REGION: ${AWS_REGION:-ap-southeast-2}
-      S3_SESSIONS_BUCKET: ${TALON_S3_SESSIONS_BUCKET:-cura-talon-sessions}
-      SECRETS_MANAGER_PREFIX: ${TALON_SECRETS_MANAGER_PREFIX:-talon}
-      HEADLESS: ${TALON_HEADLESS:-true}
+      TALON_S3_SESSIONS_BUCKET: ${TALON_S3_SESSIONS_BUCKET:-cura-talon-sessions}
+      TALON_SECRETS_MANAGER_PREFIX: ${TALON_SECRETS_MANAGER_PREFIX:-talon}
+      TALON_HEADLESS: ${TALON_HEADLESS:-true}
     ports:
       - "${TALON_PORT:-8001}:8001"
     volumes:

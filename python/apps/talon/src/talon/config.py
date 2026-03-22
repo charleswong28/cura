@@ -1,8 +1,13 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_prefix="TALON_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
     # Service
     host: str = "0.0.0.0"
@@ -13,8 +18,8 @@ class Settings(BaseSettings):
     crm_api_url: str = "http://localhost:8000"
     runner_token: str  # Bearer token with runner-scope
 
-    # AWS
-    aws_region: str = "ap-southeast-2"
+    # AWS (no prefix — standard AWS env vars)
+    aws_region: str = Field("ap-southeast-2", alias="AWS_REGION")
     s3_sessions_bucket: str = "cura-talon-sessions"
     secrets_manager_prefix: str = "talon"
 
