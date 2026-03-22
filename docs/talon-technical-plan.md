@@ -14,8 +14,10 @@
 - Task lifecycle and human approval gate
 - Site isolation design
 - Credential fetch-and-discard flow
-- Browser session persistence — Chrome profile on VM disk (primary), S3 encrypted state (fallback), session lifecycle, IP consistency design
-- Swappable `BrowserBackend` interface — browser-use (default) vs page-agent (alternative), security analysis of each
+- Browser session persistence — Chrome profile on EBS (primary), S3 encrypted state (fallback)
+- LinkedIn ban problem, IP strategy options, and final decision: recruiter home proxy (lightweight device) + EC2 + EBS
+- Phase 3 AWS architecture and Phase 4 third-party proxy fallback
+- Swappable `BrowserBackend` interface — browser-use (default) vs page-agent (alternative), security analysis
 - Determinism strategy (scoped task prompts, abort conditions, step verification)
 - A2A integration design — Talon as A2A Server, CRM as A2A Client, SSE streaming, agent card
 - Data model (TalonTask, TalonCredential, TalonAuditLog)
@@ -264,230 +266,99 @@ Access controls:
 
 ---
 
-## 5.3 Deployment, IP Consistency, and LinkedIn Detection Risk
+## 5.3 The LinkedIn Ban Problem
 
-This section documents research findings (March 2026) on LinkedIn's bot detection capabilities and what they mean for Talon's deployment model. IP consistency is not a code problem — it is a deployment decision with direct consequences for recruiter account safety.
+LinkedIn is the hardest major platform to automate. It operates multiple independent detection layers — defeating one is not enough.
 
-### LinkedIn's detection stack (2026)
+| Detection layer | What LinkedIn checks |
+|----------------|---------------------|
+| **ASN classification** | Whether the IP resolves to a datacenter (AWS, GCP, DigitalOcean etc.) — blocked at login before any session can start |
+| **IP reputation** | Whether the IP appears in fraud/abuse databases — shared residential proxy pools degrade quickly |
+| **Browser fingerprint** | TLS handshake, user-agent, canvas/font rendering — headless browsers are detectable |
+| **Behavioural analysis** | Typing cadence, scroll patterns, inter-action timing — real-time ML micro-pattern analysis (expanded 2025–2026) |
+| **Session geolocation** | Mid-session IP change invalidates the session immediately |
 
-LinkedIn has expanded bot detection significantly since 2024–2025. It now operates multiple independent layers:
+**Core constraint:** EC2 IPs are blocked at login — no cookie reuse or session persistence helps if the outbound IP is a datacenter ASN. The browser traffic must exit from a genuine residential IP.
 
-| Detection layer | What it checks | Notes |
-|----------------|---------------|-------|
-| **ASN classification** | Whether the IP resolves to a datacenter AS number | AWS, GCP, DigitalOcean etc. are blocked *at login* — the auth flow never completes |
-| **IP reputation scoring** | Whether the IP appears in fraud/abuse databases | Residential proxy IPs are increasingly flagged; shared proxy pool IPs degrade quickly |
-| **Browser fingerprint** | TLS handshake, user-agent, extension presence, canvas/font rendering | Headless browsers and anti-detect browsers are detectable |
-| **Behavioural analysis** | Typing cadence, scroll patterns, inter-action timing | A 2026 algorithm update added real-time ML analysis of micro-patterns |
-| **Session geolocation** | Whether the session IP country matches the account's registered location | Mid-session IP rotation invalidates the session immediately |
+### How we tackle it — options compared
 
-**Key finding:** LinkedIn is the hardest major platform to automate. It blocks datacenter IPs directly in the auth flow — no amount of session persistence or cookie reuse helps if the IP originates from a cloud provider. Residential proxies have ~50% account survival rate (post-2025 detection expansion). Mobile proxies (4G/5G CGNAT) have ~85% survival rate. The recruiter's own IP — never shared, never abused, matching their account's registered country — has the lowest risk of all.
+| Approach | IP type | LinkedIn survival | Always-on | Cost | Verdict |
+|----------|---------|-----------------|-----------|------|---------|
+| **Recruiter's home proxy (lightweight device)** | Home residential | Highest — identical to manual use | Yes (device is always-on, not their laptop) | ~$0–5/mo proxy device + EC2 | ✅ **Phase 3 decision** |
+| Dedicated residential/ISP IP (Webshare etc.) | Dedicated residential | ~90–95% | Yes | ~$1.50–5.50/IP/mo | ✅ Phase 4 when home unavailable |
+| Shared residential proxy pool | Shared residential | ~50% | Yes | ~$50–100/mo | ❌ Too risky post-2025 detection |
+| Mobile proxy (SOAX, Bright Data 4G/5G) | Mobile CGNAT | ~85% | Yes | ~$70–240/mo per recruiter | ❌ Expensive; overkill for Phase 3 |
+| Bare EC2 IP | Datacenter | **Blocked at login** | Yes | Included | ❌ Never viable for LinkedIn |
 
-### Deployment options for Talon
-
-| Deployment | IP type | LinkedIn survival | Session handling | Operational effort | Cost |
-|------------|---------|------------------|------------------|-------------------|------|
-| **EC2 + recruiter's home/work exit proxy** ✓ recommended | Home/office residential (tunnelled) | Highest — identical to manual use | Chrome profile on EBS | One-time Tailscale or WireGuard setup | ~$15–35/mo EC2+EBS + $0 proxy |
-| Recruiter's own machine (Phase 3 fallback) | Home/office residential | Highest — identical to manual use | Chrome profile on machine | One-time Python + Playwright setup | ~$0 infra |
-| Dedicated EC2 per recruiter + Elastic IP | Datacenter | **Blocked at login** — LinkedIn detects at ASN level | Chrome profile on EBS | Medium — one EC2 per recruiter | ~$20–50/mo per recruiter |
-| EC2 + shared residential proxy | Shared residential | ~50% survival | Chrome profile on EBS | High — proxy management, IP rotation | ~$50–100/mo per recruiter |
-| EC2 + mobile proxy (4G/5G) | Mobile CGNAT | ~85% survival | Chrome profile on EBS | High — mobile proxy subscriptions | ~$100–200/mo per recruiter |
-| **browser-use Cloud** | Datacenter (likely) | **Blocked at login** | 15-min session cap; cloud profiles | None — managed service | Usage-based + blocked |
-
-### Why browser-use Cloud is not viable for LinkedIn
-
-browser-use Cloud was evaluated as a potential "run remotely without the recruiter's machine" option. Research findings:
-
-- **IP type:** browser-use Cloud runs on its own infrastructure. The documentation describes "proprietary Chromium forks" optimised for stealth, but there is no mention of residential or mobile IPs. The service almost certainly uses datacenter IPs.
-- **LinkedIn at datacenter IPs:** LinkedIn's authentication flow performs ASN-level IP classification and **blocks datacenter IP ranges at login**. A session cannot be established from a cloud provider's IP block regardless of browser stealth or cookie state.
-- **Session cap:** Sessions are limited to 15 minutes. LinkedIn outreach batches regularly exceed this.
-- **Browser profiles:** browser-use Cloud supports persistent browser profiles (cookies, localStorage) across sessions — a good design — but this is irrelevant if login cannot complete from a datacenter IP.
-- **Verdict:** browser-use Cloud is suitable for general web automation but not for LinkedIn outreach from a recruiter account. Do not use.
-
-### On the recruiter's machine: Chrome profile vs storage_state
-
-When running on the recruiter's machine, there are two session strategies:
-
-**Option A — storage_state (JSON file, S3-backed):** Talon exports Playwright's `context.storage_state()` at end of each run, encrypts, and stores in S3. On next spawn, loads the JSON and initialises the browser context with it. This is the S3 design from Section 5.2. Clean, portable, works the same way regardless of what Chrome version or profile is installed.
-
-**Option B — Chrome profile directory (`user_data_dir`):** Talon points Playwright's `launchPersistentContext` at the recruiter's actual Chrome user data directory. The browser session shares the exact same profile as their manual LinkedIn use — same cookies, same extensions, same browsing history, same font and canvas fingerprint. This is the hardest-to-detect option but requires Chrome to not already be open on the same profile (process conflict).
-
-| | storage_state (S3) | Chrome profile (`user_data_dir`) |
-|--|-------------------|--------------------------------|
-| **Detection risk** | Low — real cookies | Lowest — indistinguishable from manual use |
-| **Fingerprint** | New browser instance | Same as recruiter's real Chrome |
-| **Profile conflict** | None | Chrome must be closed |
-| **Portability** | Any machine with vault access | Tied to this machine's Chrome install |
-| **Recommended for** | Cloud deployment, session portability | Recruiter's primary machine |
-
-**Recommended default:** Chrome profile (`user_data_dir`) on an EC2 instance with EBS volume, with Tailscale or WireGuard routing all browser traffic out through the recruiter's home/work network. If the home network is unavailable, fall back to a third-party mobile proxy (see Section 5.5).
-
-### IP detection handling
-
-Talon stores `last_ip` in session metadata. On each spawn, it compares current outbound IP to the stored value:
-- **Match** → proceed normally
-- **Mismatch** → run conservative health check; if LinkedIn shows a security prompt, discard state and trigger full re-login, updating `last_ip`
-
-This is detection, not prevention. The real mitigation is deployment. IP consistency is a constraint, not something code can fix.
+**Decision:** A lightweight proxy device at the recruiter's home (behind their router) routes EC2 browser traffic out through their genuine residential IP. EC2 runs the heavy lifting 24/7; the recruiter's home network provides the trusted IP. We can productise the hardware as a separate sold device in a later phase.
 
 ---
 
-## 5.4 Deployment: EC2 + Home/Work Exit Proxy (Phase 3 Primary)
+## 5.4 Phase 3 Architecture: EC2 + Recruiter Home Proxy
 
-Talon runs as a persistent service on an EC2 instance. All browser traffic exits via the recruiter's home or work network. EC2 provides 24/7 reliability and persistent EBS storage; the recruiter's network provides the genuine residential IP that LinkedIn trusts — identical to their manual usage.
+Talon runs on EC2. All browser traffic exits via a lightweight proxy at the recruiter's home — behind their router, always on, no laptop required.
+
+```
+[AWS — always on]                          [Recruiter's home network]
+  EC2 (Talon + browser-use + Chromium)        Lightweight proxy device
+  Chrome profiles on EBS volume        ──────  (behind home router)
+  Secrets Manager (credentials)               Home ISP residential IP
+
+LinkedIn sees: recruiter's home IP — identical to their manual use
+```
 
 ### AWS infrastructure
 
 | Component | Service | Spec | Purpose |
 |-----------|---------|------|---------|
-| Talon process | EC2 | t3.medium (2 vCPU / 4 GB RAM) | Runs browser-use + Playwright + Chromium |
-| Chrome profiles | EBS gp3 | 100 GB, attached to instance | Persistent Chrome user data directories |
-| Credential vault | AWS Secrets Manager | — | Stores LinkedIn credentials; single-use fetch tokens |
-| Session state fallback | S3 | — | Only if Talon ever runs without persistent EBS |
-| Networking | Security Group | See below | Restrict inbound; allow Tailscale UDP outbound |
+| Talon process | EC2 | t3.medium (2 vCPU / 4 GB) | Runs browser-use + Playwright + Chromium |
+| Chrome profiles | EBS gp3 | 100 GB, attached to instance | Persistent Chrome user data directories per recruiter |
+| Credential vault | AWS Secrets Manager | — | LinkedIn credentials; single-use fetch tokens |
+| Networking | Security Group | Inbound: 8001 from CRM only, 22 SSH admin-only; Outbound: all (exits via home tunnel) | Least-privilege |
 
-**EC2 instance sizing:** Chromium is memory-heavy. t3.medium (4 GB) handles one browser context comfortably. t3.large (8 GB) recommended if running concurrent contexts for multiple recruiters on one instance.
+**t3.large (8 GB)** recommended if running concurrent browser contexts for multiple recruiters on one instance.
 
-**Security Group rules:**
+### Home proxy setup
 
-| Direction | Port / Protocol | Source / Destination | Purpose |
-|-----------|----------------|----------------------|---------|
-| Inbound | 8001 TCP | CRM API security group only | A2A task dispatch |
-| Inbound | 22 TCP | Admin IP only | SSH access |
-| Outbound | 41641 UDP | 0.0.0.0/0 | Tailscale relay (DERP fallback) |
-| Outbound | 51820 UDP | 0.0.0.0/0 | WireGuard (if using Option B) |
-| Outbound | All | 0.0.0.0/0 | Browser traffic (exits via home tunnel) |
+The recruiter installs a lightweight always-on device (Raspberry Pi, mini-PC, spare box) at home and runs either Tailscale exit node or WireGuard. The device stays on and connected — the recruiter's laptop does not need to be running.
 
-### Architecture
+**Option A — Tailscale exit node (recommended, 30 min setup):**
 
-```
-[EC2 instance — always on]                    [Recruiter's home/work network]
-  Talon (Python + browser-use)             ┌─ Option A: Tailscale exit node (laptop/NAS)
-  Chrome profiles on EBS volume   ─────────┤─ Option B: WireGuard on router (always-on)
-  All outbound traffic tunnelled           └─ Option C: SSH SOCKS5 (from laptop)
-
-LinkedIn sees: recruiter's home/work IP (identical to their manual use)
-```
-
-**Why EC2 over ECS/Fargate/Lambda:**
-- Chromium requires persistent disk for Chrome profiles (ECS Fargate has no persistent local disk)
-- Talon is a long-running process (A2A server on port 8001) — Lambda's 15-min timeout is incompatible
-- EC2 with EBS gives the same Chrome profile persistence as running on the recruiter's own machine
-
-**Per-recruiter IP isolation:** Each LinkedIn account must exit via its own IP. Never tunnel multiple recruiter accounts through the same home network — LinkedIn correlates shared IPs across accounts. One home network = one recruiter account.
-
----
-
-### Tunnel options: why AWS has no native equivalent
-
-AWS does not have a managed service for routing EC2 outbound traffic through a specific home network. The two AWS-native VPN services go the **wrong direction** or are **too complex** for home use:
-
-| Option | Direction | Cost | Verdict |
-|--------|-----------|------|---------|
-| **AWS Client VPN** | Client → AWS (wrong way) | ~$72/mo endpoint + $0.05/hr per connection | ❌ Routes recruiter's device into AWS, not EC2 traffic out through home |
-| **AWS Site-to-Site VPN** | AWS VPC ↔ customer network | ~$36/mo per VPN connection | ❌ Requires static IP at home + Customer Gateway device; overkill for home setup |
-| **Tailscale on EC2** | EC2 → home machine | Free (1 exit node) | ✅ Right tool — install on EC2 like any Linux machine |
-| **WireGuard on EC2** | EC2 → home router | $0 | ✅ Right tool — config-only, no managed service needed |
-
-**Decision: Tailscale is the right tool even on AWS.** It installs on EC2 in two commands and requires no AWS-specific configuration.
-
----
-
-### Option A: Tailscale Exit Node (recommended — 30 min setup)
-
-The recruiter's home machine (or any always-on device: NAS, Raspberry Pi, spare laptop) advertises itself as a Tailscale exit node. The EC2 instance routes all traffic through it.
-
-**Home machine (one-time setup):**
 ```bash
-# Install Tailscale, advertise as exit node
+# On the home proxy device (one-time)
 tailscale up --advertise-exit-node
-# Approve in Tailscale admin console: app.tailscale.com → Machines → Edit route settings
-```
+# Approve in Tailscale admin console
 
-**EC2 instance (one-time setup, via user-data or SSH):**
-```bash
-# Install Tailscale on Amazon Linux 2 / Ubuntu
+# On EC2 (one-time, via SSH or user-data)
 curl -fsSL https://tailscale.com/install.sh | sh
-tailscale up --exit-node=<home-machine-tailscale-ip> --authkey=<tskey-...>
-
-# Verify exit IP matches recruiter's home ISP — must NOT be an AWS IP
-curl https://ipinfo.io/ip
+tailscale up --exit-node=<home-device-tailscale-ip> --authkey=<tskey-...>
+curl https://ipinfo.io/ip   # must return home ISP IP, not AWS
 ```
 
-**browser-use config — no proxy settings required.** Tailscale handles OS-level routing. All browser traffic exits via home automatically.
+No proxy settings in browser-use — Tailscale handles OS-level routing. All Chromium traffic exits via home automatically.
 
-```python
-import os
-PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "/mnt/ebs/chrome-profiles")
+**Option B — WireGuard on home router (most robust):**
 
-profile = BrowserProfile(
-    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
-    # No proxy= — Tailscale exit node routes at OS level
-)
-session = BrowserSession(browser_profile=profile)
-```
+Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense. The router is always on; no separate device needed.
 
-**Tailscale free tier:** supports 1 exit node — sufficient for Phase 3 (one recruiter per Tailscale account). Scale plan ($6/mo) adds multiple exit nodes.
-
-**Limitation:** The exit-node machine must stay on and connected. Disable sleep/hibernate on the exit-node device, or use Option B (router-level WireGuard) for always-on reliability without keeping a laptop running.
-
----
-
-### Option B: WireGuard on Home Router (most robust — always on)
-
-WireGuard on the router survives laptop sleep/restart — the router is always on. Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense, and most prosumer routers.
-
-```
-[EC2] --WireGuard peer (UDP 51820)--> [Home router] --> internet (home ISP IP)
-```
-
-**Router:** Enable WireGuard server in the router UI. Generate a peer config file for the EC2 instance.
-
-**EC2 instance:**
 ```bash
+# EC2 — install WireGuard and apply peer config from router
 apt install wireguard
-# Paste peer config from router into /etc/wireguard/wg0.conf
-# Add to /etc/systemd/system/wg0.service for auto-start
 wg-quick up wg0
 curl https://ipinfo.io/ip   # must return home ISP IP
 ```
 
-**browser-use config — identical to Tailscale (no proxy settings).** WireGuard handles OS-level routing.
+**Per-recruiter IP isolation:** Each LinkedIn account must exit via its own home network. Never tunnel multiple recruiter accounts through the same IP — LinkedIn correlates shared IPs across accounts.
 
-**When to use:** Recruiter has a compatible router and wants 24/7 reliability without any home machine staying on.
-
----
-
-### Option C: SSH SOCKS5 (simple, less reliable)
-
-```bash
-# EC2 — create SOCKS5 proxy on localhost:1080 via home machine
-autossh -N -D 1080 -M 0 user@home-ddns-hostname
-```
-
-```python
-from playwright.async_api import ProxySettings
-profile = BrowserProfile(
-    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
-    proxy=ProxySettings(server="socks5://localhost:1080"),
-)
-```
-
-**Limitations:** SSH drops require autossh or systemd restart. Home IP must be port-forwarded. Less reliable than Tailscale or WireGuard.
-
----
-
-### Chrome profile persistence on EBS
-
-Chrome profiles are stored on the EBS volume mounted to the EC2 instance. The EBS volume persists independently of the EC2 instance lifecycle — profiles survive instance stops, restarts, and even instance replacement (detach + reattach EBS to new instance).
+### Chrome profiles on EBS
 
 ```
 /mnt/ebs/chrome-profiles/
   {tenantId}/
-    {userId}/            ← one directory per recruiter
+    {userId}/          ← one directory per recruiter
       Default/
         Cookies
         Local Storage/
-        ...
 ```
 
 ```python
@@ -496,151 +367,58 @@ PROFILE_DIR = os.getenv("CHROME_PROFILE_DIR", "/mnt/ebs/chrome-profiles")
 
 profile = BrowserProfile(
     user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
+    # No proxy= — Tailscale/WG handles routing at OS level
 )
 ```
 
-**EBS mount (fstab entry for auto-mount on instance restart):**
-```
-/dev/nvme1n1  /mnt/ebs  ext4  defaults,nofail  0  2
-```
+EBS persists independently of EC2 lifecycle — profiles survive instance stops, restarts, and instance replacement (detach + reattach). S3 session state (Section 5.2) is retained as fallback for ephemeral deployments only.
 
-**S3 session state (Section 5.2) is not required for this deployment model.** S3 is retained as a fallback for ephemeral deployments without EBS. For EC2 + EBS, the EBS volume is the session store.
+---
 
-**Profile conflict:** Chrome's lock file prevents two processes opening the same profile simultaneously. Talon must run tasks for a given recruiter sequentially — already enforced by the task queue design (one `IN_PROGRESS` task per `userId` at a time).
+## 5.5 Phase 4: Third-Party Proxy (Home Network Unavailable)
 
-| | Chrome profile on EBS (Tailscale/WG) | S3 storage_state | Chrome profile on recruiter's machine |
-|-|------------------------------------|-----------------|--------------------------------------|
-| **Detection risk** | Lowest — persisted fingerprint | Low — real cookies | Lowest — indistinguishable from manual |
-| **Always-on** | Yes | Yes | No — machine must be awake |
-| **Session continuity** | EBS persists independently of EC2 | Export/import per run | Profile survives restart |
-| **Instance replacement** | Detach + reattach EBS | No change | N/A |
-| **Recommended for** | Phase 3 primary | Ephemeral containers | Phase 3 fallback |
+When the recruiter's home network cannot act as exit proxy (recruiter moves, network unavailable, agency with many recruiters), a dedicated static residential IP is the fallback.
 
-
-## 5.5 Phase 4 Fallback: Third-Party Proxy (No Home Network Available)
-
-When the recruiter's home/work network cannot act as the exit proxy (e.g., recruiter moves, network unavailable, multi-recruiter agency without per-recruiter home networks), a third-party proxy is the fallback. LinkedIn survival rates are lower than a genuine home IP but acceptable for agencies at scale.
-
-### Proxy integration with browser-use
-
-browser-use accepts Playwright's `ProxySettings` natively on `BrowserProfile`:
+**Default choice: Webshare dedicated ISP/residential IP (~$1.47/IP/mo).** Dedicated means the IP is exclusively ours — no pool sharing, no degradation from other users.
 
 ```python
 from browser_use import BrowserProfile, BrowserSession
 from playwright.async_api import ProxySettings
-
-profile = BrowserProfile(
-    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
-    proxy=ProxySettings(
-        server="http://brd.superproxy.io:33335",
-        username="brd-customer-C1234-zone-mobile_residential-session-randABC12345",
-        password="zone_password"
-    )
-)
-session = BrowserSession(browser_profile=profile)
-```
-
-### Per-recruiter deterministic proxy token
-
-Each LinkedIn account must have its own stable IP. Generate a deterministic session token from the recruiter ID so it survives Talon restarts without changing the pinned IP:
-
-```python
 import hashlib
-from playwright.async_api import ProxySettings
 
 def proxy_for_recruiter(recruiter_id: str, zone_password: str) -> ProxySettings:
     """Deterministic sticky session — same recruiter always gets same IP."""
-    session_token = hashlib.sha256(recruiter_id.encode()).hexdigest()[:8]
+    token = hashlib.sha256(recruiter_id.encode()).hexdigest()[:8]
     return ProxySettings(
         server="http://brd.superproxy.io:33335",
-        username=f"brd-customer-C1234-zone-mobile_residential-session-rand{session_token}",
+        username=f"brd-customer-C1234-zone-mobile_residential-session-rand{token}",
         password=zone_password,
     )
+
+profile = BrowserProfile(
+    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
+    proxy=proxy_for_recruiter(recruiter_id, zone_password),
+)
 ```
 
-**Account → proxy registry:** Store the `proxy_endpoint` alongside the recruiter's LinkedIn account in the database. Never reassign an IP to a different LinkedIn account — LinkedIn detects IP sharing across accounts. This mapping is permanent until the IP is explicitly burned.
+**Account → proxy mapping is permanent.** Never reassign a proxy IP to a different LinkedIn account — LinkedIn detects IP sharing across accounts. Store `proxy_endpoint` alongside the recruiter's account record.
 
-### Provider comparison
+| | Home proxy (Phase 3) | Dedicated IP (Phase 4) |
+|-|---------------------|----------------------|
+| **LinkedIn survival** | Highest (~100%) | ~90–95% |
+| **Cost** | ~$0–5/mo device + EC2 | ~$1.47–10/mo per IP |
+| **Operational effort** | One-time device setup | Config string per recruiter |
+| **When to use** | Default | Home network unavailable |
 
-**Sticky session providers (shared pool, per-GB billing):**
-
-| Provider | Type | Sticky duration | LinkedIn survival | Pricing | Notes |
-|----------|------|----------------|-----------------|---------|-------|
-| **SOAX** | Mobile 4G/5G | Up to **60 min** (best in class) | ~85% | $6.60/GB PAYG or $139/mo 150GB | 99.55% success rate; KYC required |
-| **Bright Data** | Mobile 4G/5G | Up to 30 min | ~85% | ~$14–24/GB mobile | Explicit LinkedIn product; 99%+ success |
-| **Oxylabs** | Mobile + residential | Up to 30 min | ~85% | ~$15/GB mobile | 99.9% uptime; 1.1s avg response |
-| **IPRoyal** | Residential | Up to 7 days | ~50% | ~$2–7/GB | Lower survival post-2025 detection expansion |
-
-**Dedicated IP providers (exclusively yours, flat-rate billing):**
-
-| Provider | Type | Monthly cost | LinkedIn survival | Notes |
-|----------|------|-------------|-----------------|-------|
-| **Webshare** | Dedicated ISP/residential | ~$1.47/IP | ~90–95% | Cheapest; static residential, no pool sharing |
-| **IPRoyal Static** | Dedicated residential ISP | ~$5.50/IP | ~90–95% | Permanent assignment |
-| **Proxy-Seller** | Dedicated 4G/5G mobile | ~$10/IP | ~85% | Real carrier; on-demand rotation link |
-| **PROXY.father** | Dedicated 4G/5G (real SIM) | $49–59/mo | ~85% | One SIM per IP; EU-focused |
-
-**Key insight:** Playwright renders full pages — 10–50x more bandwidth than bare HTTP scraping. A single recruiter doing 2 hours of LinkedIn automation per day burns 5–10 GB/month. At $14–24/GB that is $70–240/mo per recruiter in proxy fees alone. Dedicated flat-rate IPs at $1.47–5.50/mo are almost always cheaper.
-
-**Phase 4 default:** Dedicated ISP/static residential IP per recruiter (Webshare at ~$1.47/IP). Only use sticky mobile sessions for accounts that need re-activation after a flag event (SOAX 60-min sticky).
-
-### Sticky session format by provider
-
-```
-# Bright Data
-username: brd-customer-{CUSTOMER_ID}-zone-mobile_residential-session-rand{TOKEN}-country-us
-host: brd.superproxy.io:33335
-
-# IPRoyal (token and lifetime encoded in password)
-username: {iproyal_username}
-password: {iproyal_password}_country-us_session-{8CHAR}_lifetime-24h
-host: geo.iproyal.com:12321
-
-# Oxylabs
-username: {oxylabs_username}-sessid-{TOKEN}-country-us
-host: pr.oxylabs.io:7777
-```
-
-### WireGuard + Wireproxy mesh (50+ recruiters, no home networks)
-
-At scale, per-GB billing compounds. The alternative: a WireGuard mesh where each recruiter gets a dedicated residential ISP peer, exposed locally as a SOCKS5 port via [Wireproxy](https://github.com/windtf/wireproxy). Each WG peer is a cheap VPS at a residential ISP (~$5/mo flat), not a metered proxy pool.
-
-```
-Recruiter A → wireproxy :1080 → WireGuard peer A (residential ISP, NYC)
-Recruiter B → wireproxy :1081 → WireGuard peer B (residential ISP, London)
-
-profile_a = BrowserProfile(proxy=ProxySettings(server="socks5://127.0.0.1:1080"))
-profile_b = BrowserProfile(proxy=ProxySettings(server="socks5://127.0.0.1:1081"))
-```
-
-```ini
-# /etc/wireproxy/recruiter_a.conf
-WGConfig = /etc/wireguard/recruiter_a.conf
-
-[Socks5]
- BindAddress = 127.0.0.1:1080
-```
-
-| | Home network exit proxy (Phase 3) | Third-party dedicated IP (Phase 4) | WireGuard mesh (Phase 4 scale) |
-|-|----------------------------------|-----------------------------------|-----------------------------|
-| **LinkedIn survival** | Highest (~100%) | ~90–95% | ~90–95% (genuine ISP) |
-| **Cost** | ~$5–10/mo VM only | ~$1.47–10/mo per IP | ~$5/mo per WG peer |
-| **IP trust** | Recruiter's actual home IP | Clean dedicated pool IP | Genuine ISP IP |
-| **Operational effort** | Tailscale/WG setup once | Config string per recruiter | Provision WG peers |
-| **When to use** | Phase 3 default | Phase 4 when home unavailable | Phase 4 at 50+ recruiters |
-
+---
 
 ## 6. Browser Execution Backend
 
-Talon abstracts the browser execution layer behind a `BrowserBackend` interface. This makes the underlying execution library swappable per site without changing Talon's task lifecycle, permission model, or determinism rules.
+Talon abstracts browser execution behind a `BrowserBackend` interface — the underlying library is swappable per site without changing task lifecycle, permission model, or A2A transport.
 
 ### 6.1 BrowserBackend interface
 
-`BrowserBackend` is a four-method protocol: `open_session`, `health_check`, `execute_task`, and `close_session`. Every runner call goes through this interface — no code outside a backend implementation ever touches browser APIs directly. A new backend is a single new class plus a one-line config entry. Switching backends for a site requires no changes to the task lifecycle, permission model, or A2A transport.
-
-### 6.2 Backend selection
-
-Backends are configured per `siteKey` in Talon's runtime config. The default is `browser-use`.
+Four-method protocol: `open_session`, `health_check`, `execute_task`, `close_session`. All runner code goes through this interface — no direct browser API calls outside a backend implementation. Switching backends for a site is a one-line config change.
 
 ```json
 {
@@ -652,71 +430,23 @@ Backends are configured per `siteKey` in Talon's runtime config. The default is 
 }
 ```
 
-Swapping a backend for a site requires a config change only — no task, runner, or API code changes.
+### 6.2 Backend comparison
 
-### 6.3 backend: browser-use (default)
-
-[browser-use](https://github.com/browser-use/browser-use) wraps Playwright with an LLM agent. It controls the browser via Chrome DevTools Protocol (CDP) from an external Python process — it never touches the page source or injects scripts.
-
-**Characteristics:**
-- External process — all browser control is over CDP, not in-page
-- LLM adapts to DOM changes without code updates — no selector maintenance
-- `allowed_domains` enforced natively — site isolation built into the session constructor
-- `storage_state` parameter accepts Playwright's exported session state — S3 session persistence (Section 5.2) works out of the box
-- Does not require JavaScript injection into the target page
-
-### 6.4 backend: page-agent (alternative)
-
-[page-agent](https://github.com/alibaba/page-agent) by Alibaba is a JavaScript in-page DOM agent. Unlike browser-use, it lives **inside** the web page — injected as a script tag, parsing the DOM directly via JavaScript. No screenshots, no OCR; text-only DOM interaction. Its DOM processing layer is derived from browser-use under MIT licence.
-
-**Characteristics:**
-- In-page JavaScript injection — executes inside the target page's JavaScript context
-- DOM-native text parsing — potentially faster and cheaper per step than vision-based approaches
-- Multi-tab support via optional Chrome extension
-- Conceptually compatible with Talon's determinism rules; `allowed_domains` constraint must be re-enforced at the Talon adapter level (not natively in page-agent)
-
-#### Security assessment: page-agent
-
-**Classified as: HIGH SUPPLY CHAIN RISK. Do not use as default.**
-
-| Risk vector | Assessment |
-|-------------|------------|
-| **Origin** | Published by Alibaba Group (Chinese company). Enterprise data governance policies in many jurisdictions restrict Chinese-origin dependencies in production automation pipelines. |
-| **In-page access** | The script runs inside the target page. It has full DOM read access — including visible form fields, session cookies stored in `document.cookie`, and any data rendered on screen. A compromised version could silently exfiltrate credentials or session tokens. |
-| **Supply chain** | npm package updates are not cryptographically signed. A malicious minor-version update could add data exfiltration to the in-page script. |
-| **Audit difficulty** | In-page JS execution is harder to observe and audit than an external Python process. Browser devtools are the only window into its behaviour. |
-| **browser-use derivation** | The DOM processing layer is MIT-licensed and derived from browser-use — meaning a custom, audited fork is technically feasible. |
-
-**If page-agent is ever adopted for a specific site:**
-- Pin to an exact version (`page-agent@1.5.4`, not `^1.5.4`)
-- Audit the full diff before any version upgrade
-- Consider vendoring the source into the Cura repo rather than installing from npm
-- Never use for sites where credentials are typed (login pages) — restrict to post-login, authenticated sessions only
-- Treat the decision as a per-site opt-in requiring explicit security review
-
-**Current recommendation:** `browser-use` is the default for all sites. `page-agent` is registered in this document as a known alternative for future evaluation, not for immediate use.
-
-### 6.5 Backend comparison
-
-| Aspect | browser-use (default) | page-agent (alternative) |
-|--------|-----------------------|--------------------------|
+| Aspect | browser-use (default) | page-agent (alternative, not for production) |
+|--------|-----------------------|----------------------------------------------|
 | **Architecture** | External Python process → CDP | In-page JavaScript injection |
-| **DOM access** | Via CDP (external) | Direct JS access to full DOM |
-| **Screenshots needed** | Optional (LLM can use) | No — text-only DOM |
-| **Selector rot** | Not a problem (LLM adapts) | Not a problem (LLM adapts) |
-| **Maintenance burden** | Low | Low |
+| **LLM adapts to DOM changes** | Yes — no selector maintenance | Yes |
 | **Origin** | Open-source, grpc (Austria) | Alibaba (China) |
-| **Supply chain risk** | Low | High (see Section 6.4) |
-| **Credential exposure** | No in-page access | Full in-page DOM read |
-| **Auditability** | External process logs | CDP Runtime.evaluate — harder |
-| **Production status** | Mature, widely used | Newer (March 2026) |
-| **Swap effort** | — | Config change only (adapter ready) |
+| **Supply chain risk** | Low | High — in-page script with full DOM read access; malicious update could exfiltrate credentials |
+| **Credential exposure** | No in-page access | Full in-page DOM, including cookies |
+| **`allowed_domains` enforcement** | Native in session constructor | Must be re-enforced at Talon adapter level |
+| **Production status** | Mature, widely used | Do not use as default; evaluate per-site with explicit security review |
 
-### 6.6 Determinism rules (apply to all backends)
+**Default: `browser-use` for all sites.** `page-agent` is documented as a future option only; if ever adopted, pin to exact version and never use on login pages.
 
-The following four rules apply regardless of which backend executes a task.
+### 6.3 Determinism rules (apply to all backends)
 
-**Rule 1 — Atomic tasks.** One task = one action. No multi-step chaining within a single task. Sequences are multiple tasks, each approved individually.
+**Rule 1 — Atomic tasks.** One task = one action. Sequences are multiple individually-approved tasks.
 
 ```
 WRONG: "Find the best candidates and send them connection requests"
@@ -724,22 +454,18 @@ RIGHT: "Navigate to https://linkedin.com/in/johndoe and send a connection reques
         with the note: 'Hi John, ...'. Stop after the request is sent."
 ```
 
-**Rule 2 — Declared abort conditions.** The task payload includes explicit conditions under which to stop without error, rather than improvising.
+**Rule 2 — Declared abort conditions.** Stop conditions are explicit in the task payload, not improvised.
 
 ```json
 {
   "prompt": "Send a connection request to https://linkedin.com/in/johndoe...",
-  "abort_conditions": [
-    "already_connected",
-    "pending_invitation_exists",
-    "profile_not_found"
-  ]
+  "abort_conditions": ["already_connected", "pending_invitation_exists", "profile_not_found"]
 }
 ```
 
-**Rule 3 — Step verification.** After each declared step, the runner checks for an expected DOM state (e.g., confirmation message). If not found, the task fails immediately — no improvisation or retry loop.
+**Rule 3 — Step verification.** After each declared step, check for expected DOM state. If not found, fail immediately — no retry loop.
 
-**Rule 4 — No exploration.** Task prompts never use open-ended language ("find", "explore", "check if"). They specify exact URLs, exact actions, and exact stop conditions.
+**Rule 4 — No exploration.** Task prompts specify exact URLs, exact actions, exact stop conditions. Never open-ended language ("find", "explore", "check if").
 
 ---
 
