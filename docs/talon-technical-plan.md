@@ -14,7 +14,7 @@
 - Task lifecycle and human approval gate
 - Site isolation design
 - Credential fetch-and-discard flow
-- Key decisions (problem → options → decision): session persistence, LinkedIn IP strategy, compute model, browser backend
+- Key decisions (problem → options → decision): session persistence, LinkedIn IP strategy, Cura Proxy Agent (desktop app framework + tunnel mechanism), compute model, browser backend
 - Final architecture and risks & mitigations
 - Data model (TalonTask, TalonCredential, TalonAuditLog)
 - A2A integration (Talon as A2A Server, CRM as A2A Client, SSE streaming)
@@ -281,27 +281,191 @@ LinkedIn runs multiple independent detection layers:
 
 ### Decision
 
-**Recruiter home proxy as default.** The recruiter installs a lightweight always-on device (Raspberry Pi, mini-PC) at home and runs a Tailscale exit node or WireGuard peer. All Talon browser traffic routes through it at OS level — no proxy config in the browser code. The recruiter's laptop does not need to be on.
+**Recruiter home proxy as default.** The recruiter's machine acts as the proxy — no separate hardware needed. Talon browser traffic exits via the recruiter's home ISP, identical to their manual LinkedIn use. A background app (Cura Proxy Agent) handles setup automatically after a one-click install and Cura login.
 
 **Dedicated third-party IP as fallback** (Section 5.5) when the home network is unavailable.
 
 **Per-recruiter isolation:** Never route two LinkedIn accounts through the same IP. LinkedIn correlates shared IPs across accounts.
 
-### Home proxy setup
+---
 
-**Option A — Tailscale exit node (recommended, ~30 min setup):**
-```bash
-# On the home device (one-time)
-tailscale up --advertise-exit-node  # approve in Tailscale admin console
+## 5.3.1 Cura Proxy Agent
 
-# On EC2 / Fargate container entrypoint (one-time or per-spawn)
-curl -fsSL https://tailscale.com/install.sh | sh
-tailscale up --exit-node=<home-device-ip> --authkey=<tskey-...>
-curl https://ipinfo.io/ip   # must return home ISP IP
+### Problem
+
+Terminal commands (Tailscale CLI, WireGuard config) are a non-starter for recruiters. The setup must be:
+1. Download a file and open it — same as installing any app
+2. Sign in with Cura credentials — no separate accounts
+3. Done. Cura handles everything else.
+
+Proxy endpoint must be stored in CRM so Talon can fetch it per-recruiter at task time.
+
+---
+
+### Decision 1 — Desktop app framework
+
+#### Options
+
+| Option | Bundle size | Cross-platform path | UI | macOS integration | Verdict |
+|--------|-------------|--------------------|----|-------------------|---------|
+| **Tauri 2.0** (Rust backend + webview) | ~8 MB | macOS → Windows → Linux, same codebase | Full webview (React/HTML) | System tray, LaunchAgent, code-signing | ✅ **Chosen** |
+| Electron | ~120 MB | macOS → Windows → Linux | Full webview | Same | ❌ 15× larger; same capabilities |
+| Swift/SwiftUI | ~5 MB | macOS only | Native | Best | ❌ No Windows/Ubuntu path |
+| Go + Wails | ~12 MB | macOS → Windows → Linux | Webview | System tray via `systray` | ✅ Viable, but Rust Tauri is better maintained |
+
+**Decision:** Tauri 2.0. Ships as a signed `.dmg` on macOS. When Windows/Ubuntu support is added, same Rust backend — only the platform-specific packaging changes.
+
+macOS specifics:
+- `LSUIElement = true` in Info.plist → no Dock icon; system tray only
+- LaunchAgent plist installed at onboarding → agent starts on login automatically
+- Signed with Apple Developer ID + notarised → no Gatekeeper warning
+
+---
+
+### Decision 2 — Tunnel mechanism
+
+#### Problem
+
+The recruiter's machine is behind NAT (home router). Talon on EC2/Fargate must reach it without port forwarding. The tunnel must exit traffic via the recruiter's home ISP — not via an intermediate relay's IP.
+
+```
+Talon (EC2/Fargate) → ??? → recruiter's machine → home ISP → LinkedIn
 ```
 
-**Option B — WireGuard on home router (no device needed):**
-Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense. Router is always on; EC2/Fargate connects as a WireGuard peer. Requires router with WireGuard support.
+The relay only carries the tunnel — the exit IP must be the recruiter's residential IP.
+
+#### Options
+
+| Option | Exit IP | NAT traversal | External dependency | Ops burden | Verdict |
+|--------|---------|--------------|---------------------|-----------|---------|
+| **frp (Fast Reverse Proxy)** | Recruiter's home ISP ✅ | Client connects out (no port forward) | None — self-hosted | One `frps` EC2 nano (~$3/mo) | ✅ **Chosen** |
+| Tailscale SaaS | Recruiter's home ISP ✅ | Built-in DERP relay | Tailscale SaaS account per recruiter | Tailscale API integration, auth key rotation | ❌ SaaS dependency; key management complexity |
+| WireGuard (self-hosted server) | Relay server IP ❌ | Requires port forward or UPnP | None | WireGuard server + peer config management | ❌ Exit IP is the relay, not the recruiter's home |
+| Custom WebSocket tunnel | Recruiter's home ISP ✅ | Client connects out | None | Build + maintain tunnel protocol | ❌ Unnecessary to build when frp exists |
+
+**frp detail:** `frpc` (client) runs on the recruiter's machine and connects out to `frps` (server) on Cura's relay EC2. frp has a built-in `socks5` plugin — `frpc` exposes a SOCKS5 endpoint directly on the relay server, without needing a separate SOCKS5 daemon. Traffic flows:
+
+```
+Talon → SOCKS5 relay.cura.internal:51042 → frps (relay EC2) → frpc (recruiter machine) → home ISP → LinkedIn
+```
+
+The relay carries the tunnel bytes only. The exit IP seen by LinkedIn is the recruiter's residential ISP IP.
+
+**Decision:** frp with the built-in socks5 plugin. Self-hosted on a Cura relay EC2 (t3.nano, ~$3/mo). No external SaaS dependency.
+
+---
+
+### Architecture
+
+**Components:**
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Recruiter's machine (macOS, Windows, Ubuntu)                    │
+│                                                                  │
+│  ┌─────────────────────────────┐                                 │
+│  │  Cura Proxy Agent (Tauri)   │  system tray; starts on login   │
+│  │  • OAuth2 login (webview)   │                                 │
+│  │  • Manages frpc subprocess  │                                 │
+│  │  • Heartbeats to CRM API    │                                 │
+│  │  • Shows connection status  │                                 │
+│  └──────────────┬──────────────┘                                 │
+│                 │ spawns                                          │
+│  ┌──────────────▼──────────────┐                                 │
+│  │  frpc (bundled binary)      │ connects OUT on port 7000       │
+│  │  socks5 plugin              │ no port forwarding needed       │
+│  └──────────────┬──────────────┘                                 │
+└─────────────────┼────────────────────────────────────────────────┘
+                  │ persistent WebSocket tunnel (outbound)
+                  ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Cura Relay EC2 (t3.nano, ~$3/mo)                               │
+│                                                                  │
+│  frps                                                            │
+│  • Port 7000: tunnel connections from frpc                       │
+│  • Port 51000–51999: SOCKS5 endpoints per recruiter             │
+│    recruiter A → port 51001                                      │
+│    recruiter B → port 51002                                      │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │ SOCKS5
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Talon (EC2 / Fargate)                                          │
+│  ProxySettings(server="socks5://relay.cura.internal:51001")     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Onboarding flow (recruiter):**
+
+```
+1. Recruiter opens CRM → Settings → Proxy Agent → Download for macOS
+2. Downloads Cura-Proxy-Agent.dmg → drags to Applications → opens
+3. System tray icon appears → "Sign in with Cura"
+4. Webview opens CRM OAuth2 PKCE flow → approves → app receives access token
+5. App calls POST /api/proxy-agents/register
+     CRM: creates ProxyAgent record, assigns relay port (e.g. 51001), returns
+          { relayHost, relayPort, tunnelToken }
+6. App writes frpc config, installs LaunchAgent plist, starts frpc
+7. frpc connects to relay; CRM marks agent ONLINE
+8. Tray icon → "Connected — relay.cura.internal:51001"
+```
+
+**frpc config (generated by the app, stored in `~/Library/Application Support/CuraProxy/`):**
+
+```ini
+[common]
+server_addr = relay.cura.internal
+server_port = 7000
+token = <tunnel-token>
+
+[cura-socks5]
+type = tcp
+remote_port = 51001
+plugin = socks5
+```
+
+**CRM data model:**
+
+```prisma
+model ProxyAgent {
+  id            String           @id @default(ulid())
+  recruiterId   String           @unique
+  relayPort     Int              @unique   // 51000–51999
+  tunnelToken   String           // stored hashed; plaintext returned once at registration
+  status        ProxyAgentStatus
+  platform      String           // "macos" | "windows" | "ubuntu"
+  appVersion    String?
+  lastSeenAt    DateTime?
+  createdAt     DateTime         @default(now())
+
+  recruiter     Recruiter        @relation(fields: [recruiterId], references: [id])
+}
+
+enum ProxyAgentStatus { ONLINE OFFLINE ERROR }
+```
+
+**Talon: proxy config lookup (before opening browser session):**
+
+```python
+# Called by runner before BrowserBackend.open_session()
+async def get_proxy_for_recruiter(user_id: str) -> ProxySettings | None:
+    config = await crm_api.get_proxy_config(user_id)
+    if config and config.status == "ONLINE":
+        return ProxySettings(server=f"socks5://{config.relay_host}:{config.relay_port}")
+    return None  # falls back to dedicated third-party IP (Section 5.5)
+```
+
+**Heartbeat:** App calls `PATCH /api/proxy-agents/{id}/heartbeat` every 30 s. CRM marks agent `OFFLINE` if no heartbeat for 2 min. Talon checks status before each task — falls back to third-party proxy if offline.
+
+**Platform support plan:**
+
+| Platform | Status | Packaging | Auto-start |
+|----------|--------|-----------|-----------|
+| macOS (12+) | Phase 3 | Signed `.dmg` + `.app` | LaunchAgent plist |
+| Windows 10/11 | Phase 4 | `.exe` installer (NSIS/WiX) | Registry `HKCU\Run` |
+| Ubuntu 22.04+ | Phase 4 | `.deb` / `.AppImage` | systemd user service |
+
+Tauri 2.0 supports all three platforms from the same codebase. The frpc binary is swapped per platform (pre-compiled Go binaries released by the frp project, signed by Cura before bundling).
 
 ---
 
@@ -502,7 +666,10 @@ All decisions combined:
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
 | **LinkedIn detects automation and bans recruiter account** | Medium | High — recruiter loses LinkedIn access | Home proxy provides genuine residential IP; full Chrome profile gives consistent fingerprint; behavioural limits (rate limits, human-like pacing) enforced by task queue |
-| **Home proxy device goes offline** (power cut, ISP outage, recruiter unplugs) | Medium | Medium — tasks fail until device is back | Talon health-checks outbound IP before each task batch; alerts if IP is AWS range; falls back to third-party proxy (Section 5.5) on operator config change |
+| **Cura Proxy Agent goes offline** (machine sleeps, ISP outage, recruiter uninstalls) | Medium | Medium — tasks fail for that recruiter | CRM marks agent OFFLINE after 2-min heartbeat gap; Talon checks status before each task; falls back to third-party proxy (Section 5.5) automatically |
+| **frp relay EC2 goes down** | Low | High — all proxy agents lose tunnel | Deploy relay behind an Auto Scaling Group (min 1); frpc auto-reconnects within seconds; relay is stateless so replacement is instant |
+| **Relay port exhausted** (>1000 recruiters) | Very low | Low | Port range 51000–51999 handles 1000 recruiters; extend range or add second relay host at that scale |
+| **Tunnel token leaked** (recruiter's machine compromised) | Low | Medium — attacker can route traffic via their SOCKS5 endpoint | Tokens are hashed in CRM DB; recruiter can revoke via CRM UI (rotates token + reconnects frpc); tunnel only carries SOCKS5 — attacker can't reach CRM or vault |
 | **Chrome profile corrupted or lost** (Fargate task killed mid-upload) | Low | Medium — requires re-login + new session | S3 always holds last known-good profile; Talon detects a missing/corrupt tarball and triggers full re-login; new profile is uploaded at end of that run |
 | **Secrets Manager credential fetch fails** (IAM misconfiguration, network issue) | Low | Medium — task fails, no browser action taken | Task moves to `FAILED(NO_CREDENTIAL)`; no session opened; operator notified via CRM alert |
 | **Prompt injection in candidate profile** (LinkedIn page contains adversarial LLM instructions) | Low | High — unintended browser actions | System prompt sandboxing in browser-use; site isolation (`allowed_domains`) blocks off-site navigation; step verification catches unexpected DOM states; human approval gate means every task was reviewed |
@@ -582,6 +749,20 @@ enum TalonAuditEvent {
   STEP_COMPLETED STEP_FAILED OFF_SITE_BLOCKED
   TASK_CLAIMED TASK_COMPLETED TASK_FAILED
 }
+
+model ProxyAgent {
+  id            String           @id @default(ulid())
+  recruiterId   String           @unique
+  relayPort     Int              @unique   // 51000–51999
+  tunnelToken   String           // stored hashed; plaintext returned once at registration
+  status        ProxyAgentStatus
+  platform      String           // "macos" | "windows" | "ubuntu"
+  appVersion    String?
+  lastSeenAt    DateTime?
+  createdAt     DateTime         @default(now())
+}
+
+enum ProxyAgentStatus { ONLINE OFFLINE ERROR }
 ```
 
 ---
