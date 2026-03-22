@@ -2,7 +2,7 @@
 
 > **Status:** Design
 > **Phase:** 3 (Sourcing Automation)
-> **Last updated:** 2026-03-21
+> **Last updated:** 2026-03-22
 > **Related:** @docs/crm-technical-plan.md Section 5 (task queue), docs/outreaching-technical-plan.md (LinkedIn strategy)
 
 ---
@@ -14,15 +14,10 @@
 - Task lifecycle and human approval gate
 - Site isolation design
 - Credential fetch-and-discard flow
-- Browser session persistence — Chrome profile on EBS (primary), S3 encrypted state (fallback)
-- LinkedIn ban problem, IP strategy options, and final decision: recruiter home proxy (lightweight device)
-- Compute cost model: shared EC2 stop/start (Phase 3, 2 recruiters) → ECS Fargate scale-to-zero (Phase 4, 30+ recruiters)
-- Third-party proxy fallback when home network unavailable
-- Swappable `BrowserBackend` interface — browser-use (default) vs page-agent (alternative), security analysis
-- Determinism strategy (scoped task prompts, abort conditions, step verification)
-- A2A integration design — Talon as A2A Server, CRM as A2A Client, SSE streaming, agent card
+- Key decisions (problem → options → decision): session persistence, LinkedIn IP strategy, compute model, browser backend
+- Final architecture and risks & mitigations
 - Data model (TalonTask, TalonCredential, TalonAuditLog)
-- Key design decisions with alternatives considered
+- A2A integration (Talon as A2A Server, CRM as A2A Client, SSE streaming)
 
 ## What This Document Does NOT Cover
 
@@ -54,7 +49,7 @@ That is the complete scope. Talon does not discover tasks, does not decide what 
 | **One site per session** | `allowed_domains` set at session creation; off-site navigation throws and fails the task |
 | **Human approval required** | `PENDING_APPROVAL → READY` transition requires Approver-role JWT; no system path exists |
 | **Roles never overlap** | Orchestrator token has no runner API access; runner token has no task-write access |
-| **Session persists across spawns** | Browser state (cookies, localStorage) encrypted and stored in S3; next spawn resumes without re-login |
+| **Session persists across spawns** | Full Chrome profile tarball encrypted in S3; any compute spawn downloads, runs, and re-uploads — 90-day sessions without re-login |
 
 ---
 
@@ -196,330 +191,341 @@ The vault is a separate service, not embedded in the runner or the CRM API.
 
 ---
 
-## 5.2 Browser Session Persistence
+## 5.2 Session Persistence
 
-### The problem
+### Problem
 
-Talon is designed to be **ephemeral** — it spawns per task batch, runs, then exits. Without session persistence, every Talon spawn requires a full login to the target site. For LinkedIn this is actively harmful:
+Talon is ephemeral — it spawns per task batch, runs, then exits. Without session persistence, every spawn requires a fresh LinkedIn login. That is actively harmful: frequent re-logins are a bot signal, 2FA breaks the unattended flow, and LinkedIn treats long-lived sessions as a trust indicator.
 
-1. Frequent fresh logins are a strong automation signal — human users maintain long-lived sessions
-2. Login may require 2FA, breaking the unattended flow
-3. LinkedIn tracks session age as a trust indicator; a session that has existed for weeks looks like a human
+**Goal:** resume the same authenticated session across any number of Talon spawns, on any compute, without keeping a long-lived process alive.
 
-The root goal is: **session continuity across Talon spawns, without keeping a long-lived process alive**.
+### Options
 
-### The solution: full Chrome profile tarball in S3
+| Option | Pros | Cons |
+|--------|------|------|
+| **Full Chrome profile tarball → S3** | 90-day sessions; consistent fingerprint (device IDs, canvas, IndexedDB); portable across any compute | ~50–200 MB per recruiter; ~5–15s download/upload per task batch |
+| `storage_state` JSON → S3 | ~50 KB; instant transfer | New browser context each run — new fingerprint; LinkedIn may challenge sooner |
+| EBS persistent disk | Fastest (no transfer); full fingerprint | Tied to one EC2 instance; prevents scale-to-zero; always-on cost |
+| Always-on process | No transfer overhead | Memory leak risk; crash = lost session; continuous attack surface; always-on cost |
 
-At the end of each Talon run, tar the entire Chrome `user_data_dir` and upload it encrypted to S3. On the next spawn — on any container or EC2 instance — download and extract it to local disk, then point Chromium at that directory. Login is only required once; the session persists for LinkedIn's full 90-day window without asking the recruiter to log in again.
+**Why not mount S3 directly as a filesystem?** Chrome writes SQLite and LevelDB files with POSIX file locks. s3fs-fuse is unreliable for database workloads. The correct pattern is copy-in / copy-out: download tarball to ephemeral local disk, run Chrome against it, upload updated tarball when done. Fargate ephemeral disk (20 GB default) is a real POSIX filesystem — Chrome runs against it with no issues.
 
-**Why the full profile, not just `storage_state`?** `storage_state` (Playwright's JSON export of cookies + localStorage, ~50 KB) resumes an authenticated session but creates a fresh browser context each run — new device fingerprint, new canvas hash, new font metrics. LinkedIn may detect the inconsistency and challenge the session sooner. The full Chrome profile preserves everything LinkedIn uses to recognise "the same browser": cookies, localStorage, IndexedDB, browser-level device IDs, and extension state. The trade-off is size (~50–200 MB vs ~50 KB) and a ~5–15s download/upload at task start/end — acceptable given the 90-day session benefit.
+### Decision
 
-**Why not mount S3 directly as a filesystem?** Chrome writes SQLite databases and LevelDB files concurrently, requiring POSIX file locking. Mounting S3 via s3fs-fuse is unreliable for database workloads. The correct pattern is copy-in / copy-out: download the tarball to local ephemeral disk, run Chrome against it, upload the updated tarball when done.
+**Full Chrome profile tarball in S3.** At task start, download and extract to `/tmp/chrome/{userId}/`. At task end, tar and re-upload. Session key stored in Secrets Manager; profile encrypted with AES-256-GCM before upload (Section 5.2.1).
 
 ### Session lifecycle
 
 ```
 Talon spawns for (tenantId, userId, siteKey)
   │
-  ├── Fetch session key from vault (per-user, per-site encryption key)
+  ├── Fetch session key from Secrets Manager
   │
   ├── Check S3: s3://cura-talon/sessions/{tenantId}/{userId}/{siteKey}.tar.gz.enc
-  │     │
-  │     ├── Found → decrypt → extract to /tmp/chrome/{userId}/
-  │     │     └── Health check: is session still active?
-  │     │           ├── Healthy → skip login entirely, proceed to tasks
-  │     │           └── Expired/invalid → full login, then continue
-  │     │
-  │     └── Not found → full login (creates new profile on first run)
+  │     ├── Found  → decrypt → extract to /tmp/chrome/{userId}/
+  │     │            health check: is session still active?
+  │     │              ├── Healthy  → skip login, proceed to tasks
+  │     │              └── Expired  → full login, then continue
+  │     └── Not found → full login (first run)
   │
-  ├── Execute approved tasks (Chrome reads/writes local /tmp/chrome/{userId}/)
+  ├── Execute approved tasks  (Chrome reads/writes /tmp/chrome/{userId}/)
   │
-  ├── Tar + encrypt /tmp/chrome/{userId}/ → upload to S3 (overwrite previous)
+  ├── Tar /tmp/chrome/{userId}/ → encrypt → upload to S3 (overwrite)
   │
-  └── Exit — local /tmp cleaned up, credential reference discarded from memory
+  └── Exit — /tmp cleaned up; session key discarded from memory
 ```
 
-### What is stored vs not stored
+### What is stored
 
-| Data | Storage | Rationale |
-|------|---------|-----------|
-| Full Chrome profile (cookies, localStorage, IndexedDB, device IDs) | S3 (encrypted tarball) | 90-day session continuity + fingerprint consistency |
-| Last-seen IP | S3 session metadata | IP change detection (see 5.3) |
-| Estimated session expiry | S3 session metadata | Avoid unnecessary health-check round trips |
-| Login credentials (username, password, 2FA secret) | Vault only | Never go near S3; only fetched on full login |
-| Task payloads | CRM DB | Nothing task-related belongs in S3 |
-| Audit events | Audit service | S3 is not an audit destination |
+| Data | Where | Why |
+|------|-------|-----|
+| Full Chrome profile (cookies, localStorage, IndexedDB, device IDs) | S3 encrypted tarball | 90-day session + fingerprint consistency |
+| Login credentials (username, password, 2FA) | Secrets Manager only | Never touch S3 |
+| Task payloads | CRM DB | Not session-related |
 
-**Stored profile is a credential.** It grants authenticated access to the recruiter's LinkedIn session. The encryption and access controls in Section 5.2.1 treat it as such.
+### 5.2.1 Encryption
 
-### 5.2.1 Encryption design
+Two layers:
+1. **Talon-side AES-256-GCM** — per-user, per-site key from Secrets Manager. Plaintext never reaches S3.
+2. **AWS SSE-KMS** — S3 bucket encrypted at rest. Second independent layer.
 
-Two independent encryption layers:
-
-1. **Talon-side (AES-256-GCM):** Before upload, Talon encrypts the session state with a per-user, per-site key fetched from the vault. The plaintext never reaches S3. The vault key is never written to S3.
-2. **AWS-side (SSE-KMS):** S3 bucket is configured with SSE-KMS. Even if someone bypasses the vault, they face a second encryption layer managed by AWS KMS.
-
-Access controls:
-- S3 bucket policy restricts `GetObject` / `PutObject` on `sessions/*` to Talon's IAM role only
-- 14-day inactivity TTL via S3 lifecycle policy — stale states auto-delete
-- Every S3 access logged to CloudTrail
-
-**Security trade-off accepted:** Storing session state externally means a fully compromised AWS account could yield encrypted session blobs. This is accepted because: (a) the vault key is not in S3, so blobs without the vault are useless ciphertext; (b) a full AWS account compromise also gives access to the CRM database, vault, and all recruiter data — the session state is not the incremental risk. The threat model for Cura does not include complete AWS account compromise as a realistic attacker scenario for Phase 3.
+IAM: `s3:GetObject/PutObject` on `sessions/*` scoped to Talon's task role only. 90-day inactivity TTL via S3 lifecycle policy.
 
 ---
 
-## 5.3 The LinkedIn Ban Problem
+## 5.3 LinkedIn IP Strategy
 
-LinkedIn is the hardest major platform to automate. It operates multiple independent detection layers — defeating one is not enough.
+### Problem
 
-| Detection layer | What LinkedIn checks |
-|----------------|---------------------|
-| **ASN classification** | Whether the IP resolves to a datacenter (AWS, GCP, DigitalOcean etc.) — blocked at login before any session can start |
-| **IP reputation** | Whether the IP appears in fraud/abuse databases — shared residential proxy pools degrade quickly |
-| **Browser fingerprint** | TLS handshake, user-agent, canvas/font rendering — headless browsers are detectable |
-| **Behavioural analysis** | Typing cadence, scroll patterns, inter-action timing — real-time ML micro-pattern analysis (expanded 2025–2026) |
-| **Session geolocation** | Mid-session IP change invalidates the session immediately |
+EC2 IPs are blocked at LinkedIn login — ASN-level classification rejects datacenter ranges before any session can start. Browser traffic must exit from a genuine residential IP.
 
-**Core constraint:** EC2 IPs are blocked at login — no cookie reuse or session persistence helps if the outbound IP is a datacenter ASN. The browser traffic must exit from a genuine residential IP.
+LinkedIn runs multiple independent detection layers:
 
-### How we tackle it — options compared
+| Layer | What it checks |
+|-------|---------------|
+| ASN classification | Datacenter IP ranges — blocked at login |
+| IP reputation | Fraud/abuse databases — shared pools degrade quickly |
+| Browser fingerprint | Headless browser signals, TLS handshake |
+| Behavioural analysis | Typing cadence, scroll timing, micro-patterns (ML, expanded 2025–2026) |
+| Session geolocation | Mid-session IP change invalidates the session immediately |
 
-| Approach | IP type | LinkedIn survival | Always-on | Cost | Verdict |
-|----------|---------|-----------------|-----------|------|---------|
-| **Recruiter's home proxy (lightweight device)** | Home residential | Highest — identical to manual use | Yes (device is always-on, not their laptop) | ~$0–5/mo proxy device + EC2 | ✅ **Phase 3 decision** |
-| Dedicated residential/ISP IP (Webshare etc.) | Dedicated residential | ~90–95% | Yes | ~$1.50–5.50/IP/mo | ✅ Phase 4 when home unavailable |
-| Shared residential proxy pool | Shared residential | ~50% | Yes | ~$50–100/mo | ❌ Too risky post-2025 detection |
-| Mobile proxy (SOAX, Bright Data 4G/5G) | Mobile CGNAT | ~85% | Yes | ~$70–240/mo per recruiter | ❌ Expensive; overkill for Phase 3 |
-| Bare EC2 IP | Datacenter | **Blocked at login** | Yes | Included | ❌ Never viable for LinkedIn |
+### Options
 
-**Decision:** A lightweight proxy device at the recruiter's home (behind their router) routes EC2 browser traffic out through their genuine residential IP. EC2 runs the heavy lifting 24/7; the recruiter's home network provides the trusted IP. We can productise the hardware as a separate sold device in a later phase.
+| Option | IP type | LinkedIn survival | Cost | Verdict |
+|--------|---------|-----------------|------|---------|
+| **Recruiter home proxy (lightweight device)** | Home residential | ~100% — identical to manual use | ~$0–5/mo device | ✅ Default |
+| Dedicated residential/ISP IP (Webshare) | Dedicated residential | ~90–95% | ~$1.50–5.50/IP/mo | ✅ Fallback |
+| Shared residential proxy pool | Shared residential | ~50% | ~$50–100/mo | ❌ Too risky |
+| Mobile proxy (SOAX, Bright Data 4G/5G) | Mobile CGNAT | ~85% | ~$70–240/mo | ❌ Expensive |
+| Bare EC2 IP | Datacenter | Blocked at login | Included | ❌ Never viable |
 
----
+### Decision
 
-## 5.4 Compute Model: Cost vs Scale
+**Recruiter home proxy as default.** The recruiter installs a lightweight always-on device (Raspberry Pi, mini-PC) at home and runs a Tailscale exit node or WireGuard peer. All Talon browser traffic routes through it at OS level — no proxy config in the browser code. The recruiter's laptop does not need to be on.
 
-### The core constraint
+**Dedicated third-party IP as fallback** (Section 5.5) when the home network is unavailable.
 
-EC2 instances cost money whether or not tasks are running. At 2 recruiters, LinkedIn outreach runs in short batches (the task queue triggers every 30 min per Section 5 of crm-technical-plan.md). Between batches, compute sits idle. At 30 recruiters, the pattern is the same but multiplied — peak demand is still burst, not continuous.
-
-The right model: **start compute when tasks arrive, stop it when the queue drains.**
-
-The full Chrome profile tarball in S3 (Section 5.2) is what makes this possible — the session is portable across any compute. Any instance or Fargate container that spawns downloads the tarball, runs tasks against it, then uploads the updated profile and exits. No EBS, no persistent disk, no always-on instance.
-
-### Phase 3: Shared EC2 with queue-driven stop/start (2 recruiters at launch)
-
-One shared EC2 instance serves all recruiters. It starts when the CRM task queue has work, runs the batch, then stops itself. Idle cost: near zero.
-
-```
-EventBridge rule (every 30 min)
-  → Lambda: check CRM queue depth for READY tasks
-      ├── Tasks present → start EC2 (ec2:StartInstances)
-      └── No tasks → do nothing
-
-EC2 starts → Talon runs → processes all READY tasks
-  → queue drains → Talon calls ec2:StopInstances on itself → instance stops
-```
-
-**Why shared EC2 (not one per recruiter):** At 2–5 recruiters, tasks rarely overlap. A t3.medium (4 GB) handles one Chromium context comfortably; t3.large (8 GB) handles 2 concurrent. One instance is enough. Per-recruiter session isolation is handled by S3 keys, not by separate instances.
-
-**AWS infrastructure (Phase 3):**
-
-| Component | Service | Spec | Purpose |
-|-----------|---------|------|---------|
-| Talon process | EC2 | t3.medium → t3.large at 5+ recruiters | Runs browser-use + Playwright + Chromium |
-| Session state | S3 | ~50–200 MB per recruiter | Full Chrome profile tarball, encrypted (Section 5.2) |
-| Credential vault | Secrets Manager | — | LinkedIn credentials |
-| Queue poller | EventBridge + Lambda | Every 30 min | Start EC2 when tasks present |
-| IAM | Instance profile | `ec2:StopInstances` (self only), `s3:GetObject/PutObject` on sessions bucket, `secretsmanager:GetSecretValue` | Least privilege |
-
-**Estimated cost (Phase 3, 2 recruiters):**
-- EC2 t3.medium running ~2–3 hr/day (task batches) → ~$10–15/mo
-- S3 session state → ~$0
-- Lambda + EventBridge → ~$0 (well within free tier)
-- EBS: none required (OS on root volume only)
-
-### Phase 4: ECS Fargate, scale to zero (10–30 recruiters)
-
-Above ~10 recruiters, the stop/start EC2 model adds friction — cold start latency grows, and managing instance state across many concurrent recruiters becomes messy. Switch to ECS Fargate: containers spin up per task batch and terminate when done. Zero idle cost. No EC2 instances to manage.
-
-```
-CRM task queue has READY tasks
-  → EventBridge Pipe or Lambda → ECS RunTask (Fargate, spot)
-      → Container starts (~30s cold start)
-      → Talon downloads Chrome profile tarball from S3 → extracts to /tmp
-      → Executes approved tasks
-      → Tars updated profile → uploads to S3
-      → Container exits → billing stops
-```
-
-**Fargate Chromium requirements:** `--no-sandbox` (rootless container), 2 vCPU / 4 GB task definition. No persistent disk — session state lives in S3.
-
-**Estimated cost (Phase 4, 30 recruiters, 2 hr/day automation each):**
-- 30 × 2 hr × $0.04/hr (Fargate spot) → ~$50/mo compute
-- S3 session state → ~$0
-- No idle cost
-
-### Comparison
-
-| | Phase 3: Shared EC2 stop/start | Phase 4: ECS Fargate |
-|-|-------------------------------|---------------------|
-| **Idle cost** | ~$0 (stopped) | $0 (no instances) |
-| **Running cost** | ~$10–15/mo | ~$50/mo at 30 recruiters |
-| **Cold start** | 30–60s EC2 start | ~30s container start |
-| **Concurrency** | Sequential (one instance) | Parallel (one task per container) |
-| **Operational complexity** | Low | Medium (ECS task definitions) |
-| **When to switch** | — | At ~10 recruiters or concurrency needed |
-| **Session storage** | S3 Chrome profile tarball | S3 Chrome profile tarball |
-
-**No EBS in either model.** EBS is only relevant if fingerprint consistency becomes a problem (same browser fingerprint across runs). If LinkedIn starts flagging sessions, add an EBS volume to EC2 (Phase 3) or an EFS mount to Fargate (Phase 4) to persist a full Chrome `user_data_dir`. That is an upgrade path, not the default.
+**Per-recruiter isolation:** Never route two LinkedIn accounts through the same IP. LinkedIn correlates shared IPs across accounts.
 
 ### Home proxy setup
 
-Each recruiter installs a lightweight always-on device at home (Raspberry Pi, mini-PC, spare box) and runs a Tailscale exit node or WireGuard. The device stays on; the recruiter's laptop does not need to be running. EC2 or Fargate containers route all browser traffic through it at OS level — no proxy settings in the browser code.
-
-**Option A — Tailscale exit node (recommended, 30 min setup):**
-
+**Option A — Tailscale exit node (recommended, ~30 min setup):**
 ```bash
-# On the home proxy device (one-time)
-tailscale up --advertise-exit-node
-# Approve in Tailscale admin console
+# On the home device (one-time)
+tailscale up --advertise-exit-node  # approve in Tailscale admin console
 
-# On EC2 / in Fargate container startup (via user-data or entrypoint)
+# On EC2 / Fargate container entrypoint (one-time or per-spawn)
 curl -fsSL https://tailscale.com/install.sh | sh
-tailscale up --exit-node=<home-device-tailscale-ip> --authkey=<tskey-...>
-curl https://ipinfo.io/ip   # must return home ISP IP, not AWS
+tailscale up --exit-node=<home-device-ip> --authkey=<tskey-...>
+curl https://ipinfo.io/ip   # must return home ISP IP
 ```
 
-**Option B — WireGuard on home router (most robust, no device needed):**
+**Option B — WireGuard on home router (no device needed):**
+Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense. Router is always on; EC2/Fargate connects as a WireGuard peer. Requires router with WireGuard support.
 
-Router stays on always. Supported by OpenWrt, Asus-Merlin, pfSense, OPNsense. EC2/container connects as a WireGuard peer.
+---
 
-**Per-recruiter IP isolation:** Each LinkedIn account must exit via its own home network. Never route multiple recruiter accounts through the same IP — LinkedIn correlates shared IPs across accounts.
+## 5.4 Compute Model
 
-## 5.5 Fallback: Third-Party Proxy (Home Network Unavailable)
+### Problem
 
-When the recruiter's home network cannot act as exit proxy (recruiter moves, network unavailable, agency with many recruiters), a dedicated static residential IP is the fallback.
+EC2 costs money whether or not tasks are running. LinkedIn outreach runs in short bursts (task queue triggers every 30 min). Between bursts, compute is idle. The compute model must:
+- Cost near zero when idle
+- Handle 2 recruiters at launch
+- Scale to 30+ recruiters in 3 months without a rewrite
 
-**Default choice: Webshare dedicated ISP/residential IP (~$1.47/IP/mo).** Dedicated means the IP is exclusively ours — no pool sharing, no degradation from other users.
+S3 profile storage (Section 5.2) makes compute fully stateless — any instance can pick up any recruiter's session.
+
+### Options
+
+| Option | Idle cost | Running cost | Concurrency | Complexity | Verdict |
+|--------|-----------|-------------|-------------|------------|---------|
+| **EC2 stop/start (EventBridge + Lambda)** | ~$0 (stopped) | ~$10–15/mo | Sequential | Low | ✅ Phase 3 |
+| Always-on EC2 | ~$30–40/mo | Same | Sequential | Low | ❌ Wasteful at 2 recruiters |
+| **ECS Fargate spot** | $0 | ~$50/mo at 30 recruiters | Parallel | Medium | ✅ Phase 4 |
+| Lambda | $0 | Near $0 | Parallel | Medium | ❌ 15-min timeout too short for browser tasks |
+
+### Decision
+
+**Phase 3 (launch, 2–5 recruiters): Shared EC2, stop/start on queue depth.**
+**Phase 4 (~10+ recruiters): ECS Fargate spot, scale to zero.**
+
+No EBS. Session state lives in S3 — compute is fully swappable.
+
+### Phase 3 architecture
+
+```
+EventBridge rule (every 30 min)
+  → Lambda checks CRM queue for READY tasks
+      ├── Tasks present → ec2:StartInstances
+      └── No tasks     → do nothing
+
+EC2 starts → Talon processes all READY tasks
+  → queue drains → Talon calls ec2:StopInstances on itself → stopped
+```
+
+| Component | Service | Spec |
+|-----------|---------|------|
+| Talon process | EC2 | t3.medium (4 GB); t3.large (8 GB) at 5+ recruiters |
+| Session profiles | S3 | ~50–200 MB per recruiter |
+| Credentials | Secrets Manager | — |
+| Queue poller | EventBridge + Lambda | Every 30 min |
+| IAM | Instance profile | `ec2:StopInstances` self-only, `s3:GetObject/PutObject` sessions bucket, `secretsmanager:GetSecretValue` |
+
+**Estimated cost (2 recruiters): ~$10–15/mo** (EC2 running ~2–3 hr/day; S3 and Lambda near $0).
+
+### Phase 4 architecture
+
+```
+CRM READY tasks → EventBridge Pipe → ECS RunTask (Fargate spot)
+  → Container starts (~30s)
+  → Downloads Chrome profile tarball from S3 → /tmp
+  → Executes tasks
+  → Uploads updated tarball → S3
+  → Container exits → billing stops
+```
+
+Fargate requirements: `--no-sandbox`, 2 vCPU / 4 GB task definition. 20 GB ephemeral disk (default) is sufficient for a 200 MB profile.
+
+**Estimated cost (30 recruiters, 2 hr/day): ~$50/mo.** Zero idle cost.
+
+**Switch trigger:** at ~10 recruiters, or when concurrent execution across recruiters is needed.
+
+---
+
+## 5.5 Fallback: Third-Party Proxy
+
+### Problem
+
+The home proxy requires the recruiter's home device to be on and connected. If the recruiter moves, travels, or the network is unavailable, there is no fallback without a pre-configured alternative IP.
+
+### Options
+
+| Option | LinkedIn survival | Cost | Notes |
+|--------|-----------------|------|-------|
+| **Dedicated static residential IP (Webshare)** | ~90–95% | ~$1.47–5.50/IP/mo | Exclusively ours; no pool sharing |
+| Shared residential pool | ~50% | ~$50–100/mo | Degrades; multiple users share IPs |
+| Mobile proxy (SOAX 4G/5G) | ~85% | ~$70–240/mo | Better survival but expensive at scale |
+
+### Decision
+
+**Dedicated Webshare residential IP per recruiter.** Exclusively assigned — no shared pool degradation. Account-to-IP mapping is permanent; never reassign an IP to a different LinkedIn account.
 
 ```python
-from browser_use import BrowserProfile, BrowserSession
-from playwright.async_api import ProxySettings
-import hashlib
-
-def proxy_for_recruiter(recruiter_id: str, zone_password: str) -> ProxySettings:
-    """Deterministic sticky session — same recruiter always gets same IP."""
-    token = hashlib.sha256(recruiter_id.encode()).hexdigest()[:8]
-    return ProxySettings(
-        server="http://brd.superproxy.io:33335",
-        username=f"brd-customer-C1234-zone-mobile_residential-session-rand{token}",
-        password=zone_password,
-    )
-
 profile = BrowserProfile(
-    user_data_dir=f"{PROFILE_DIR}/{tenant_id}/{user_id}",
-    proxy=proxy_for_recruiter(recruiter_id, zone_password),
+    user_data_dir=f"/tmp/chrome/{user_id}",
+    proxy=ProxySettings(server="http://<webshare-proxy>", username="...", password="..."),
 )
 ```
 
-**Account → proxy mapping is permanent.** Never reassign a proxy IP to a different LinkedIn account — LinkedIn detects IP sharing across accounts. Store `proxy_endpoint` alongside the recruiter's account record.
-
-| | Home proxy (default) | Dedicated third-party IP (fallback) |
-|-|---------------------|-------------------------------------|
-| **LinkedIn survival** | Highest (~100%) | ~90–95% |
-| **Cost** | ~$0–5/mo device + EC2 | ~$1.47–10/mo per IP |
-| **Operational effort** | One-time device setup | Config string per recruiter |
-| **When to use** | Default | Home network unavailable |
+Store `proxy_endpoint` on the recruiter's account record. This is an operational config change per recruiter — no code change.
 
 ---
 
 ## 6. Browser Execution Backend
 
-Talon abstracts browser execution behind a `BrowserBackend` interface — the underlying library is swappable per site without changing task lifecycle, permission model, or A2A transport.
+### Problem
 
-### 6.1 BrowserBackend interface
+LinkedIn and other target sites update their UI frequently. Hardcoded CSS selectors break silently and require code changes on every update. The backend must handle UI changes without selector maintenance, while keeping the execution architecture secure and auditable.
 
-Four-method protocol: `open_session`, `health_check`, `execute_task`, `close_session`. All runner code goes through this interface — no direct browser API calls outside a backend implementation. Switching backends for a site is a one-line config change.
+### Options
+
+| Option | Adapts to UI changes | Security risk | Maintenance | Verdict |
+|--------|---------------------|---------------|-------------|---------|
+| **browser-use (LLM + CDP, external process)** | Yes — LLM adapts | Low — no in-page access | Low | ✅ Default |
+| Raw Playwright + selectors | No — breaks on UI update | Low | High — code changes per update | ❌ |
+| page-agent (Alibaba, in-page JS injection) | Yes | **High** — in-page script reads full DOM including credentials; Chinese-origin dependency; unsigned npm updates | Low | ❌ Not for production |
+
+**page-agent detail:** Runs inside the target page's JavaScript context. A malicious version update (npm packages are not cryptographically signed) could silently exfiltrate credentials or session tokens. Supply chain risk is unacceptable as a default.
+
+### Decision
+
+**browser-use for all sites.** External Python process controlling Chrome via CDP — never touches page internals. LLM adapts to DOM changes without selector maintenance.
+
+`page-agent` is registered as a known future candidate only. If ever adopted for a specific site: pin to exact version, audit full diff before any upgrade, never use on login pages, require explicit security review.
+
+### BrowserBackend interface
+
+All runner code goes through a four-method interface: `open_session`, `health_check`, `execute_task`, `close_session`. Switching backends for a site is a one-line config change — no task lifecycle or permission model changes.
 
 ```json
-{
-  "site_backends": {
-    "linkedin.com": "browser-use",
-    "seek.com.au":  "browser-use"
-  },
-  "default_backend": "browser-use"
-}
+{ "site_backends": { "linkedin.com": "browser-use" }, "default_backend": "browser-use" }
 ```
 
-### 6.2 Backend comparison
+### Determinism rules (apply to all backends)
 
-| Aspect | browser-use (default) | page-agent (alternative, not for production) |
-|--------|-----------------------|----------------------------------------------|
-| **Architecture** | External Python process → CDP | In-page JavaScript injection |
-| **LLM adapts to DOM changes** | Yes — no selector maintenance | Yes |
-| **Origin** | Open-source, grpc (Austria) | Alibaba (China) |
-| **Supply chain risk** | Low | High — in-page script with full DOM read access; malicious update could exfiltrate credentials |
-| **Credential exposure** | No in-page access | Full in-page DOM, including cookies |
-| **`allowed_domains` enforcement** | Native in session constructor | Must be re-enforced at Talon adapter level |
-| **Production status** | Mature, widely used | Do not use as default; evaluate per-site with explicit security review |
-
-**Default: `browser-use` for all sites.** `page-agent` is documented as a future option only; if ever adopted, pin to exact version and never use on login pages.
-
-### 6.3 Determinism rules (apply to all backends)
-
-**Rule 1 — Atomic tasks.** One task = one action. Sequences are multiple individually-approved tasks.
-
+**Rule 1 — Atomic tasks.** One task = one action.
 ```
 WRONG: "Find the best candidates and send them connection requests"
 RIGHT: "Navigate to https://linkedin.com/in/johndoe and send a connection request
-        with the note: 'Hi John, ...'. Stop after the request is sent."
+        with note: 'Hi John...'. Stop after the request is sent."
 ```
 
-**Rule 2 — Declared abort conditions.** Stop conditions are explicit in the task payload, not improvised.
-
+**Rule 2 — Declared abort conditions.** Stop conditions are explicit in the task payload.
 ```json
-{
-  "prompt": "Send a connection request to https://linkedin.com/in/johndoe...",
-  "abort_conditions": ["already_connected", "pending_invitation_exists", "profile_not_found"]
-}
+{ "abort_conditions": ["already_connected", "pending_invitation_exists", "profile_not_found"] }
 ```
 
 **Rule 3 — Step verification.** After each declared step, check for expected DOM state. If not found, fail immediately — no retry loop.
 
-**Rule 4 — No exploration.** Task prompts specify exact URLs, exact actions, exact stop conditions. Never open-ended language ("find", "explore", "check if").
+**Rule 4 — No exploration.** Exact URLs, exact actions, exact stop conditions. Never open-ended language ("find", "explore", "check if").
 
 ---
 
-## 7. No-Task, No-Error Guarantee
+## 7. Final Architecture
 
-A runner with no approved tasks does nothing. When the A2A task queue returns empty for a given `siteKey`, Talon exits cleanly. No browser session is opened, no credential is fetched, no S3 session state is touched.
-
-The chain of consequences:
+All decisions combined:
 
 ```
-No READY tasks
-  → No task claimed
-    → No browser session opened
-      → No credential fetched
-        → No browser action taken
-          → No external side effects
+[AWS]
+  EventBridge (every 30 min)
+    → Lambda: queue depth check
+        → EC2 start (Phase 3) / ECS RunTask (Phase 4)
+
+  Talon container / EC2 instance
+    ├── Downloads Chrome profile tarball from S3 → /tmp/chrome/{userId}/
+    ├── Fetches credential from Secrets Manager (if login needed)
+    ├── Runs browser-use + Playwright (Chromium)
+    │     All traffic exits via recruiter's home proxy (Tailscale/WireGuard)
+    ├── Executes approved tasks
+    ├── Uploads updated Chrome profile tarball → S3
+    └── Stops EC2 / exits container
+
+  S3
+    sessions/{tenantId}/{userId}/{siteKey}.tar.gz.enc  ← Chrome profiles
+
+  Secrets Manager
+    linkedin/{tenantId}/{userId}  ← credentials
+
+[Recruiter's home network]
+  Lightweight proxy device (Raspberry Pi / mini-PC)
+    Tailscale exit node or WireGuard peer
+    Always on, behind home router
+    LinkedIn sees: recruiter's genuine residential IP
 ```
 
-This is not a convention — it is the architecture. The runner cannot act without a task because every action is gated by a task claim.
+**Phase 3 (2–5 recruiters at launch):**
+- 1 × shared EC2 t3.medium; starts on queue depth, stops when queue drains
+- ~$10–15/mo total
+
+**Phase 4 (~10+ recruiters):**
+- ECS Fargate spot; one container per task batch; true scale-to-zero
+- ~$50/mo at 30 recruiters
+
+**Fallback (home network unavailable):**
+- Dedicated Webshare residential IP per recruiter (~$1.47–5.50/IP/mo)
 
 ---
 
-## 8. Data Model
+## 8. Risks and Mitigations
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| **LinkedIn detects automation and bans recruiter account** | Medium | High — recruiter loses LinkedIn access | Home proxy provides genuine residential IP; full Chrome profile gives consistent fingerprint; behavioural limits (rate limits, human-like pacing) enforced by task queue |
+| **Home proxy device goes offline** (power cut, ISP outage, recruiter unplugs) | Medium | Medium — tasks fail until device is back | Talon health-checks outbound IP before each task batch; alerts if IP is AWS range; falls back to third-party proxy (Section 5.5) on operator config change |
+| **Chrome profile corrupted or lost** (Fargate task killed mid-upload) | Low | Medium — requires re-login + new session | S3 always holds last known-good profile; Talon detects a missing/corrupt tarball and triggers full re-login; new profile is uploaded at end of that run |
+| **Secrets Manager credential fetch fails** (IAM misconfiguration, network issue) | Low | Medium — task fails, no browser action taken | Task moves to `FAILED(NO_CREDENTIAL)`; no session opened; operator notified via CRM alert |
+| **Prompt injection in candidate profile** (LinkedIn page contains adversarial LLM instructions) | Low | High — unintended browser actions | System prompt sandboxing in browser-use; site isolation (`allowed_domains`) blocks off-site navigation; step verification catches unexpected DOM states; human approval gate means every task was reviewed |
+| **Supply chain compromise of browser-use** | Very low | High | Pin to exact version in requirements.txt; automated Dependabot PRs reviewed before merge; external-process architecture limits blast radius (no in-page access) |
+| **EC2 fails to stop itself** (Talon crash before StopInstances call) | Low | Low — EC2 runs until next check | Lambda poller re-checks queue every 30 min; if queue is empty and EC2 is running, Lambda stops it. Add separate watchdog Lambda on 5-min schedule as safety net |
+| **Fargate task exceeds 20 GB ephemeral disk** | Very low | Low — task fails | Chrome profiles rarely exceed 500 MB; Fargate ephemeral can be expanded to 200 GB; alert on S3 tarball size > 1 GB |
+| **LinkedIn session expires before 90 days** | Medium | Low — recruiter re-authenticates once | Health check at each spawn detects expired session; triggers full re-login automatically; 2FA handled via TOTP secret in Secrets Manager |
+| **Two Talon tasks attempt to load same recruiter profile concurrently** | Very low | Medium — Chrome lock file conflict | Task queue enforces one `IN_PROGRESS` task per `userId` at a time (DB constraint) |
+
+---
+
+
+## 9. Data Model
 
 ```prisma
 model TalonTask {
   id              String          @id @default(ulid())
   tenantId        String
-  userId          String          // which recruiter's session to use
-  siteKey         String          // e.g. "linkedin.com"
+  userId          String
+  siteKey         String
   status          TalonTaskStatus
   payload         Json            // { prompt, max_steps, abort_conditions }
-  approvedBy      String?         // userId of human approver
+  approvedBy      String?
   approvedAt      DateTime?
   runnerId        String?
   sessionId       String?
@@ -531,32 +537,17 @@ model TalonTask {
   createdAt       DateTime        @default(now())
   startedAt       DateTime?
   completedAt     DateTime?
-  parentTaskId    String?         // for task sequences
-  coworkTaskId    String?         // link back to CRM CoworkTask
+  coworkTaskId    String?
 
   @@index([tenantId, status, siteKey])
   @@index([tenantId, userId, status])
 }
 
-enum TalonTaskStatus {
-  DRAFT
-  PENDING_APPROVAL
-  REJECTED
-  READY
-  CLAIMED
-  IN_PROGRESS
-  COMPLETED
-  FAILED
-}
+enum TalonTaskStatus { DRAFT PENDING_APPROVAL REJECTED READY CLAIMED IN_PROGRESS COMPLETED FAILED }
 
 enum TalonErrorCode {
-  NO_CREDENTIAL
-  SESSION_INVALID
-  STEP_FAILED
-  OFF_SITE_NAVIGATION
-  TIMEOUT
-  MAX_STEPS_EXCEEDED
-  ABORT_CONDITION_MET   // expected stop, not an error
+  NO_CREDENTIAL SESSION_INVALID STEP_FAILED OFF_SITE_NAVIGATION
+  TIMEOUT MAX_STEPS_EXCEEDED ABORT_CONDITION_MET
 }
 
 model TalonCredential {
@@ -564,7 +555,7 @@ model TalonCredential {
   tenantId         String
   userId           String
   siteKey          String
-  encryptedPayload Json     // AES-256-GCM; decrypted by vault service only
+  encryptedPayload Json     // AES-256-GCM; decrypted by Secrets Manager only
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -572,174 +563,26 @@ model TalonCredential {
 }
 
 model TalonAuditLog {
-  id        String   @id @default(ulid())
+  id        String          @id @default(ulid())
   taskId    String
   tenantId  String
   runnerId  String
   event     TalonAuditEvent
   siteKey   String
-  metadata  Json     // url, action_type — never PII values, always IDs
-  timestamp DateTime @default(now())
+  metadata  Json            // url, action_type — never PII values
+  timestamp DateTime        @default(now())
 
   @@index([taskId])
   @@index([tenantId, timestamp])
 }
 
 enum TalonAuditEvent {
-  CREDENTIAL_FETCH_REQUESTED
-  CREDENTIAL_FETCH_DENIED
-  SESSION_OPENED
-  SESSION_CLOSED
-  STEP_COMPLETED
-  STEP_FAILED
-  OFF_SITE_BLOCKED
-  TASK_CLAIMED
-  TASK_COMPLETED
-  TASK_FAILED
+  CREDENTIAL_FETCH_REQUESTED CREDENTIAL_FETCH_DENIED
+  SESSION_OPENED SESSION_CLOSED
+  STEP_COMPLETED STEP_FAILED OFF_SITE_BLOCKED
+  TASK_CLAIMED TASK_COMPLETED TASK_FAILED
 }
 ```
-
----
-
-## 9. Key Design Decisions
-
-### 9.1 Name: Talon (not Claw, Operator, or Pilot)
-
-**Decision:** Talon
-
-**Rationale:**
-- Preserves the intent of the original "claw" concept (direct, purposeful grip)
-- Implies precision and control — a talon acts exactly where directed
-- Memorable single word, no conflicts with existing tools in the ecosystem
-
-**Alternatives considered:** Operator (too generic), Pilot (implies autonomy/navigation), Grip (too abstract), Warden (sounds defensive rather than active).
-
----
-
-### 9.2 Swappable BrowserBackend with browser-use as default
-
-**Decision:** `BrowserBackend` interface with `BrowserUseBackend` as default. Backends are swappable per `siteKey` via config.
-
-**Rationale:**
-- LinkedIn, Seek, and other target sites update their UI frequently — CSS selectors break silently; an LLM-driven backend avoids selector rot
-- browser-use is mature, external-process architecture, low supply chain risk
-- page-agent (Alibaba) is a credible alternative but carries high supply chain risk as an in-page JavaScript injection from a Chinese-origin dependency — see Section 6.4
-- The adapter pattern means we can evaluate and adopt new backends (or swap away from a compromised one) without touching the task lifecycle, permission model, or API
-
-**Trade-offs accepted:** browser-use's LLM core is non-deterministic by nature. Mitigated by scoped task prompts, abort conditions, and step verification (Section 6.6). The LLM executes within a bounded instruction set, not open-ended exploration.
-
-**Alternatives rejected:**
-- Raw Playwright with hardcoded selectors — high maintenance, requires code changes on every LinkedIn UI update. Rejected.
-- page-agent as default — high supply chain risk (in-page JS, Alibaba origin). Available as opt-in per site after explicit security review. Not the default.
-
----
-
-### 9.3 Human-only approval gate — no auto-approve path
-
-**Decision:** `PENDING_APPROVAL → READY` requires a human Approver action. No system account holds the Approver role.
-
-**Rationale:**
-- Browser actions have external, irreversible effects: sent messages, connection requests, InMails
-- Automated approval creates a path from task creation to execution with no human checkpoint
-- One compromised Orchestrator + one auto-approve rule = unlimited unreviewed browser actions
-
-**Alternative rejected:** Auto-approve low-risk read-only tasks (e.g., `SCAN_INBOX`). Even read-only tasks operate inside a recruiter's live authenticated session. Human oversight at this layer is the correct trade-off.
-
----
-
-### 9.4 Orchestrator/Runner role separation enforced at API layer
-
-**Decision:** Separate API tokens with disjoint permission sets. Enforced by API gateway — not application code.
-
-**Rationale:**
-- Application-level permission checks can be bypassed by bugs or misconfiguration
-- API gateway enforcement means a runner token physically cannot reach task-create endpoints
-- Limits blast radius: compromised runner ≠ compromised task queue
-
-**Alternative rejected:** Single `automation` service account with full access. Too broad. Violates principle of least privilege. Rejected.
-
----
-
-### 9.5 Credential vault as separate service
-
-**Decision:** Credentials stored in a dedicated vault service, not in the CRM database.
-
-**Rationale:**
-- CRM database is multi-tenant; a tenant isolation bug would expose other tenants' credentials
-- Vault has its own audit log, separate from the CRM audit trail
-- Single-use fetch tokens mean a stolen token cannot be reused
-
-**Alternative rejected:** Store encrypted credentials in the CRM's PostgreSQL database with Prisma encryption. Simpler to build, but the CRM DB is a higher-attack-surface target. Rejected.
-
----
-
-### 9.6 S3 encrypted session state for ephemeral process model
-
-**Decision:** Browser session state (cookies + localStorage) encrypted and stored in S3, keyed by `{tenantId}/{userId}/{siteKey}`. Talon remains ephemeral — spawns per batch, exits after tasks complete.
-
-**Rationale:**
-- LinkedIn treats session continuity as a trust signal. A fresh login on every Talon spawn looks like automation — a session that has existed for weeks looks like a human.
-- An always-on Talon process (the alternative that avoids S3) holds a live browser and LinkedIn session 24/7. A crash loses the session, leak detection is harder, and the process has a continuous attack surface.
-- S3 is the natural fit for blob storage. The full Chrome profile tarball (~50–200 MB) is downloaded at task start and re-uploaded at end — the copy-in/copy-out pattern avoids the POSIX filesystem limitations of mounting S3 directly. Sessions survive for LinkedIn's full 90-day window without asking the recruiter to re-authenticate.
-
-**Security trade-off accepted:** Stored session state is effectively a session credential. Mitigated by: Talon-side AES-256-GCM before upload (vault-derived key, never in S3); AWS SSE-KMS as a second layer; strict IAM (Talon's runtime role only); 14-day inactivity TTL. The threat of a compromised S3 bucket yielding usable session tokens is accepted — a full AWS compromise gives access to far more than session state.
-
-| Option | Re-login frequency | Always-on process | Security exposure | Portability |
-|--------|------------------|-------------------|-------------------|-------------|
-| **S3 encrypted state (chosen)** | Only on expiry (~weeks) | No | Encrypted blobs; vault-gated key | High — any Talon instance |
-| Persistent process | Never | Yes | Session in memory; crash = lost | Low — single machine |
-| Local filesystem | Only on expiry | No | Unencrypted by default | Low — single machine |
-| PostgreSQL binary column | Only on expiry | No | DB encryption | High |
-| No persistence | Every spawn | No | None — no stored state | N/A |
-
-**Why not PostgreSQL:** Binary session blobs (1–5 MB) are a poor fit for a relational DB row. S3 lifecycle policies, IAM, and SSE-KMS are the right controls for binary artifact storage.
-
-**Why not always-on process:** Operational overhead disproportionate to the 30-min-per-session workload. Crash recovery complexity, no benefit over S3 persistence for session continuity.
-
----
-
-### 9.7 One site per session (strict isolation)
-
-**Decision:** `allowed_domains` set at browser session creation to exactly `[task.site_key]`.
-
-**Rationale:**
-- A task approved for LinkedIn must not be able to reach Gmail, a banking site, or any other authenticated context
-- Cross-site navigation cannot happen accidentally (configuration error) or maliciously (prompt injection in task payload)
-- Audit logs are meaningful: every entry maps to exactly one site
-
-**Alternative rejected:** Allow-all navigation with post-hoc logging. Logged harm is still harm. An accidental Gmail interaction that sent an email is not recoverable by knowing it happened. Rejected.
-
----
-
-### 9.8 Deployment model: EC2 + recruiter's home/work exit proxy (Phase 3)
-
-**Decision:** Talon runs on an EC2 instance (t3.medium, self-hosted browser-use) with Chrome profiles on EBS, and all browser traffic routed through the recruiter's home or work network via Tailscale exit node or WireGuard on their home router.
-
-**Rationale (research-backed):**
-
-LinkedIn operates ASN-level IP classification directly in its authentication flow. Datacenter IP ranges are blocked at login. The recruiter's home/work IP — never shared, never abused, matching their account's registered country — has the lowest detection risk of all options. The cloud VM + home network exit proxy model achieves the best of both worlds:
-
-1. **Cloud VM:** always on, no dependency on the recruiter's laptop being awake, reliable 24/7 operation
-2. **Home network exit:** LinkedIn sees the recruiter's actual residential IP — identical to their manual use
-
-Session state is stored as a Chrome profile directory on the VM's persistent disk — no S3 export/import cycle needed.
-
-| Deployment | LinkedIn viable? | Why |
-|------------|-----------------|-----|
-| **EC2 + home/work exit proxy (Tailscale/WG)** | ✅ Yes — recommended | Real residential IP tunnelled through home; EC2 reliability; Chrome profile on EBS |
-| Recruiter's own machine (fallback) | ✅ Yes | Real residential IP, same as manual use; machine must be awake |
-| browser-use Cloud | ❌ No | Datacenter IPs blocked at LinkedIn login; 15-min session cap; custom proxy requires Enterprise |
-| Cloud VM + Elastic IP | ❌ No | Datacenter ASN — blocked at LinkedIn login |
-| Cloud VM + residential proxy | ⚠️ Risky | ~50% account survival; acceptable only for non-sensitive testing |
-| Cloud VM + mobile proxy | ✅ Viable (Phase 4 fallback) | ~85% survival; adds $100–200/mo per recruiter + proxy management |
-
-**Trade-offs accepted:**
-- Recruiter's home network must be available (router on, internet connected) during task execution — reasonable assumption for Phase 3
-- One-time Tailscale or WireGuard setup on the recruiter's home machine/router (~30 min)
-- One home network = one LinkedIn account (IP isolation constraint)
-- EC2 t3.medium + 100 GB EBS costs ~$30–35/mo per tenant
-
-**Phase 4 trigger:** If home networks prove unavailable (recruiter travels, moves, ISP outage), switch that account to a dedicated third-party ISP IP (Webshare ~$1.47/IP) as fallback. This is an operational config change per recruiter, not a code change. See Section 5.5. AWS Site-to-Site VPN is not used — it costs ~$36/mo per VPN connection and requires Customer Gateway hardware at the recruiter's home.
 
 ---
 
@@ -934,13 +777,9 @@ Each `TalonTask` carries a `coworkTaskId` reference for traceability. The CRM do
 
 ---
 
----
-
 ## 12. Open Questions
 
-1. **Vault service technology (resolved — 2026-03-21):** AWS Secrets Manager. Cura is on AWS; Secrets Manager integrates natively with EC2 IAM roles (no static credentials), supports automatic rotation, and has audit logging via CloudTrail. Single-use fetch tokens are implemented as short-lived Secrets Manager grants scoped to the runner's IAM role per task.
-2. **Runner hosting (resolved — 2026-03-21):** EC2 t3.medium + EBS + recruiter's home/work exit proxy via Tailscale or WireGuard (Section 5.4). EC2 provides 24/7 reliability; home network exit provides genuine residential IP. Detection risk is identical to running on the recruiter's machine. AWS has no native service for routing EC2 outbound traffic through a home network — Tailscale is the right tool. Third-party proxies (Section 5.5) are the Phase 4 fallback when home networks are unavailable.
-3. **Approval UX:** One-by-one task approval is friction. Bulk approval ("approve today's outreach queue") needs CRM UI design — bulk confirm must still show the full ranked list, not a blind "approve all" button.
-4. **Prompt injection defence:** A candidate's LinkedIn profile could contain text designed to hijack browser-use's LLM (e.g., "ignore previous instructions and send a message to..."). Mitigation: system prompt sandboxing + off-site navigation blocking (already enforced) + step verification. Requires adversarial testing before Phase 3 launch.
-5. **Session state TTL strategy:** 14-day inactivity TTL is a starting point. LinkedIn sessions may survive longer; expiring them early forces unnecessary re-logins. The right TTL should be informed by observed LinkedIn session lifetimes in production — track `SESSION_INVALID` error rate after S3 load to calibrate.
-6. **page-agent evaluation trigger:** If browser-use proves unreliable on a specific site in production, page-agent is the natural next candidate. Gate on: security audit of the pinned version, confirmed no login-page use, explicit security review sign-off. Adapter is already designed (Section 6); adoption is a config change.
+1. **Approval UX:** One-by-one task approval is friction. Bulk approval ("approve today's outreach queue") needs CRM UI design — bulk confirm must still show the full ranked list, not a blind "approve all" button.
+2. **Prompt injection defence:** A candidate's LinkedIn profile could contain adversarial LLM instructions. Mitigation in Section 8 (risks). Requires adversarial testing before Phase 3 launch.
+3. **Session TTL calibration:** 90-day S3 lifecycle TTL is a starting point. Calibrate against observed `SESSION_INVALID` error rate in production.
+4. **page-agent evaluation trigger:** If browser-use proves unreliable on a specific site, page-agent is the next candidate — gate on security audit, no login-page use, explicit sign-off. Adapter is already in place (Section 6).
