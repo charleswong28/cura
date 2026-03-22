@@ -208,9 +208,13 @@ Talon is designed to be **ephemeral** — it spawns per task batch, runs, then e
 
 The root goal is: **session continuity across Talon spawns, without keeping a long-lived process alive**.
 
-### The solution: encrypted session state in S3
+### The solution: full Chrome profile tarball in S3
 
-At the end of each Talon run, export the browser's storage state (cookies + localStorage — the minimal set needed to resume an authenticated session) and persist it encrypted to S3. On the next spawn, load and resume. Login is only required when the stored session has expired or been invalidated.
+At the end of each Talon run, tar the entire Chrome `user_data_dir` and upload it encrypted to S3. On the next spawn — on any container or EC2 instance — download and extract it to local disk, then point Chromium at that directory. Login is only required once; the session persists for LinkedIn's full 90-day window without asking the recruiter to log in again.
+
+**Why the full profile, not just `storage_state`?** `storage_state` (Playwright's JSON export of cookies + localStorage, ~50 KB) resumes an authenticated session but creates a fresh browser context each run — new device fingerprint, new canvas hash, new font metrics. LinkedIn may detect the inconsistency and challenge the session sooner. The full Chrome profile preserves everything LinkedIn uses to recognise "the same browser": cookies, localStorage, IndexedDB, browser-level device IDs, and extension state. The trade-off is size (~50–200 MB vs ~50 KB) and a ~5–15s download/upload at task start/end — acceptable given the 90-day session benefit.
+
+**Why not mount S3 directly as a filesystem?** Chrome writes SQLite databases and LevelDB files concurrently, requiring POSIX file locking. Mounting S3 via s3fs-fuse is unreliable for database workloads. The correct pattern is copy-in / copy-out: download the tarball to local ephemeral disk, run Chrome against it, upload the updated tarball when done.
 
 ### Session lifecycle
 
@@ -219,37 +223,34 @@ Talon spawns for (tenantId, userId, siteKey)
   │
   ├── Fetch session key from vault (per-user, per-site encryption key)
   │
-  ├── Check S3: s3://cura-talon/sessions/{tenantId}/{userId}/{siteKey}.enc
+  ├── Check S3: s3://cura-talon/sessions/{tenantId}/{userId}/{siteKey}.tar.gz.enc
   │     │
-  │     ├── Found → decrypt → load into browser context (storage_state)
+  │     ├── Found → decrypt → extract to /tmp/chrome/{userId}/
   │     │     └── Health check: is session still active?
   │     │           ├── Healthy → skip login entirely, proceed to tasks
   │     │           └── Expired/invalid → full login, then continue
   │     │
-  │     └── Not found → full login
+  │     └── Not found → full login (creates new profile on first run)
   │
-  ├── Execute approved tasks
+  ├── Execute approved tasks (Chrome reads/writes local /tmp/chrome/{userId}/)
   │
-  ├── Export browser storage state (cookies, localStorage)
-  │     └── Encrypt with session key → upload to S3 (overwrite previous)
+  ├── Tar + encrypt /tmp/chrome/{userId}/ → upload to S3 (overwrite previous)
   │
-  └── Exit — credential reference and session key discarded from memory
+  └── Exit — local /tmp cleaned up, credential reference discarded from memory
 ```
 
 ### What is stored vs not stored
 
 | Data | Storage | Rationale |
 |------|---------|-----------|
-| Browser storage state (cookies, localStorage) | S3 (encrypted) | The session resumption payload |
+| Full Chrome profile (cookies, localStorage, IndexedDB, device IDs) | S3 (encrypted tarball) | 90-day session continuity + fingerprint consistency |
 | Last-seen IP | S3 session metadata | IP change detection (see 5.3) |
 | Estimated session expiry | S3 session metadata | Avoid unnecessary health-check round trips |
 | Login credentials (username, password, 2FA secret) | Vault only | Never go near S3; only fetched on full login |
 | Task payloads | CRM DB | Nothing task-related belongs in S3 |
 | Audit events | Audit service | S3 is not an audit destination |
 
-**Stored session state is a credential.** It grants access to the recruiter's authenticated site session. The encryption and access controls in Section 5.2.1 treat it as such.
-
-**Why not the full Chrome profile directory in S3?** Chrome's `user_data_dir` contains SQLite databases (Cookies), LevelDB databases (Local Storage, IndexedDB), and lock files. These require a real POSIX filesystem with file locking — S3 object storage cannot serve as the backing store for concurrent database writes. `storage_state` (Playwright's JSON export of cookies + localStorage, ~50–100 KB) is the correct portable format for S3. It is everything needed to resume an authenticated session without the filesystem constraints.
+**Stored profile is a credential.** It grants authenticated access to the recruiter's LinkedIn session. The encryption and access controls in Section 5.2.1 treat it as such.
 
 ### 5.2.1 Encryption design
 
@@ -303,7 +304,7 @@ EC2 instances cost money whether or not tasks are running. At 2 recruiters, Link
 
 The right model: **start compute when tasks arrive, stop it when the queue drains.**
 
-`storage_state` in S3 (Section 5.2) is what makes this possible — session state is portable across any compute. No EBS, no persistent disk needed. Any instance that spawns can load the session and pick up where the last one left off.
+The full Chrome profile tarball in S3 (Section 5.2) is what makes this possible — the session is portable across any compute. Any instance or Fargate container that spawns downloads the tarball, runs tasks against it, then uploads the updated profile and exits. No EBS, no persistent disk, no always-on instance.
 
 ### Phase 3: Shared EC2 with queue-driven stop/start (2 recruiters at launch)
 
@@ -326,7 +327,7 @@ EC2 starts → Talon runs → processes all READY tasks
 | Component | Service | Spec | Purpose |
 |-----------|---------|------|---------|
 | Talon process | EC2 | t3.medium → t3.large at 5+ recruiters | Runs browser-use + Playwright + Chromium |
-| Session state | S3 | ~100 KB per recruiter | storage_state JSON, encrypted (Section 5.2) |
+| Session state | S3 | ~50–200 MB per recruiter | Full Chrome profile tarball, encrypted (Section 5.2) |
 | Credential vault | Secrets Manager | — | LinkedIn credentials |
 | Queue poller | EventBridge + Lambda | Every 30 min | Start EC2 when tasks present |
 | IAM | Instance profile | `ec2:StopInstances` (self only), `s3:GetObject/PutObject` on sessions bucket, `secretsmanager:GetSecretValue` | Least privilege |
@@ -345,9 +346,9 @@ Above ~10 recruiters, the stop/start EC2 model adds friction — cold start late
 CRM task queue has READY tasks
   → EventBridge Pipe or Lambda → ECS RunTask (Fargate, spot)
       → Container starts (~30s cold start)
-      → Talon loads storage_state from S3
+      → Talon downloads Chrome profile tarball from S3 → extracts to /tmp
       → Executes approved tasks
-      → Exports storage_state to S3
+      → Tars updated profile → uploads to S3
       → Container exits → billing stops
 ```
 
@@ -368,7 +369,7 @@ CRM task queue has READY tasks
 | **Concurrency** | Sequential (one instance) | Parallel (one task per container) |
 | **Operational complexity** | Low | Medium (ECS task definitions) |
 | **When to switch** | — | At ~10 recruiters or concurrency needed |
-| **Session storage** | S3 storage_state | S3 storage_state |
+| **Session storage** | S3 Chrome profile tarball | S3 Chrome profile tarball |
 
 **No EBS in either model.** EBS is only relevant if fingerprint consistency becomes a problem (same browser fingerprint across runs). If LinkedIn starts flagging sessions, add an EBS volume to EC2 (Phase 3) or an EFS mount to Fargate (Phase 4) to persist a full Chrome `user_data_dir`. That is an upgrade path, not the default.
 
@@ -679,7 +680,7 @@ enum TalonAuditEvent {
 **Rationale:**
 - LinkedIn treats session continuity as a trust signal. A fresh login on every Talon spawn looks like automation — a session that has existed for weeks looks like a human.
 - An always-on Talon process (the alternative that avoids S3) holds a live browser and LinkedIn session 24/7. A crash loses the session, leak detection is harder, and the process has a continuous attack surface.
-- S3 is the natural fit for binary blob storage. Playwright's `context.storage_state()` and `storage_state` parameter provide the exact API needed for export/import with zero custom serialisation.
+- S3 is the natural fit for blob storage. The full Chrome profile tarball (~50–200 MB) is downloaded at task start and re-uploaded at end — the copy-in/copy-out pattern avoids the POSIX filesystem limitations of mounting S3 directly. Sessions survive for LinkedIn's full 90-day window without asking the recruiter to re-authenticate.
 
 **Security trade-off accepted:** Stored session state is effectively a session credential. Mitigated by: Talon-side AES-256-GCM before upload (vault-derived key, never in S3); AWS SSE-KMS as a second layer; strict IAM (Talon's runtime role only); 14-day inactivity TTL. The threat of a compromised S3 bucket yielding usable session tokens is accepted — a full AWS compromise gives access to far more than session state.
 
