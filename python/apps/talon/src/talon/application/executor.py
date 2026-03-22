@@ -17,16 +17,17 @@ Eight-step execution sequence (talon-technical-plan.md §10.4):
 """
 
 import logging
+import uuid
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.types import (
+    Artifact,
     DataPart,
-    Message,
     Part,
-    Role,
     TaskArtifactUpdateEvent,
     TaskState,
+    TaskStatus,
     TaskStatusUpdateEvent,
 )
 
@@ -58,27 +59,29 @@ class TalonAgentExecutor(AgentExecutor):
         self._tasks = task_repository
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        task_id = context.task_id or ""
+        context_id = context.context_id or ""
+
         # Step 1 — parse message
         msg = self._parse_message(context)
         if msg is None:
-            await self._emit_failed(event_queue, "Invalid message format")
+            await self._emit_failed(event_queue, task_id, context_id, "Invalid message format")
             return
 
-        task_id = msg.task_id
         site_key = msg.site_key
         payload = msg.payload
-        user_id = context.context_id or ""
+        user_id = context_id
         tenant_id = await self._resolve_tenant(user_id)
 
         # Step 2 — safety gate
-        task = await self._tasks.fetch(task_id)
+        task = await self._tasks.fetch(msg.task_id)
         if task is None or task["status"] != TalonTaskStatus.READY:
-            await self._emit_failed(event_queue, "Task is not READY — rejected")
+            await self._emit_failed(event_queue, task_id, context_id, "Task is not READY — rejected")
             return
 
         # Step 3 — claim
-        await self._tasks.transition(task_id, TalonTaskStatus.CLAIMED)
-        await self._emit_working(event_queue, "Task claimed. Preparing session.")
+        await self._tasks.transition(msg.task_id, TalonTaskStatus.CLAIMED)
+        await self._emit_working(event_queue, task_id, context_id, "Task claimed. Preparing session.")
 
         profile_dir = f"/tmp/chrome/{user_id}/{site_key}"
         credential = None
@@ -91,10 +94,10 @@ class TalonAgentExecutor(AgentExecutor):
             # Step 5 — credential (only when login required)
             if needs_login:
                 try:
-                    credential = self._credentials.fetch(tenant_id, user_id, site_key, task_id)
+                    credential = self._credentials.fetch(tenant_id, user_id, site_key, msg.task_id)
                 except CredentialNotFoundError as e:
-                    await self._tasks.fail(task_id, TalonErrorCode.NO_CREDENTIAL, str(e))
-                    await self._emit_failed(event_queue, str(e))
+                    await self._tasks.fail(msg.task_id, TalonErrorCode.NO_CREDENTIAL, str(e))
+                    await self._emit_failed(event_queue, task_id, context_id, str(e))
                     return
 
             # Step 6 — open browser
@@ -106,38 +109,34 @@ class TalonAgentExecutor(AgentExecutor):
                 pass
 
             if not await self._browser.health_check():
-                await self._tasks.fail(task_id, TalonErrorCode.SESSION_INVALID, "health check failed")
-                await self._emit_failed(event_queue, "Session invalid")
+                await self._tasks.fail(
+                    msg.task_id, TalonErrorCode.SESSION_INVALID, "health check failed"
+                )
+                await self._emit_failed(event_queue, task_id, context_id, "Session invalid")
                 return
 
-            await self._emit_working(event_queue, "Browser session opened.")
+            await self._emit_working(event_queue, task_id, context_id, "Browser session opened.")
 
             # Step 7 — execute
-            await self._tasks.transition(task_id, TalonTaskStatus.IN_PROGRESS)
+            await self._tasks.transition(msg.task_id, TalonTaskStatus.IN_PROGRESS)
             steps = await self._browser.execute_task(payload)
 
             for step in steps:
                 await event_queue.enqueue_event(
                     TaskStatusUpdateEvent(
-                        state=TaskState.working,
-                        message=Message(
-                            role=Role.agent,
-                            parts=[
-                                Part(
-                                    root=DataPart(
-                                        type="data",
-                                        data={"step": step.step, "description": step.description},
-                                    )
-                                )
-                            ],
+                        taskId=task_id,
+                        contextId=context_id,
+                        final=False,
+                        status=TaskStatus(
+                            state=TaskState.working,
                         ),
                     )
                 )
 
         except Exception as e:
-            logger.exception("task %s failed", task_id)
-            await self._tasks.fail(task_id, TalonErrorCode.STEP_FAILED, str(e))
-            await self._emit_failed(event_queue, str(e))
+            logger.exception("task %s failed", msg.task_id)
+            await self._tasks.fail(msg.task_id, TalonErrorCode.STEP_FAILED, str(e))
+            await self._emit_failed(event_queue, task_id, context_id, str(e))
             return
         finally:
             await self._browser.close_session()
@@ -145,17 +144,23 @@ class TalonAgentExecutor(AgentExecutor):
 
         # Step 8 — persist session, emit completed
         self._sessions.upload(tenant_id, user_id, site_key, profile_dir)
-        await self._tasks.transition(task_id, TalonTaskStatus.COMPLETED)
+        await self._tasks.transition(msg.task_id, TalonTaskStatus.COMPLETED)
 
         result = TaskResult(success=True, steps=steps)
-        await event_queue.enqueue_event(
-            TaskArtifactUpdateEvent(
-                artifact={"type": "data", "data": result.model_dump()},
-                last_chunk=True,
-            )
+        artifact = Artifact(
+            artifact_id=str(uuid.uuid4()),
+            parts=[Part(root=DataPart(type="data", data=result.model_dump()))],
         )
         await event_queue.enqueue_event(
-            TaskStatusUpdateEvent(state=TaskState.completed, final=True)
+            TaskArtifactUpdateEvent(taskId=task_id, contextId=context_id, artifact=artifact)
+        )
+        await event_queue.enqueue_event(
+            TaskStatusUpdateEvent(
+                taskId=task_id,
+                contextId=context_id,
+                final=True,
+                status=TaskStatus(state=TaskState.completed),
+            )
         )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
@@ -182,25 +187,26 @@ class TalonAgentExecutor(AgentExecutor):
         # TODO: fetch from CRM proxy agent config (TALON-056)
         return None
 
-    async def _emit_working(self, event_queue: EventQueue, text: str) -> None:
+    async def _emit_working(
+        self, event_queue: EventQueue, task_id: str, context_id: str, text: str
+    ) -> None:
         await event_queue.enqueue_event(
             TaskStatusUpdateEvent(
-                state=TaskState.working,
-                message=Message(
-                    role=Role.agent,
-                    parts=[Part(root=DataPart(type="text", text=text))],
-                ),
+                taskId=task_id,
+                contextId=context_id,
+                final=False,
+                status=TaskStatus(state=TaskState.working),
             )
         )
 
-    async def _emit_failed(self, event_queue: EventQueue, text: str) -> None:
+    async def _emit_failed(
+        self, event_queue: EventQueue, task_id: str, context_id: str, text: str
+    ) -> None:
         await event_queue.enqueue_event(
             TaskStatusUpdateEvent(
-                state=TaskState.failed,
-                message=Message(
-                    role=Role.agent,
-                    parts=[Part(root=DataPart(type="text", text=text))],
-                ),
+                taskId=task_id,
+                contextId=context_id,
                 final=True,
+                status=TaskStatus(state=TaskState.failed),
             )
         )
