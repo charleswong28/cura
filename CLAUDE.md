@@ -17,6 +17,7 @@
 | `docs/ai-playbook.md` | AI Operations | AI behaviour rules, decision documentation protocol, and server validation steps |
 | `js/cura-crm-project-management.md` | Project Management | Unified Phase 1 CRM plan — backend API + frontend web app. 6 EPICs, 27 Stories, 121 Tasks (TASK-001–056 BE, WA-001–079 FE) |
 | `js/apps/web-home-page/home-page-project-management.md` | Project Management | Marketing home page plan (cura.com) — Superhuman-inspired design, 8 EPICs, 12 Stories, 63 Tasks (HP-001–HP-063) |
+| `python/apps/talon/talon-project-management.md` | Project Management | Talon browser executor plan — Phase 3 sourcing automation. 7 EPICs, 32 Stories, 78 Tasks (TALON-001–TALON-078). Covers: scaffold, A2A server, browser backend, session persistence, credential vault, proxy management, CRM integration. |
 | `USAGE.md` | Developer Guide | How to start the project locally, bin scripts reference, service ports, and Docker Compose commands |
 | `docs/customer_interview/2026-02-27-interview-with-man.md` | Customer Research | Sourcing-first recruiter interview. Key themes: job spec auto-generation, multi-channel sourcing, one-click outreach, auto-enrichment. Gap analysis vs. current north star included. |
 
