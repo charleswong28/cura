@@ -701,8 +701,8 @@ interface RequestUser {
 
 `JwtAuthGuard` (registered as `APP_GUARD`) runs on every request:
 1. Verify JWT signature + expiry (no I/O).
-2. Redis `MGET [user_ver:{sub}, session:{sid}]` — version check + session liveness in one round-trip.
-3. Resolve `JWT.teams[].id` (shortIds) → ULIDs via in-process permanent cache.
+2. Redis `GET user_ver:{sub}` — version check in one round-trip.
+3. Resolve `JWT.teams[].id` (shortIds) → ULIDs via in-process permanent `Map<number, string>`. The mapping is sourced from the `Team` table (`shortId` + `id` columns), loaded lazily on first miss via `SELECT id, short_id FROM teams WHERE short_id = ANY($1)`, and never evicted (shortId → ULID is immutable). At CRM scale (10,000 teams × ~130 bytes per entry) the map is ≈1.3 MB — negligible.
 4. Hydrate `permissions` from DB-ETag cache (see §9.6 and §10).
 
 ### 9.3 Guard Stack Per Resolver
@@ -720,14 +720,15 @@ Request
 The Prisma extension (`PrismaService.forTenant(tenantId)`) injects `tenantId` into every query automatically. `JwtAuthGuard` extracts `tenantId` from the JWT — no DB round-trip on the hot path.
 
 ```typescript
-// Resolver example
+// @Query(() => ReturnType) — NestJS code-first GraphQL decorator.
+// Marks the method as a GraphQL query field and declares the return type for
+// schema generation (TypeScript generics are erased at runtime; Apollo needs it).
 @Resolver(() => Candidate)
 export class CandidateResolver {
   @Query(() => [Candidate])
   @RequirePermission('candidate:view_all')
   async candidates(@CurrentUser() user: RequestUser) {
     return this.candidateService.findAll(user);
-    // findAll calls prisma.forTenant(user.tenantId) + data scope filter internally
   }
 
   @Query(() => Candidate)
@@ -744,6 +745,66 @@ export class CandidateResolver {
   }
 }
 ```
+
+**Team-scope enforcement in `findAll`.** Each role carries a `DataScopeType` per resource type (§5.1). `CandidateService.findAll` converts that scope into a WHERE clause:
+
+```typescript
+// CandidateService.findAll
+async findAll(user: RequestUser): Promise<Candidate[]> {
+  const db      = this.prisma.forTenant(user.tenantId);
+  const teamIds = user.teams.map(t => t.id);           // from JWT claims
+  const scope   = await this.permissionService.getDataScope(user, 'Candidate');
+
+  let ownerFilter: Prisma.CandidateWhereInput;
+  switch (scope) {
+    case DataScopeType.ALL:
+      ownerFilter = {};
+      break;
+    case DataScopeType.TEAM_TREE: {
+      const allTeamIds = await this.teamService.expandTeamTree(teamIds); // recursive CTE
+      const memberIds  = await this.teamService.getMemberIds(allTeamIds);
+      ownerFilter = { ownerUserId: { in: memberIds } };
+      break;
+    }
+    case DataScopeType.MY_TEAMS: {
+      // getMemberIds: SELECT user_id FROM team_members WHERE team_id = ANY($1)
+      const memberIds = await this.teamService.getMemberIds(teamIds);
+      ownerFilter = { ownerUserId: { in: memberIds } };
+      break;
+    }
+    case DataScopeType.MINE:
+      ownerFilter = { ownerUserId: user.userId };
+      break;
+    default:                      // EXPLICIT — only records with a Permission row
+      ownerFilter = { id: { in: [] } };
+  }
+
+  // Always union in records explicitly shared with this user outside their normal scope
+  const grantedIds = await this.permissionService.getExplicitlyGrantedIds(user, 'Candidate');
+
+  return db.candidate.findMany({
+    where: { deletedAt: null, OR: [ownerFilter, { id: { in: grantedIds } }] },
+  });
+}
+```
+
+**Concrete trace — "London recruiter, MY_TEAMS scope":**
+
+```sql
+-- Step 1: getMemberIds(['london-team-ulid'])
+SELECT user_id FROM team_members WHERE team_id = ANY(ARRAY['london-team-ulid'])
+-- → ['alice-id', 'bob-id', 'charlie-id']
+
+-- Step 2: the Prisma findMany resolves to:
+SELECT * FROM candidates
+WHERE  tenant_id  = 'T_ACME'
+  AND  deleted_at IS NULL
+  AND (owner_user_id IN ('alice-id', 'bob-id', 'charlie-id')
+       OR id IN ('explicitly-shared-candidate-id'))
+```
+
+A recruiter on the London team only sees candidates owned by other London team members, plus any records explicitly shared with them via a `Permission` row.
+
 
 ### 9.5 PermissionService Core Methods
 
@@ -777,10 +838,9 @@ class PermissionService {
 
 | Key pattern | Type | Value | Written when |
 |-------------|------|-------|--------------|
-| `user_ver:{userId}` | INT | Atomic counter | `INCR` on team/role/deactivation/deletion change |
-| `session:{sid}` | string `"1"` | TTL = `Session.expiresAt − now` | `SET EX` on login/refresh; `DEL` on revoke |
+| `user_ver:{userId}` | INT | Atomic counter | `INCR` on **any** auth state change (team, role, logout, deactivation, password change, …) |
 
-No Redis keys for permission data — permissions are validated against the DB's own timestamps.
+One key type only. No per-session keys; no permission-timestamp keys. The DB `Session` table is the source of truth for whether a refresh is permitted.
 
 **In-process per NestJS instance:**
 
@@ -811,16 +871,17 @@ Row-level permission checks (`Permission` table) are already request-scoped — 
 
 ### 10.2 Redis Key Schema
 
-Only two key patterns. No Redis keys for permission data.
+One key type only. No per-session keys needed — the DB `Session` table handles revocation state; Redis only signals "did anything change?"
 
 ```
-user_ver:{userId}    INT    Atomic counter. INCR when any JWT-embedded field changes.
-                            Checked on every request. JWT.ver mismatch → JWT_STALE.
-
-session:{sid}        "1"    Presence = valid. TTL = Session.expiresAt − now (seconds).
-                            SET EX on login/refresh. DEL on explicit revoke.
-                            Missing on check → session revoked.
+user_ver:{userId}    INT    Atomic counter. INCR on ANY auth state change:
+                            logout, role/team change, deactivation, password change, etc.
+                            JWT.ver mismatch → JWT_STALE → client uses refresh token.
+                            Refresh succeeds or fails based on DB Session.revokedAt /
+                            User.loginable state — Redis is the signal, DB is the gate.
 ```
+
+**Why no `session:{sid}` key?** JWT `exp` handles natural expiry (no I/O). Forced early invalidation (logout, deactivation) is handled by `INCR user_ver`, which stales the JWT and triggers a refresh. The refresh path checks `Session.revokedAt` and `User.loginable` in the DB — if either blocks, the client is forced to re-login. No per-session Redis state is needed because Redis holds one counter per user, not one flag per session.
 
 ---
 
@@ -831,12 +892,11 @@ session:{sid}        "1"    Presence = valid. TTL = Session.expiresAt − now (s
    → HS512 signature + exp
    → Extract { sub, tid, sid, ver, teams, roles }
 
-2. Redis MGET [user_ver:{sub}, session:{sid}]  — 1 round-trip
-   → user_ver missing OR != JWT.ver  →  throw JwtStaleException   { code: 'JWT_STALE' }
-   → session:{sid} missing           →  throw UnauthorizedException { code: 'SESSION_REVOKED' }
+2. Redis GET user_ver:{sub}  — 1 round-trip
+   → missing OR != JWT.ver  →  throw JwtStaleException { code: 'JWT_STALE' }
 
 3. Resolve JWT teams[].id (shortIds) → ULIDs via in-process permanent cache
-   → cache miss: SELECT id, short_id FROM teams WHERE short_id IN (?)
+   → cache miss: SELECT id, short_id FROM teams WHERE short_id = ANY($1)
 
 4. Build RequestUser from JWT claims + resolved ULIDs — zero further I/O
 
@@ -848,29 +908,50 @@ session:{sid}        "1"    Presence = valid. TTL = Session.expiresAt − now (s
    → ETag differs → full fetch → update cache
 ```
 
-Total I/O on the happy path: **1 Redis MGET + 1 DB `SELECT MAX`**. When the ETag matches (the common case), no further DB queries for auth on that request.
+Total I/O on the happy path: **1 Redis GET + 1 DB `SELECT MAX`**. When the ETag matches (the common case), no further DB queries for auth on that request.
 
 ---
 
 ### 10.4 JWT_STALE Client Flow
 
-`JWT_STALE` is not a hard error — it means the token is cryptographically valid but the embedded state is outdated. The client responds by using its refresh token to get a new JWT, then retries the original request transparently.
+`JWT_STALE` means the token is cryptographically valid but the embedded state is outdated. The client uses its refresh token to get a new JWT, then retries transparently. **`JWT_STALE` is also the mechanism that enforces logout and deactivation** — the refresh path is where the DB gate fires.
 
 ```
 Client receives  401 { code: 'JWT_STALE' }
 → POST /auth/refresh { refreshToken }
     Server:
-      1. Look up Session by refreshTokenHash (DB: revokedAt IS NULL, expiresAt > now)
-      2. Check User.loginable AND !deletedAt  ← deactivation enforced here
-      3. GET Redis user_ver:{userId}           ← read current version
-      4. SELECT TeamMember rows               ← latest team memberships
-      5. SELECT UserRole rows                 ← latest roles
+      1. Look up Session by refreshTokenHash
+         → Session.revokedAt IS NOT NULL → 401 "Session revoked" → client must re-login
+         → Session.expiresAt < now       → 401 "Session expired"  → client must re-login
+      2. Check User.loginable AND !deletedAt
+         → loginable = false or deletedAt set → 401 "Account inactive" → client must re-login
+      3. GET Redis user_ver:{userId}      ← current version number
+      4. SELECT TeamMember rows           ← latest team memberships
+      5. SELECT UserRole rows             ← latest roles
       6. Issue new JWT: latest ver, teams[], roles[]
-      7. Rotate refresh token (new hash in Session row)
+      7. Rotate refresh token
 → Client retries original request with new access token
 ```
 
-This is the same endpoint as normal token expiry refresh — `JWT_STALE` is just an additional trigger. Deactivation is enforced at step 2: a deactivated user's refresh is rejected, the client is forced to re-authenticate (and fails login).
+**Logout flow (single session):**
+```
+POST /auth/logout
+  DB:    Session.revokedAt = now        ← blocks future refresh for this session
+  Redis: INCR user_ver:{userId}         ← stales current JWT immediately
+
+User's next request → JWT_STALE → client refreshes → Session.revokedAt → 401 → re-login
+Other concurrent sessions on other devices → also get JWT_STALE → their refresh succeeds
+(their Sessions are still valid) → new JWT issued with updated ver ✓
+```
+
+**Deactivation flow:**
+```
+Admin deactivates user:
+  DB:    User.loginable = false; Session.revokedAt = now (all sessions)
+  Redis: INCR user_ver:{userId}
+
+User's next request → JWT_STALE → client refreshes → Session.revokedAt + loginable=false → 401
+```
 
 ---
 
@@ -910,37 +991,24 @@ The `SELECT MAX(GREATEST(...))` hits indexes on `user_roles.user_id` and `roles.
 
 ### 10.6 Mutation → Redis + DB Writes
 
-Every mutation that changes JWT-embedded state or session validity **must** write to both DB and Redis atomically (in a single service call) before returning.
+Every mutation that changes auth state **must** write to DB first, then `INCR user_ver`. Redis is the signal; DB is the gate (refresh checks Session + User state).
 
 | Event | Redis | DB |
 |-------|-------|----|
-| Login / token refresh | `SET session:{sid} "1" EX <ttl>` | `Session` insert / rotate |
-| Logout | `DEL session:{sid}` | `Session.revokedAt = now` |
-| Logout-all | `DEL session:{sid}` for each active sid | `Session.revokedAt = now` for all |
-| Team membership add | `INCR user_ver:{userId}` | `TeamMember` insert |
-| Team membership remove | `INCR user_ver:{userId}` | `TeamMember` delete |
-| Role assigned to user | `INCR user_ver:{userId}` | `UserRole` insert |
-| Role removed from user | `INCR user_ver:{userId}` | `UserRole` delete |
+| Login | `SET user_ver:{userId} 0 NX` (seed if absent) | `Session` insert |
+| Token refresh (successful) | — | `Session` rotate refresh token hash |
+| Logout (single session) | `INCR user_ver:{userId}` | `Session.revokedAt = now` |
+| Logout-all | `INCR user_ver:{userId}` | `Session.revokedAt = now` for all |
+| Team membership add/remove | `INCR user_ver:{userId}` | `TeamMember` write |
+| Role assigned/removed | `INCR user_ver:{userId}` | `UserRole` write |
 | `Role.permissions` updated | `INCR user_ver:{u}` for all holders¹ | `Role.updatedAt` bumped |
-| User deactivated (immediate) | `INCR user_ver:{userId}`; `DEL session:{sid}` all | `User.loginable=false`; `Session.revokedAt` all |
-| User deactivated (eventual) | `INCR user_ver:{userId}` | `User.loginable=false` |
-| User deleted | `INCR user_ver:{userId}`; `DEL session:{sid}` all | `User.deletedAt`; `Session.revokedAt` all |
-| Password changed | `INCR user_ver:{userId}`; `DEL session:{sid}` all | `Session.revokedAt` all; `passwordHash` |
-| Refresh token reuse detected | `DEL session:{sid}` all for user | `Session.revokedAt` all |
-| Permission granted/revoked | (none — DB `createdAt` is the ETag for row-level) | `Permission` write |
+| User deactivated | `INCR user_ver:{userId}` | `User.loginable=false`; `Session.revokedAt` all |
+| User deleted | `INCR user_ver:{userId}` | `User.deletedAt`; `Session.revokedAt` all |
+| Password changed | `INCR user_ver:{userId}` | `Session.revokedAt` all; `passwordHash` |
+| Refresh token reuse detected | `INCR user_ver:{userId}` | `Session.revokedAt` all |
+| Permission granted/revoked | — | `Permission` write |
 
-¹ `SELECT userId FROM UserRole WHERE roleId = ?` — cheap at CRM scale (roles have few holders).
-
----
-
-### 10.7 Deactivation Enforcement Timing
-
-| Method | Effective |
-|--------|-----------|
-| `INCR user_ver` + `DEL session:{sid}` (all) | **Immediate** — next request fails session check |
-| `INCR user_ver` only | **≤15 min** — JWT_STALE triggers refresh; refresh rejects at `User.loginable` check |
-
-Default on `User.deactivate()`: use the immediate method (both Redis writes + DB revoke). Eventual enforcement is available for non-critical bulk operations (e.g., nightly cleanup of inactive users).
+¹ `SELECT userId FROM UserRole WHERE roleId = ?` — cheap at CRM scale.
 
 ---
 
@@ -974,17 +1042,10 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    // Single Redis round-trip: version check + session check
-    const [redisVer, sessionFlag] = await this.redis.mget(
-      `user_ver:${payload.sub}`,
-      `session:${payload.sid}`,
-    );
-
+    // Single Redis GET: version check
+    const redisVer = await this.redis.get(`user_ver:${payload.sub}`);
     if (redisVer === null || Number(redisVer) !== payload.ver) {
-      throw new JwtStaleException(); // client uses refresh token
-    }
-    if (sessionFlag === null) {
-      throw new UnauthorizedException('Session revoked');
+      throw new JwtStaleException(); // client uses refresh token → refresh checks DB Session
     }
 
     // Resolve team shortIds → ULIDs (in-process permanent cache)
@@ -1021,9 +1082,8 @@ export class JwtAuthGuard implements CanActivate {
    → crypto verify — JWT contains:
        sub="U_ALICE", tid="T_ACME", sid="S1", ver=5,
        teams=[{id:7,r:"L"},{id:12,r:"M"}], roles=["recruiter"]
-   → Redis MGET [user_ver:U_ALICE, session:S1]
-       user_ver = 5 ✓ matches JWT.ver
-       session:S1 = "1" ✓ present
+   → Redis GET user_ver:U_ALICE → 5
+       5 == JWT.ver ✓
    → resolve shortIds 7→"TM1", 12→"TM2" (in-process cache hit)
    → DB-ETag check: MAX(GREATEST(assignedAt, updatedAt)) for Alice's roles
        ETag matches in-process cache → permissions = Set{"candidate:view_all", "job:create", ...}
