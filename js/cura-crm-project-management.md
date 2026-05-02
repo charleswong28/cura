@@ -127,14 +127,14 @@
 > Prisma models for identity, sessions, MFA, roles, teams, permissions, and audit log.
 > Spec: `authn-authz-technical-plan.md §1, §3, §4, §5, §8`
 
-- [ ] **TASK-065:** Add `AuthIdentity`, `Session`, `MfaDevice`, `PasswordResetToken`, `PasswordHistory` models to Prisma schema
-- [ ] **TASK-066:** Add `Role`, `UserRole`, `RoleDataScope` models to Prisma schema (including `tenantId?` for custom tenant roles)
-- [ ] **TASK-067:** Add `Team` (self-referential, `TeamKind` enum, `shortId` auto-increment) and `TeamMember` (`LEAD | MEMBER` role) models to Prisma schema
-- [ ] **TASK-068:** Add `Permission`, `PermissionGrant`, `PermissionCascadeRule`, `PermissionInheritance`, `ShareToken` models to Prisma schema
-- [ ] **TASK-069:** Add `AuditLog` model to Prisma schema with required indexes
-- [ ] **TASK-070:** Run and verify migrations; update seed data
-- [ ] **TASK-071:** Seed built-in roles (`admin`, `senior_recruiter`, `recruiter`, `viewer`) with permission strings and `RoleDataScope` rows per §4.2 and §5.1
-- [ ] **TASK-072:** Seed built-in `PermissionCascadeRule` rows (`JobApplication→Candidate`, `JobApplication→Job`, `Offer→JobApplication`, `Interview→JobApplication`, `Client→Job`) per §5.4
+- [x] **TASK-065:** Add `AuthIdentity`, `Session`, `MfaDevice`, `PasswordResetToken`, `PasswordHistory` models to Prisma schema
+- [x] **TASK-066:** Add `Role`, `UserRole`, `RoleDataScope` models to Prisma schema (including `tenantId?` for custom tenant roles)
+- [x] **TASK-067:** Add `Team` (self-referential, `TeamKind` enum, `shortId` auto-increment) and `TeamMember` (`LEAD | MEMBER` role) models to Prisma schema
+- [x] **TASK-068:** Add `Permission`, `PermissionGrant`, `PermissionCascadeRule`, `PermissionInheritance`, `ShareToken` models to Prisma schema
+- [x] **TASK-069:** Add `AuditLog` model to Prisma schema with required indexes
+- [x] **TASK-070:** Run and verify migrations; update seed data
+- [x] **TASK-071:** Seed built-in roles (`admin`, `senior_recruiter`, `recruiter`, `viewer`) with permission strings and `RoleDataScope` rows per §4.2 and §5.1
+- [x] **TASK-072:** Seed built-in `PermissionCascadeRule` rows (`JobApplication→Candidate`, `JobApplication→Job`, `Offer→JobApplication`, `Interview→JobApplication`, `Client→Job`) per §5.4
 
 #### Story 2.2: Auth Service — Login, Sessions & Password Reset (BE)
 
@@ -476,14 +476,14 @@
 
 - **EPICs:** 0/6 Complete
 - **Stories:** 8/34 Complete
-- **Tasks:** 27/165 Complete (0 BE + 27 FE)
+- **Tasks:** 35/165 Complete (8 BE + 27 FE)
 
 > Note: Sprint 1 FE stories remain complete. Clerk BE/FE work (Stories 2.1–2.3 old, TASK-048–064, WA-020–027) is superseded by the first-party auth plan. Task counts reset for EPIC-002 BE work.
 
 ### Current Sprint
 
 **Sprint:** Sprint 2
-**Active Stories:** Story 2.1 (Auth & Permission Database Schema) — in progress
+**Active Stories:** Story 2.2 (Auth Service — Login, Sessions & Password Reset) — next up
 **Blocked Items:** None
 
 ---
@@ -518,12 +518,13 @@
 
 ## Change Log
 
-| Date       | Change                                      | Impact                         |
-| ---------- | ------------------------------------------- | ------------------------------ |
-| 2026-02-22 | Initial backend project breakdown           | 5 EPICs, 11 Stories, 56 Tasks  |
-| 2026-03-15 | Web-app frontend task breakdown             | 7 EPICs, 17 Stories, 79 Tasks  |
-| 2026-03-15 | Merged backend + frontend into unified plan | 6 EPICs, 27 Stories, 121 Tasks |
-| 2026-05-02 | Replaced Clerk with first-party auth system | EPIC-002 rewritten: 10 stories (2.1–2.10), 36 new tasks (TASK-065–100, WA-080–092); Clerk stories/tasks superseded; Sprint 3 added for auth guards + FE auth; sprints renumbered 2–7; story count 34, task count 165 |
+| Date       | Change                                                 | Impact                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-02-22 | Initial backend project breakdown                      | 5 EPICs, 11 Stories, 56 Tasks                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 2026-03-15 | Web-app frontend task breakdown                        | 7 EPICs, 17 Stories, 79 Tasks                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 2026-03-15 | Merged backend + frontend into unified plan            | 6 EPICs, 27 Stories, 121 Tasks                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 2026-05-02 | Replaced Clerk with first-party auth system            | EPIC-002 rewritten: 10 stories (2.1–2.10), 36 new tasks (TASK-065–100, WA-080–092); Clerk stories/tasks superseded; Sprint 3 added for auth guards + FE auth; sprints renumbered 2–7; story count 34, task count 165                                                                                                                                                                                                                                                                     |
+| 2026-05-02 | Story 2.1 complete — Auth & Permission database schema | Added 16 new models (AuthIdentity, Session, MfaDevice, PasswordResetToken, PasswordHistory, PasswordPolicy, Role, UserRole, RoleDataScope, Team, TeamMember, Permission, PermissionGrant, PermissionCascadeRule, PermissionInheritance, ShareToken, AuditLog) + 7 new enums; updated Tenant (slug), User (loginable, firstLogin, authIdentityId), Candidate/Client/Job (ownerUserId, createdById); seeded 4 built-in roles + 12 data scope rows + 5 cascade rules; TASK-065–072 complete |
 
 ---
 

@@ -18,11 +18,6 @@ datasource db {
 // Enums
 // ---------------------------------------------------------------------------
 
-enum UserRole {
-  ADMIN
-  RECRUITER
-}
-
 enum CandidateStatus {
   ACTIVE
   INACTIVE
@@ -58,16 +53,66 @@ enum ActivityAction {
 }
 
 // ---------------------------------------------------------------------------
+// EPIC-002: Auth & Permission Enums
+// ---------------------------------------------------------------------------
+
+enum TeamKind {
+  BUSINESS  // sales team, practice group, desk
+  REGION    // APAC, EMEA, Americas
+  PRACTICE  // Healthcare, Technology, Finance
+  OTHER
+}
+
+enum TeamRole {
+  LEAD    // team manager — grants LEAD-level on permission resolution
+  MEMBER  // standard member
+}
+
+enum DataScopeType {
+  ALL        // see every record in the tenant (admin)
+  TEAM_TREE  // see records owned by my teams + all descendant teams
+  MY_TEAMS   // see records owned by my direct teams only (no descendants)
+  MINE       // see only records where ownerUserId = me
+  EXPLICIT   // see only records with an explicit Permission grant
+}
+
+enum GranteeType {
+  USER
+  TEAM
+  ROLE
+}
+
+enum AccessLevel {
+  VIEW
+  EDIT
+  OWNER
+}
+
+enum GrantSource {
+  DIRECT     // manually granted by a user
+  INHERITED  // from PermissionInheritance graph
+  RULE       // system auto-grant on record creation (§5.5)
+  APPROVAL   // triggered by an approval flow
+}
+
+enum GrantAction {
+  GRANT
+  UPGRADE
+  DOWNGRADE
+  REVOKE
+}
+
+// ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
 
-/// Represents a headhunting firm. Clerk Organization is the tenant boundary.
+/// Represents a headhunting firm / organisation (the tenant boundary).
 model Tenant {
-  id         String   @id
-  clerkOrgId String   @unique @map("clerk_org_id")
-  name       String
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id        String   @id
+  slug      String   @unique // used for multi-tenant login (tenantSlug in JWT)
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   users        User[]
   clients      Client[]
@@ -78,32 +123,353 @@ model Tenant {
   @@map("tenants")
 }
 
-/// Recruiter or admin belonging to a tenant.
+/// Recruiter or admin belonging to a tenant. One AuthIdentity → many Users (one per tenant).
 model User {
-  id          String   @id
-  tenantId    String   @map("tenant_id")
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  clerkUserId String   @unique @map("clerk_user_id")
-  email       String
-  firstName   String   @map("first_name")
-  lastName    String   @map("last_name")
-  role        UserRole @default(RECRUITER)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id             String        @id
+  tenantId       String        @map("tenant_id")
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  authIdentityId String?       @unique @map("auth_identity_id")
+  authIdentity   AuthIdentity? @relation(fields: [authIdentityId], references: [id])
+  email          String
+  firstName      String        @map("first_name")
+  lastName       String        @map("last_name")
+  loginable      Boolean       @default(true) // false = deactivated
+  firstLogin     DateTime?     @map("first_login")
+  lastInactiveAt DateTime?     @map("last_inactive_at")
+  deletedAt      DateTime?     @map("deleted_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  assignedJobs Job[] @relation("JobAssignee")
-  activityLogs ActivityLog[]
+  sessions          Session[]
+  userRoles         UserRole[]
+  teamMemberships   TeamMember[]
+  assignedJobs      Job[]       @relation("JobAssignee")
+  ownedJobs         Job[]       @relation("JobOwner")
+  createdJobs       Job[]       @relation("JobCreator")
+  ownedCandidates   Candidate[] @relation("CandidateOwner")
+  createdCandidates Candidate[] @relation("CandidateCreator")
+  bdClients         Client[]    @relation("ClientBD")
+  createdClients    Client[]    @relation("ClientCreator")
+  activityLogs      ActivityLog[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("users")
 }
 
+// ---------------------------------------------------------------------------
+// EPIC-002 — Auth Identity & Credential Models (TASK-065)
+// ---------------------------------------------------------------------------
+
+/// Credential store — one per person, shared across tenants.
+/// AuthIdentity holds credentials; User holds the operational profile per tenant.
+model AuthIdentity {
+  id               String    @id
+  email            String    @unique
+  passwordHash     String    @map("password_hash")
+  oidcSubject      String?   @unique @map("oidc_subject")
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")   // set after 5 consecutive fails
+  mfaEnrolled      Boolean   @default(false) @map("mfa_enrolled")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  users               User[]
+  sessions            Session[]
+  mfaDevices          MfaDevice[]
+  passwordResetTokens PasswordResetToken[]
+  passwordHistory     PasswordHistory[]
+
+  @@map("auth_identities")
+}
+
+/// Refresh-token sessions. One auth identity can have many active sessions (multi-device).
+model Session {
+  id               String       @id
+  authIdentityId   String       @map("auth_identity_id")
+  authIdentity     AuthIdentity @relation(fields: [authIdentityId], references: [id])
+  userId           String       @map("user_id")      // the User (tenant-scoped) for this session
+  user             User         @relation(fields: [userId], references: [id])
+  refreshTokenHash String       @unique @map("refresh_token_hash")
+  ip               String?
+  userAgent        String?      @map("user_agent")
+  expiresAt        DateTime     @map("expires_at")   // +90 days from creation
+  revokedAt        DateTime?    @map("revoked_at")   // set on logout / reuse detection
+  lastUsedAt       DateTime?    @map("last_used_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  @@index([authIdentityId])
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// TOTP device for an AuthIdentity. One identity may have at most one active MFA device.
+model MfaDevice {
+  id                String       @id
+  authIdentityId    String       @map("auth_identity_id")
+  authIdentity      AuthIdentity @relation(fields: [authIdentityId], references: [id])
+  secretEncrypted   String       @map("secret_encrypted") // AES-256-GCM; key from env
+  backupCodesHashed String[]     @map("backup_codes_hashed") // argon2id(code); deleted on use
+  enrolledAt        DateTime     @default(now()) @map("enrolled_at")
+  lastVerifiedAt    DateTime?    @map("last_verified_at")
+
+  @@index([authIdentityId])
+  @@map("mfa_devices")
+}
+
+/// One-time tokens for the forgot-password flow. Stored as hashes; raw token is emailed.
+model PasswordResetToken {
+  id             String       @id
+  authIdentityId String       @map("auth_identity_id")
+  authIdentity   AuthIdentity @relation(fields: [authIdentityId], references: [id])
+  tokenHash      String       @unique @map("token_hash")
+  expiresAt      DateTime     @map("expires_at")   // +1 hour
+  usedAt         DateTime?    @map("used_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([authIdentityId])
+  @@map("password_reset_tokens")
+}
+
+/// Previous password hashes for history enforcement. Capped at PasswordPolicy.historySize.
+model PasswordHistory {
+  id             String       @id
+  authIdentityId String       @map("auth_identity_id")
+  authIdentity   AuthIdentity @relation(fields: [authIdentityId], references: [id])
+  passwordHash   String       @map("password_hash")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([authIdentityId])
+  @@map("password_history")
+}
+
+/// Tenant-level or global password complexity and history policy.
+model PasswordPolicy {
+  id            String  @id
+  tenantId      String? @unique @map("tenant_id") // null = global default
+  minLength     Int     @default(8) @map("min_length")
+  requireUpper  Boolean @default(true) @map("require_upper")
+  requireLower  Boolean @default(true) @map("require_lower")
+  requireDigit  Boolean @default(true) @map("require_digit")
+  requireSymbol Boolean @default(false) @map("require_symbol")
+  historySize   Int     @default(5) @map("history_size") // how many old passwords to check
+
+  @@map("password_policies")
+}
+
+// ---------------------------------------------------------------------------
+// EPIC-002 — Role & Functional Permission Models (TASK-066)
+// ---------------------------------------------------------------------------
+
+/// Functional role — holds a set of permission strings (e.g. "candidate:view_all").
+/// Built-in roles have tenantId = null and cannot be modified.
+/// Tenants can define custom roles by setting tenantId.
+model Role {
+  id          String    @id
+  shortId     Int       @unique @default(autoincrement()) @map("short_id") // compact JWT encoding
+  tenantId    String?   @map("tenant_id")   // null = system-wide built-in
+  name        String
+  description String?
+  permissions Json      // string[] — e.g. ["candidate:view_all", "job:create"]
+  builtin     Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  userRoles  UserRole[]
+  dataScopes RoleDataScope[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+/// Junction table: user ↔ role assignment.
+model UserRole {
+  userId       String
+  roleId       String
+  assignedAt   DateTime @default(now()) @map("assigned_at")
+  assignedById String   @map("assigned_by_id")
+  user         User     @relation(fields: [userId], references: [id])
+  role         Role     @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+/// Per-resource default visibility scope for each role (drives list-query filtering).
+model RoleDataScope {
+  roleId       String        @map("role_id")
+  resourceType String        @map("resource_type") // 'Candidate' | 'Job' | 'Client' | ...
+  dataScope    DataScopeType @map("data_scope")
+  role         Role          @relation(fields: [roleId], references: [id])
+
+  @@id([roleId, resourceType])
+  @@map("role_data_scopes")
+}
+
+// ---------------------------------------------------------------------------
+// EPIC-002 — Team Structure (TASK-067)
+// ---------------------------------------------------------------------------
+
+/// Self-referential team tree. `kind` replaces Gllue's team / team2 / team3 trio.
+/// shortId is a compact int used in JWT `teams` claim for space efficiency.
+model Team {
+  id        String    @id
+  shortId   Int       @unique @default(autoincrement()) @map("short_id") // immutable; JWT encoding
+  tenantId  String    @map("tenant_id")
+  parentId  String?   @map("parent_id")
+  parent    Team?     @relation("TeamHierarchy", fields: [parentId], references: [id])
+  children  Team[]    @relation("TeamHierarchy")
+  name      String
+  kind      TeamKind
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  members TeamMember[]
+
+  @@index([tenantId, kind])
+  @@map("teams")
+}
+
+/// Team membership with LEAD / MEMBER role for permission resolution.
+model TeamMember {
+  teamId   String   @map("team_id")
+  userId   String   @map("user_id")
+  role     TeamRole
+  joinedAt DateTime @default(now()) @map("joined_at")
+  team     Team     @relation(fields: [teamId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@id([teamId, userId])
+  @@map("team_members")
+}
+
+// ---------------------------------------------------------------------------
+// EPIC-002 — Row-Level Permission Models (TASK-068)
+// ---------------------------------------------------------------------------
+
+/// Per-record access grant. One row = one grantee's access to one resource.
+/// Replaces Gllue's 14+ `*privilege/*uniqueprivilege` table pairs.
+model Permission {
+  id           String      @id
+  tenantId     String      @map("tenant_id")
+  granteeType  GranteeType @map("grantee_type")
+  granteeId    String      @map("grantee_id")
+  resourceType String      @map("resource_type") // 'Candidate' | 'Job' | 'Client' | ...
+  resourceId   String      @map("resource_id")
+  accessLevel  AccessLevel @map("access_level")
+  grantSource  GrantSource @map("grant_source")
+  expiresAt    DateTime?   @map("expires_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  createdById  String      @map("created_by_id")
+
+  @@unique([tenantId, granteeType, granteeId, resourceType, resourceId])
+  @@index([tenantId, resourceType, resourceId]) // "who can access record X?"
+  @@index([granteeId, tenantId, resourceType])  // "what can grantee see?"
+  @@map("permissions")
+}
+
+/// Append-only audit trail for all permission changes. Never delete rows.
+model PermissionGrant {
+  id           String       @id
+  permissionId String?      @map("permission_id") // null after revoke
+  tenantId     String       @map("tenant_id")
+  granteeType  GranteeType  @map("grantee_type")
+  granteeId    String       @map("grantee_id")
+  resourceType String       @map("resource_type")
+  resourceId   String       @map("resource_id")
+  action       GrantAction
+  fromLevel    AccessLevel? @map("from_level")
+  toLevel      AccessLevel? @map("to_level")
+  reason       String?
+  actorId      String       @map("actor_id")
+  occurredAt   DateTime     @default(now()) @map("occurred_at")
+
+  @@index([resourceType, resourceId, occurredAt])
+  @@index([granteeId, occurredAt])
+  @@map("permission_grants")
+}
+
+/// Cascade rules: access to `fromResourceType` auto-grants access to `toResourceType`.
+/// Seeded at migration; see §5.4 of authn-authz-technical-plan.md.
+model PermissionCascadeRule {
+  id               String      @id
+  fromResourceType String      @map("from_resource_type")
+  toResourceType   String      @map("to_resource_type")
+  minAccessLevel   AccessLevel @map("min_access_level") // min level on 'from' to trigger
+  grantLevel       AccessLevel @map("grant_level")      // level granted on 'to'
+
+  @@unique([fromResourceType, toResourceType])
+  @@map("permission_cascade_rules")
+}
+
+/// Explicit inheritance graph for approval-triggered propagation.
+/// When a team holds a Permission, membership changes require no graph update.
+model PermissionInheritance {
+  parentPermissionId String      @map("parent_permission_id")
+  childGranteeType   GranteeType @map("child_grantee_type")
+  childGranteeId     String      @map("child_grantee_id")
+
+  @@id([parentPermissionId, childGranteeType, childGranteeId])
+  @@map("permission_inheritances")
+}
+
+/// Magic-link token for sharing a resource with an external user (no Cura account).
+model ShareToken {
+  id           String      @id
+  tenantId     String      @map("tenant_id")
+  tokenHash    String      @unique @map("token_hash")
+  resourceType String      @map("resource_type")
+  resourceId   String      @map("resource_id")
+  accessLevel  AccessLevel @map("access_level")
+  expiresAt    DateTime    @map("expires_at")
+  createdById  String      @map("created_by_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  revokedAt    DateTime?   @map("revoked_at")
+
+  @@index([tenantId, resourceType, resourceId])
+  @@map("share_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// EPIC-002 — Audit Log (TASK-069)
+// ---------------------------------------------------------------------------
+
+/// Structured audit log for authn/authz and data events. Replaces ActivityLog long-term.
+/// See §8 of authn-authz-technical-plan.md for tracked event types.
+model AuditLog {
+  id           String   @id
+  tenantId     String?  @map("tenant_id")
+  actorId      String?  @map("actor_id")           // null for system events
+  actorType    String   @default("USER") @map("actor_type") // USER | SYSTEM | API_KEY
+  resourceType String   @map("resource_type")
+  resourceId   String   @map("resource_id")
+  action       String   // 'authn.login_success' | 'permission.granted' | 'candidate.exported' | ...
+  oldValue     Json?    @map("old_value")
+  newValue     Json?    @map("new_value")
+  ip           String?
+  userAgent    String?  @map("user_agent")
+  occurredAt   DateTime @default(now()) @map("occurred_at")
+
+  @@index([tenantId, resourceType, resourceId])
+  @@index([tenantId, actorId, occurredAt])
+  @@index([occurredAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Core CRM Models
+// ---------------------------------------------------------------------------
+
 /// A job-seeker tracked by the tenant.
 model Candidate {
   id             String          @id
   tenantId       String          @map("tenant_id")
   tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  ownerUserId    String?         @map("owner_user_id")     // for data-scope MINE / MY_TEAMS
+  ownerUser      User?           @relation("CandidateOwner", fields: [ownerUserId], references: [id])
+  createdById    String?         @map("created_by_id")
+  createdBy      User?           @relation("CandidateCreator", fields: [createdById], references: [id])
   firstName      String          @map("first_name")
   lastName       String          @map("last_name")
   email          String?
@@ -117,7 +483,7 @@ model Candidate {
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
 
-  // email uniqueness is per-tenant; NULLs are intentionally allowed (multiple candidates may have no email)
+  // email uniqueness is per-tenant; NULLs are intentionally allowed
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("candidates")
@@ -125,31 +491,26 @@ model Candidate {
 
 /// A client company that posts job orders.
 model Client {
-  id        String       @id
-  tenantId  String       @map("tenant_id")
-  tenant    Tenant       @relation(fields: [tenantId], references: [id])
-  name      String
-  industry  String?
-  website   String?
-  phone     String?
-  address   String?
-  status    ClientStatus @default(PROSPECT)
-  createdAt DateTime     @default(now()) @map("created_at")
-  updatedAt DateTime     @updatedAt @map("updated_at")
+  id          String       @id
+  tenantId    String       @map("tenant_id")
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  bdUserId    String?      @map("bd_user_id")   // business-development owner; auto-granted OWNER
+  bdUser      User?        @relation("ClientBD", fields: [bdUserId], references: [id])
+  createdById String?      @map("created_by_id")
+  createdBy   User?        @relation("ClientCreator", fields: [createdById], references: [id])
+  name        String
+  industry    String?
+  website     String?
+  phone       String?
+  address     String?
+  status      ClientStatus @default(PROSPECT)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
 
   jobs Job[]
 
   @@index([tenantId])
   @@map("clients")
-}
-
-/// Marketing waitlist — email sign-ups captured from the home page.
-model WaitlistEntry {
-  id        String   @id
-  email     String   @unique
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("waitlist_entries")
 }
 
 /// An open position linked to a client company.
@@ -159,6 +520,10 @@ model Job {
   tenant       Tenant      @relation(fields: [tenantId], references: [id])
   clientId     String      @map("client_id")
   client       Client      @relation(fields: [clientId], references: [id])
+  ownerUserId  String?     @map("owner_user_id")  // for data-scope and auto-grant EDIT
+  ownerUser    User?       @relation("JobOwner", fields: [ownerUserId], references: [id])
+  createdById  String?     @map("created_by_id")
+  createdBy    User?       @relation("JobCreator", fields: [createdById], references: [id])
   title        String
   description  String?
   status       JobStatus   @default(OPEN)
@@ -173,7 +538,16 @@ model Job {
   @@map("jobs")
 }
 
-/// Audit trail for user-management actions within a tenant.
+/// Marketing waitlist — email sign-ups captured from the home page.
+model WaitlistEntry {
+  id        String   @id
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("waitlist_entries")
+}
+
+/// Clerk-era audit trail — superseded by AuditLog for new events; retained for history.
 model ActivityLog {
   id         String         @id
   tenantId   String         @map("tenant_id")

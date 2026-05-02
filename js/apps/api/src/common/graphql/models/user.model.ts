@@ -1,25 +1,24 @@
 import { ObjectType, Field, ID } from "@nestjs/graphql";
-import { UserRole } from "../enums";
 
 @ObjectType()
 export class UserModel {
   @Field(() => ID)
   id!: string;
 
-  @Field(() => String)
+  @Field()
   tenantId!: string;
 
-  @Field(() => String)
+  @Field()
   email!: string;
 
-  @Field(() => String)
+  @Field()
   firstName!: string;
 
-  @Field(() => String)
+  @Field()
   lastName!: string;
 
-  @Field(() => UserRole)
-  role!: UserRole;
+  @Field()
+  loginable!: boolean;
 
   @Field(() => Date)
   createdAt!: Date;
