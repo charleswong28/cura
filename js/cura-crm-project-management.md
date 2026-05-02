@@ -140,20 +140,20 @@
 
 > Core authentication flows per `authn-authz-technical-plan.md §2`.
 
-- [ ] **TASK-073:** Implement `AuthService.login()` — Argon2id verify, account lockout (5 consecutive fails → `lockedUntil`), tenant resolution by `tenantSlug`, `loginable`/`deletedAt` check, `Session` insert, JWT sign (HS512, 15 min access token, 90-day refresh token)
-- [ ] **TASK-074:** Implement `POST /auth/refresh` — look up `Session` by `refreshTokenHash`, check `revokedAt`/`expiresAt`/`loginable`, rotate refresh token atomically, detect reuse (revoke all sessions on reuse), issue new JWT with latest `user_ver` from Redis
-- [ ] **TASK-075:** Implement `POST /auth/logout` and `POST /auth/logout-all` — set `Session.revokedAt`, `INCR user_ver:{userId}` in Redis
-- [ ] **TASK-076:** Implement `POST /auth/password-reset/request` — rate-limited (3 req/hr per email), ULID+random token, store hash in `PasswordResetToken`, send email magic link
-- [ ] **TASK-077:** Implement `POST /auth/password-reset/confirm` — verify token, `PasswordPolicy` validation, `PasswordHistory` check (cap at policy size), Argon2id hash, revoke all sessions, `INCR user_ver`
-- [ ] **TASK-078:** Implement `PasswordService` — Argon2id hash/verify, complexity rules, history enforcement
+- [x] **TASK-073:** Implement `AuthService.login()` — Argon2id verify, account lockout (5 consecutive fails → `lockedUntil`), tenant resolution by `tenantSlug`, `loginable`/`deletedAt` check, `Session` insert, JWT sign (HS512, 15 min access token, 90-day refresh token)
+- [x] **TASK-074:** Implement `POST /auth/refresh` — look up `Session` by `refreshTokenHash`, check `revokedAt`/`expiresAt`/`loginable`, rotate refresh token atomically, detect reuse (revoke all sessions on reuse), issue new JWT with latest `user_ver` from Redis
+- [x] **TASK-075:** Implement `POST /auth/logout` and `POST /auth/logout-all` — set `Session.revokedAt`, `INCR user_ver:{userId}` in Redis
+- [x] **TASK-076:** Implement `POST /auth/password-reset/request` — rate-limited (3 req/hr per email), ULID+random token, store hash in `PasswordResetToken`, send email magic link
+- [x] **TASK-077:** Implement `POST /auth/password-reset/confirm` — verify token, `PasswordPolicy` validation, `PasswordHistory` check (cap at policy size), Argon2id hash, revoke all sessions, `INCR user_ver`
+- [x] **TASK-078:** Implement `PasswordService` — Argon2id hash/verify, complexity rules, history enforcement
 
 #### Story 2.3: MFA — TOTP & Backup Codes (BE)
 
 > TOTP enrolment, verification, and backup codes per `authn-authz-technical-plan.md §2.2`.
 
-- [ ] **TASK-079:** Implement `MfaService.enrol()` — generate TOTP secret, encrypt with AES-256-GCM (key from env), store in `MfaDevice.secretEncrypted`, return QR code URI
-- [ ] **TASK-080:** Implement `POST /auth/mfa/verify` — validate `mfaChallengeToken`, TOTP code check against decrypted secret, lock challenge after 3 fails, on success proceed to session creation
-- [ ] **TASK-081:** Implement backup codes — generate 10 codes, store as `argon2id(code)` hashes in `MfaDevice.backupCodesHashed`, delete matching hash on use (single-use)
+- [x] **TASK-079:** Implement `MfaService.enrol()` — generate TOTP secret, encrypt with AES-256-GCM (key from env), store in `MfaDevice.secretEncrypted`, return QR code URI
+- [x] **TASK-080:** Implement `POST /auth/mfa/verify` — validate `mfaChallengeToken`, TOTP code check against decrypted secret, lock challenge after 3 fails, on success proceed to session creation
+- [x] **TASK-081:** Implement backup codes — generate 10 codes, store as `argon2id(code)` hashes in `MfaDevice.backupCodesHashed`, delete matching hash on use (single-use)
 
 #### Story 2.4: JWT Guards & Principal Hydration (BE)
 
@@ -475,15 +475,15 @@
 ### Completion Status
 
 - **EPICs:** 0/6 Complete
-- **Stories:** 8/34 Complete
-- **Tasks:** 35/165 Complete (8 BE + 27 FE)
+- **Stories:** 10/34 Complete
+- **Tasks:** 44/165 Complete (17 BE + 27 FE)
 
 > Note: Sprint 1 FE stories remain complete. Clerk BE/FE work (Stories 2.1–2.3 old, TASK-048–064, WA-020–027) is superseded by the first-party auth plan. Task counts reset for EPIC-002 BE work.
 
 ### Current Sprint
 
 **Sprint:** Sprint 2
-**Active Stories:** Story 2.2 (Auth Service — Login, Sessions & Password Reset) — next up
+**Active Stories:** Story 2.4 (JWT Guards & Principal Hydration) — next up
 **Blocked Items:** None
 
 ---
@@ -525,6 +525,7 @@
 | 2026-03-15 | Merged backend + frontend into unified plan            | 6 EPICs, 27 Stories, 121 Tasks                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 2026-05-02 | Replaced Clerk with first-party auth system            | EPIC-002 rewritten: 10 stories (2.1–2.10), 36 new tasks (TASK-065–100, WA-080–092); Clerk stories/tasks superseded; Sprint 3 added for auth guards + FE auth; sprints renumbered 2–7; story count 34, task count 165                                                                                                                                                                                                                                                                     |
 | 2026-05-02 | Story 2.1 complete — Auth & Permission database schema | Added 16 new models (AuthIdentity, Session, MfaDevice, PasswordResetToken, PasswordHistory, PasswordPolicy, Role, UserRole, RoleDataScope, Team, TeamMember, Permission, PermissionGrant, PermissionCascadeRule, PermissionInheritance, ShareToken, AuditLog) + 7 new enums; updated Tenant (slug), User (loginable, firstLogin, authIdentityId), Candidate/Client/Job (ownerUserId, createdById); seeded 4 built-in roles + 12 data scope rows + 5 cascade rules; TASK-065–072 complete |
+| 2026-05-02 | Stories 2.2 + 2.3 complete — Auth Service, MFA         | AuthService (login, refresh, logout×2, password-reset request+confirm), PasswordService (Argon2id hash/verify, complexity, history), MfaService (TOTP enrol, AES-256-GCM secret encryption, challenge-based verify, 10 single-use backup codes), RedisService (user_ver, rate-limit, challenge store); REST controller at `/auth/*`; deps: argon2, jsonwebtoken, ioredis, otplib; seed real Argon2id hash; TASK-073–081 complete                                                         |
 
 ---
 

@@ -4,6 +4,7 @@ import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { GraphQLModule } from "@nestjs/graphql";
 import { ApolloDriver, ApolloDriverConfig } from "@nestjs/apollo";
 import { JwtAuthGuard } from "./auth";
+import { AuthModule } from "./auth/auth.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { WaitlistModule } from "./waitlist/waitlist.module";
@@ -25,6 +26,7 @@ import { ActivityModule } from "./activity/activity.module";
     DataLoaderModule,
     HealthModule,
     WaitlistModule,
+    AuthModule,
     ActivityModule,
     UserModule,
   ],
