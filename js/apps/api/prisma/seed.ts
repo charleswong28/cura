@@ -123,7 +123,8 @@ async function main() {
   // --- AuthIdentities (first-party credentials for dev users) ---
   // Passwords are bcrypt/argon2 hashes — use "password" for dev login.
   // The hash below is argon2id("password") — do not use in production.
-  const devPasswordHash = "$argon2id$v=19$m=65536,t=3,p=4$devSeedHashPlaceholder";
+  const devPasswordHash =
+    "$argon2id$v=19$m=65536,t=3,p=4$o/FxOX+uhPgZpYu2R875nQ$7YRX4Ohv1qrRdFiGnI+/YtJik4aR9ovFfJb5ZnZPh18";
 
   const authAdmin = await prisma.authIdentity.upsert({
     where: { id: AUTH_IDENTITY_ADMIN_ID },
