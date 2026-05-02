@@ -18,9 +18,9 @@
 
 ### EPIC-002: Authentication & Multi-tenancy
 
-**Objective:** Clerk login/signup, org switching, route protection, JWT tenant context, role-based access
+**Objective:** First-party authn/authz — email + password login, JWT sessions, TOTP MFA, role-based functional permissions, row-level `Permission` model, team-based access, multi-tenancy via `Tenant` model, route protection
 **Priority:** P0 — security critical
-**Depends on:** Clerk account setup
+**Design Reference:** `docs/authn-authz-technical-plan.md`
 
 ### EPIC-003: Candidate Management
 
@@ -122,50 +122,105 @@
 
 ### EPIC-002: Authentication & Multi-tenancy
 
-#### Story 2.1: Clerk Backend Integration (BE)
+#### Story 2.1: Auth & Permission Database Schema (BE)
 
-- [x] **TASK-048:** Set up Clerk Organizations for multi-tenancy
-- [x] **TASK-049:** Configure JWT with tenant_id custom claims
-- [x] **TASK-050:** Implement ClerkAuthGuard for NestJS
-- [x] **TASK-052:** Test tenant data isolation
+> Prisma models for identity, sessions, MFA, roles, teams, permissions, and audit log.
+> Spec: `authn-authz-technical-plan.md §1, §3, §4, §5, §8`
 
-#### Story 2.2: Clerk Frontend Integration (FE)
+- [ ] **TASK-065:** Add `AuthIdentity`, `Session`, `MfaDevice`, `PasswordResetToken`, `PasswordHistory` models to Prisma schema
+- [ ] **TASK-066:** Add `Role`, `UserRole`, `RoleDataScope` models to Prisma schema (including `tenantId?` for custom tenant roles)
+- [ ] **TASK-067:** Add `Team` (self-referential, `TeamKind` enum, `shortId` auto-increment) and `TeamMember` (`LEAD | MEMBER` role) models to Prisma schema
+- [ ] **TASK-068:** Add `Permission`, `PermissionGrant`, `PermissionCascadeRule`, `PermissionInheritance`, `ShareToken` models to Prisma schema
+- [ ] **TASK-069:** Add `AuditLog` model to Prisma schema with required indexes
+- [ ] **TASK-070:** Run and verify migrations; update seed data
+- [ ] **TASK-071:** Seed built-in roles (`admin`, `senior_recruiter`, `recruiter`, `viewer`) with permission strings and `RoleDataScope` rows per §4.2 and §5.1
+- [ ] **TASK-072:** Seed built-in `PermissionCascadeRule` rows (`JobApplication→Candidate`, `JobApplication→Job`, `Offer→JobApplication`, `Interview→JobApplication`, `Client→Job`) per §5.4
 
-> Protect all CRM routes behind Clerk login. Show sign-in/sign-up pages for unauthenticated users.
+#### Story 2.2: Auth Service — Login, Sessions & Password Reset (BE)
 
-- [x] **WA-020:** Install `@clerk/nextjs` and configure `ClerkProvider` in root layout
-- [x] **WA-021:** Create sign-in page (`/sign-in/[[...sign-in]]/page.tsx`)
-- [x] **WA-022:** Create sign-up page (`/sign-up/[[...sign-up]]/page.tsx`)
-- [x] **WA-023:** Add `clerkMiddleware` in `middleware.ts` to protect `(app)` routes
-- [x] **WA-024:** Display user name + avatar in sidebar/topbar from Clerk session
+> Core authentication flows per `authn-authz-technical-plan.md §2`.
 
-#### Story 2.2.1: Clerk Webhook Sync (BE)
+- [ ] **TASK-073:** Implement `AuthService.login()` — Argon2id verify, account lockout (5 consecutive fails → `lockedUntil`), tenant resolution by `tenantSlug`, `loginable`/`deletedAt` check, `Session` insert, JWT sign (HS512, 15 min access token, 90-day refresh token)
+- [ ] **TASK-074:** Implement `POST /auth/refresh` — look up `Session` by `refreshTokenHash`, check `revokedAt`/`expiresAt`/`loginable`, rotate refresh token atomically, detect reuse (revoke all sessions on reuse), issue new JWT with latest `user_ver` from Redis
+- [ ] **TASK-075:** Implement `POST /auth/logout` and `POST /auth/logout-all` — set `Session.revokedAt`, `INCR user_ver:{userId}` in Redis
+- [ ] **TASK-076:** Implement `POST /auth/password-reset/request` — rate-limited (3 req/hr per email), ULID+random token, store hash in `PasswordResetToken`, send email magic link
+- [ ] **TASK-077:** Implement `POST /auth/password-reset/confirm` — verify token, `PasswordPolicy` validation, `PasswordHistory` check (cap at policy size), Argon2id hash, revoke all sessions, `INCR user_ver`
+- [ ] **TASK-078:** Implement `PasswordService` — Argon2id hash/verify, complexity rules, history enforcement
 
-> Provision Tenant and User records automatically when orgs/users are created or updated in Clerk.
+#### Story 2.3: MFA — TOTP & Backup Codes (BE)
 
-- [x] **TASK-057:** Install `svix` package for webhook signature verification
-- [x] **TASK-058:** Create `/webhooks/clerk` REST endpoint (WebhookController) with raw body parsing and Svix signature verification
-- [x] **TASK-059:** Handle `organization.created` event — create Tenant row with `clerkOrgId` + org name
-- [x] **TASK-060:** Handle `organization.updated` event — update Tenant name
-- [x] **TASK-061:** Handle `organizationMembership.created` event — create User row linked to Tenant (resolve clerkOrgId → tenantId, set email/name/role from Clerk)
-- [x] **TASK-062:** Handle `organizationMembership.deleted` event — delete User row
-- [x] **TASK-063:** Handle `user.updated` event — update User email/name
-- [x] **TASK-064:** Add `CLERK_WEBHOOK_SECRET` to `.env.example` and document Clerk Dashboard webhook setup
+> TOTP enrolment, verification, and backup codes per `authn-authz-technical-plan.md §2.2`.
 
-#### Story 2.3: Organization Switching (FE)
+- [ ] **TASK-079:** Implement `MfaService.enrol()` — generate TOTP secret, encrypt with AES-256-GCM (key from env), store in `MfaDevice.secretEncrypted`, return QR code URI
+- [ ] **TASK-080:** Implement `POST /auth/mfa/verify` — validate `mfaChallengeToken`, TOTP code check against decrypted secret, lock challenge after 3 fails, on success proceed to session creation
+- [ ] **TASK-081:** Implement backup codes — generate 10 codes, store as `argon2id(code)` hashes in `MfaDevice.backupCodesHashed`, delete matching hash on use (single-use)
 
-> Recruiters can switch between tenants (Clerk Organizations). Active org determines tenant context.
+#### Story 2.4: JWT Guards & Principal Hydration (BE)
 
-- [x] **WA-025:** Add Clerk `<OrganizationSwitcher>` to sidebar
-- [x] **WA-026:** Create organization setup page for first-time users (create or join org)
-- [x] **WA-027:** Ensure Apollo Client re-fetches data on org switch (cache clear + refetch)
+> `JwtAuthGuard` (APP_GUARD), Redis version check, team cache, DB-ETag permission cache per `authn-authz-technical-plan.md §9–10`.
 
-#### Story 2.4: User Management (BE)
+- [ ] **TASK-082:** Implement `JwtAuthGuard` — HS512 verify, Redis `GET user_ver:{sub}` version check (mismatch → `JWT_STALE` 401), resolve team shortIds → ULIDs, hydrate `permissions`, assemble `RequestUser` on `req.user`
+- [ ] **TASK-083:** Implement `TeamShortIdCache` — in-process permanent `Map<shortId, ULID>`, lazy DB load on miss (`SELECT id, short_id FROM teams WHERE short_id = ANY($1)`), never evicted
+- [ ] **TASK-084:** Implement `PermissionCacheService.getFunctionalPermissions()` — `SELECT MAX(GREATEST(ur.assigned_at, r.updated_at)) AS etag`, compare to in-process cache, full fetch only on ETag mismatch
+- [ ] **TASK-085:** Implement `FunctionalPermissionGuard` and `@RequirePermission('resource:action')` decorator
+- [ ] **TASK-086:** Implement `@Public()` and `@CurrentUser()` decorators; seed Redis `user_ver:{userId}` to `0` on first login (`SET NX`)
 
-- [ ] **TASK-053:** Create user profile management
-- [ ] **TASK-054:** Implement role-based permissions (admin, recruiter)
-- [ ] **TASK-055:** Add user invitation workflow
-- [ ] **TASK-056:** Create user activity tracking foundation
+#### Story 2.5: Permission Service — Row-Level Checks (BE)
+
+> `PermissionService` core methods, resolution algorithm, cascade rules, system auto-grants per `authn-authz-technical-plan.md §5`.
+
+- [ ] **TASK-087:** Implement `PermissionService.can()` — collect grantees (USER + TEAM ids + ROLE ids), `SELECT MAX(accessLevel)` query, TEAM-role adjustment (LEAD keeps granted level; MEMBER capped below OWNER), request-scoped LRU cache per `(userId, resourceType, resourceId)`
+- [ ] **TASK-088:** Implement `PermissionService.assertCan()` (throws `ForbiddenException`) and `effectiveLevel()` (returns `AccessLevel | null`)
+- [ ] **TASK-089:** Implement cascade rule resolution (Step 4 of algorithm) — check `PermissionCascadeRule` where `fromResourceType = resourceType`, recurse via `can()` on parent resource
+- [ ] **TASK-090:** Implement `PermissionService.grant()` and `revoke()` — upsert `Permission` row, append `PermissionGrant` audit row, `adjustLevel()` for upgrades/downgrades
+- [ ] **TASK-091:** Implement `getDataScope()` (resolve highest `DataScopeType` across user's roles) and `getExplicitlyGrantedIds()` (for list-query OR clause)
+- [ ] **TASK-092:** Implement system auto-grants on record creation — `Candidate` (OWNER to creator, VIEW to creator's teams), `Job` (OWNER to creator, EDIT to `ownerUserId`, VIEW to client BD owner), `Client` (OWNER to `bdUserId`), `JobApplication` (EDIT to `ownerUserId`) per §5.5
+
+#### Story 2.6: Team Service & Resolver (BE)
+
+> Team CRUD, hierarchy expansion, member management per `authn-authz-technical-plan.md §3`.
+
+- [ ] **TASK-093:** Implement `TeamService` — create/update/delete team; `expandTeamTree(teamIds)` via recursive CTE; `getMemberIds(teamIds)` via `SELECT user_id FROM team_members WHERE team_id = ANY($1)`
+- [ ] **TASK-094:** Implement `TeamResolver` — GraphQL queries (`teams`, `team`) and mutations (`createTeam`, `updateTeam`, `addTeamMember`, `removeTeamMember`)
+- [ ] **TASK-095:** Wire all team membership changes to `INCR user_ver:{userId}` in Redis (add member, remove member, change role)
+
+#### Story 2.7: User & Role Management (BE)
+
+> User invite, role assignment, deactivation, custom roles per `authn-authz-technical-plan.md §4`.
+
+- [ ] **TASK-096:** Implement user invite flow — create `AuthIdentity` + `User`, send email with temporary password link; `TASK-053` superseded
+- [ ] **TASK-097:** Implement `UserRole` assignment and removal — write DB row, `INCR user_ver:{userId}`; `TASK-054` superseded
+- [ ] **TASK-098:** Implement user deactivation — `User.loginable = false`, `Session.revokedAt = now` (all), `INCR user_ver`; `TASK-055` superseded
+- [ ] **TASK-099:** Implement tenant custom role CRUD — create/update `Role` with `tenantId` set; built-in roles (`tenantId = null`) are read-only
+- [ ] **TASK-100:** Add user activity tracking — `User.lastInactiveAt`, `User.firstLogin`; `TASK-056` superseded
+
+#### Story 2.8: Frontend — Login & Session Management (FE)
+
+> Replace Clerk with first-party auth pages and Apollo auth link.
+
+- [ ] **WA-080:** Create login page (`/login`) — email + password form, `POST /auth/login`, store `accessToken` in memory and `refreshToken` in httpOnly cookie
+- [ ] **WA-081:** Update Apollo auth link — inject `Authorization: Bearer <accessToken>`; intercept `JWT_STALE` (401 `code: 'JWT_STALE'`) → `POST /auth/refresh` → retry original request transparently
+- [ ] **WA-082:** Implement logout — `POST /auth/logout`, clear tokens, redirect to `/login`; add logout button to sidebar/topbar
+- [ ] **WA-083:** Update `middleware.ts` — protect `(app)` routes by checking access token cookie/presence (remove Clerk dependency)
+- [ ] **WA-084:** Display user name + avatar in sidebar/topbar from `me` GraphQL query (replaces Clerk session); `WA-020`–`WA-024` superseded
+- [ ] **WA-085:** Handle MFA challenge screen — after login, if `mfaRequired: true`, prompt TOTP code before proceeding
+
+#### Story 2.9: Frontend — MFA Enrolment & Password Reset (FE)
+
+> TOTP enrolment flow and password reset pages.
+
+- [ ] **WA-086:** Create MFA enrolment page — display QR code URI as scannable image, confirm a TOTP code to activate enrolment
+- [ ] **WA-087:** Display backup codes after enrolment with one-time download prompt (plaintext list)
+- [ ] **WA-088:** Create forgot-password page (`/forgot-password`) — email input, submit to `POST /auth/password-reset/request`, show confirmation message
+- [ ] **WA-089:** Create reset-password page (`/reset-password?token=...`) — new password + confirm form, submit to `POST /auth/password-reset/confirm`, redirect to login on success
+
+#### Story 2.10: Multi-tenancy & Org Switching (FE)
+
+> Tenant context in JWT; UI for switching tenants (replaces Clerk `<OrganizationSwitcher>`).
+
+- [ ] **WA-090:** Build tenant switcher UI — list user's tenants (from `me` query), selecting one re-issues JWT via `POST /auth/login` with `tenantSlug`; `WA-025` superseded
+- [ ] **WA-091:** On tenant switch, clear Apollo cache and re-fetch with new `accessToken`; `WA-027` superseded
+- [ ] **WA-092:** Create org setup / first-login page — prompt user to create or join a tenant after first successful login; `WA-026` superseded
 
 ---
 
@@ -352,17 +407,29 @@
 - Story 1.7 (Apollo Client Setup) ✅
 - Story 1.8 (GraphQL Codegen) ✅
 
-### Sprint 2: Database, API Foundation & Auth
+### Sprint 2: Database, API Foundation & Auth Core (BE)
 
-**Goal:** Migrations, seed data, API foundation, Clerk auth on both ends
+**Goal:** Migrations, API foundation, first-party auth service (login, sessions, password reset, MFA)
 
 - Story 1.2 (Database Schema Foundation)
 - Story 1.3 (API Foundation)
-- Story 2.1 (Clerk Backend Integration)
-- Story 2.2 (Clerk Frontend Integration)
-- Story 2.3 (Organization Switching)
+- Story 2.1 (Auth & Permission Database Schema)
+- Story 2.2 (Auth Service — Login, Sessions & Password Reset)
+- Story 2.3 (MFA — TOTP & Backup Codes)
 
-### Sprint 3: Candidate Management
+### Sprint 3: Auth Guards, Permissions, Teams & Frontend Auth
+
+**Goal:** Guards wired, row-level permissions live, frontend login replacing Clerk
+
+- Story 2.4 (JWT Guards & Principal Hydration)
+- Story 2.5 (Permission Service — Row-Level Checks)
+- Story 2.6 (Team Service & Resolver)
+- Story 2.7 (User & Role Management)
+- Story 2.8 (Frontend — Login & Session Management)
+- Story 2.9 (Frontend — MFA Enrolment & Password Reset)
+- Story 2.10 (Multi-tenancy & Org Switching)
+
+### Sprint 4: Candidate Management
 
 **Goal:** Full candidate CRUD — backend API + frontend UI
 
@@ -371,7 +438,7 @@
 - Story 3.4 (Candidate List Page)
 - Story 3.6 (Candidate Create & Edit)
 
-### Sprint 4: Candidate Polish + Client Management
+### Sprint 5: Candidate Polish + Client Management
 
 **Goal:** Candidate search/filter/delete, client CRUD
 
@@ -383,9 +450,9 @@
 - Story 4.3 (Client List Page)
 - Story 4.4 (Client Create & Edit)
 
-### Sprint 5: Job Management + Polish
+### Sprint 6: Job Management + Polish
 
-**Goal:** Job CRUD, client delete, dashboard, command palette
+**Goal:** Job CRUD, client delete
 
 - Story 4.5 (Client Delete)
 - Story 5.1 (Job API — CRUD)
@@ -394,11 +461,10 @@
 - Story 5.4 (Job Create & Edit)
 - Story 5.5 (Job Delete & Status)
 
-### Sprint 6: Dashboard, User Management & Polish
+### Sprint 7: Dashboard & Command Palette
 
-**Goal:** Dashboard, command palette, user management, bug fixes
+**Goal:** Dashboard, command palette, bug fixes
 
-- Story 2.4 (User Management)
 - Story 6.1 (Dashboard Page)
 - Story 6.2 (Command Palette)
 
@@ -409,13 +475,15 @@
 ### Completion Status
 
 - **EPICs:** 0/6 Complete
-- **Stories:** 11/28 Complete
-- **Tasks:** 52/129 Complete (25 BE + 27 FE)
+- **Stories:** 8/34 Complete
+- **Tasks:** 27/165 Complete (0 BE + 27 FE)
+
+> Note: Sprint 1 FE stories remain complete. Clerk BE/FE work (Stories 2.1–2.3 old, TASK-048–064, WA-020–027) is superseded by the first-party auth plan. Task counts reset for EPIC-002 BE work.
 
 ### Current Sprint
 
 **Sprint:** Sprint 2
-**Active Stories:** Story 2.1 ✅, Story 2.2 ✅, Story 2.2.1 ✅, Story 2.3 ✅, Story 2.4 (next)
+**Active Stories:** Story 2.1 (Auth & Permission Database Schema) — in progress
 **Blocked Items:** None
 
 ---
@@ -455,6 +523,7 @@
 | 2026-02-22 | Initial backend project breakdown           | 5 EPICs, 11 Stories, 56 Tasks  |
 | 2026-03-15 | Web-app frontend task breakdown             | 7 EPICs, 17 Stories, 79 Tasks  |
 | 2026-03-15 | Merged backend + frontend into unified plan | 6 EPICs, 27 Stories, 121 Tasks |
+| 2026-05-02 | Replaced Clerk with first-party auth system | EPIC-002 rewritten: 10 stories (2.1–2.10), 36 new tasks (TASK-065–100, WA-080–092); Clerk stories/tasks superseded; Sprint 3 added for auth guards + FE auth; sprints renumbered 2–7; story count 34, task count 165 |
 
 ---
 
