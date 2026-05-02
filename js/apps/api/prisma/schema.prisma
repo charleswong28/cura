@@ -103,6 +103,38 @@ enum GrantAction {
 }
 
 // ---------------------------------------------------------------------------
+// CRM Pipeline Enums
+// ---------------------------------------------------------------------------
+
+enum ApplicationStageType {
+  APPLIED
+  LONGLIST
+  CV_SENT
+  INTERVIEW
+  OFFER
+  PLACEMENT
+  REJECTED
+}
+
+enum LanguageProficiency {
+  BASIC
+  CONVERSATIONAL
+  PROFESSIONAL
+  NATIVE
+}
+
+enum FeeType {
+  FLAT
+  PERCENTAGE
+}
+
+enum MigrationStatus {
+  ACTIVE    // crons running, Cura domain mutations are read-only
+  CUTOVER   // cutover completed, Cura is fully writable
+  DISABLED  // migration module disabled
+}
+
+// ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
 
@@ -479,13 +511,19 @@ model Candidate {
   location       String?
   status         CandidateStatus @default(ACTIVE)
   notes          String?
-  lastUpdatedBy  String?         @map("last_updated_by")
+  updatedById    String?         @map("updated_by_id")
+  deletedAt      DateTime?       @map("deleted_at")
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
 
+  experiences  CandidateExperience[]
+  educations   CandidateEducation[]
+  languages    CandidateLanguage[]
+  applications JobApplication[]
+
   // email uniqueness is per-tenant; NULLs are intentionally allowed
   @@unique([tenantId, email])
-  @@index([tenantId])
+  @@index([tenantId, deletedAt])
   @@map("candidates")
 }
 
@@ -503,13 +541,22 @@ model Client {
   website     String?
   phone       String?
   address     String?
-  status      ClientStatus @default(PROSPECT)
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  parentId        String?      @map("parent_id")
+  parent          Client?      @relation("ClientHierarchy", fields: [parentId], references: [id])
+  children        Client[]     @relation("ClientHierarchy")
+  status          ClientStatus @default(PROSPECT)
+  activeJobCount  Int          @default(0) @map("active_job_count")
+  totalJobCount   Int          @default(0) @map("total_job_count")
+  deletedAt       DateTime?    @map("deleted_at")
+  updatedById     String?      @map("updated_by_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
 
-  jobs Job[]
+  jobs     Job[]
+  contacts ClientContact[]
 
-  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, bdUserId])
   @@map("clients")
 }
 
@@ -525,17 +572,270 @@ model Job {
   createdById  String?     @map("created_by_id")
   createdBy    User?       @relation("JobCreator", fields: [createdById], references: [id])
   title        String
-  description  String?
-  status       JobStatus   @default(OPEN)
-  priority     JobPriority @default(MEDIUM)
-  assignedToId String?     @map("assigned_to_id")
-  assignedTo   User?       @relation("JobAssignee", fields: [assignedToId], references: [id])
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  description      String?
+  status           JobStatus   @default(OPEN)
+  priority         JobPriority @default(MEDIUM)
+  assignedToId     String?     @map("assigned_to_id")
+  assignedTo       User?       @relation("JobAssignee", fields: [assignedToId], references: [id])
+  openDate         DateTime?   @map("open_date")
+  closeDate        DateTime?   @map("close_date")
+  applicationCount Int         @default(0) @map("application_count")
+  interviewCount   Int         @default(0) @map("interview_count")
+  offerCount       Int         @default(0) @map("offer_count")
+  placementCount   Int         @default(0) @map("placement_count")
+  deletedAt        DateTime?   @map("deleted_at")
+  updatedById      String?     @map("updated_by_id")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
-  @@index([tenantId])
-  @@index([clientId])
+  applications JobApplication[]
+
+  @@index([tenantId, status, deletedAt])
+  @@index([tenantId, clientId])
+  @@index([tenantId, ownerUserId])
   @@map("jobs")
+}
+
+// ---------------------------------------------------------------------------
+// CRM — Client Contacts
+// ---------------------------------------------------------------------------
+
+/// HR contacts at a client company. Distinct from Candidate (avoids Gllue's type-discriminator collapse).
+model ClientContact {
+  id          String    @id
+  tenantId    String    @map("tenant_id")
+  clientId    String    @map("client_id")
+  client      Client    @relation(fields: [clientId], references: [id])
+  ownerUserId String?   @map("owner_user_id")
+  createdById String?   @map("created_by_id")
+  firstName   String    @map("first_name")
+  lastName    String    @map("last_name")
+  title       String?
+  email       String?
+  phone       String?
+  isPrimary   Boolean   @default(false) @map("is_primary")
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, clientId])
+  @@map("client_contacts")
+}
+
+// ---------------------------------------------------------------------------
+// CRM — Candidate Resume Sub-Records
+// ---------------------------------------------------------------------------
+
+model CandidateExperience {
+  id           String    @id
+  tenantId     String    @map("tenant_id")
+  candidateId  String    @map("candidate_id")
+  candidate    Candidate @relation(fields: [candidateId], references: [id])
+  company      String
+  title        String
+  location     String?
+  startDate    DateTime? @map("start_date")
+  endDate      DateTime? @map("end_date")
+  isCurrent    Boolean   @default(false) @map("is_current")
+  description  String?
+  displayOrder Int       @default(0) @map("display_order")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, candidateId])
+  @@map("candidate_experiences")
+}
+
+model CandidateEducation {
+  id           String    @id
+  tenantId     String    @map("tenant_id")
+  candidateId  String    @map("candidate_id")
+  candidate    Candidate @relation(fields: [candidateId], references: [id])
+  institution  String
+  degree       String?
+  field        String?
+  startDate    DateTime? @map("start_date")
+  endDate      DateTime? @map("end_date")
+  displayOrder Int       @default(0) @map("display_order")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, candidateId])
+  @@map("candidate_educations")
+}
+
+model CandidateLanguage {
+  id          String              @id
+  tenantId    String              @map("tenant_id")
+  candidateId String              @map("candidate_id")
+  candidate   Candidate           @relation(fields: [candidateId], references: [id])
+  language    String              // ISO 639-1: 'en', 'zh', 'fr', ...
+  proficiency LanguageProficiency
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  @@unique([tenantId, candidateId, language])
+  @@index([tenantId, candidateId])
+  @@map("candidate_languages")
+}
+
+// ---------------------------------------------------------------------------
+// CRM — Pipeline: Spine + Stage Tables
+// ---------------------------------------------------------------------------
+
+/// The pipeline spine — one row per (Candidate × Job).
+/// Stage transitions live in ApplicationStage rows; this row caches the highest stage reached.
+model JobApplication {
+  id          String               @id
+  tenantId    String               @map("tenant_id")
+  candidateId String               @map("candidate_id")
+  candidate   Candidate            @relation(fields: [candidateId], references: [id])
+  jobId       String               @map("job_id")
+  job         Job                  @relation(fields: [jobId], references: [id])
+  source      String?              // 'manual' | 'linkedin' | 'portal' | 'referral'
+  ownerUserId String?              @map("owner_user_id")
+  maxStage    ApplicationStageType @default(APPLIED) @map("max_stage")
+  isActive    Boolean              @default(true) @map("is_active")
+  matchScore  Decimal?             @db.Decimal(5, 2) @map("match_score")
+  deletedAt   DateTime?            @map("deleted_at")
+  createdById String?              @map("created_by_id")
+  updatedById String?              @map("updated_by_id")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  stages     ApplicationStage[]
+  interviews Interview[]
+  offers     Offer[]
+  placements Placement[]
+
+  @@unique([tenantId, candidateId, jobId])
+  @@index([tenantId, jobId, isActive])
+  @@index([tenantId, maxStage])
+  @@map("job_applications")
+}
+
+/// Append-only typed event log. One row per stage transition. Never update rows.
+model ApplicationStage {
+  id            String               @id
+  tenantId      String               @map("tenant_id")
+  applicationId String               @map("application_id")
+  application   JobApplication       @relation(fields: [applicationId], references: [id])
+  stage         ApplicationStageType
+  enteredAt     DateTime             @default(now()) @map("entered_at")
+  enteredById   String               @map("entered_by_id")
+  note          String?
+
+  @@index([tenantId, applicationId, enteredAt])
+  @@map("application_stages")
+}
+
+model Interview {
+  id                String         @id
+  tenantId          String         @map("tenant_id")
+  applicationId     String         @map("application_id")
+  application       JobApplication @relation(fields: [applicationId], references: [id])
+  round             Int
+  scheduledAt       DateTime       @map("scheduled_at")
+  completedAt       DateTime?      @map("completed_at")
+  interviewerUserId String?        @map("interviewer_user_id")
+  feedback          String?
+  rating            Int?           // 1–5
+  createdById       String         @map("created_by_id")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  @@index([tenantId, applicationId])
+  @@map("interviews")
+}
+
+model Offer {
+  id            String         @id
+  tenantId      String         @map("tenant_id")
+  applicationId String         @map("application_id")
+  application   JobApplication @relation(fields: [applicationId], references: [id])
+  amount        Decimal?       @db.Decimal(15, 2)
+  currency      String?        @default("USD")
+  signedAt      DateTime?      @map("signed_at")
+  startDate     DateTime?      @map("start_date")
+  declinedAt    DateTime?      @map("declined_at")
+  declineReason String?        @map("decline_reason")
+  createdById   String         @map("created_by_id")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([tenantId, applicationId])
+  @@map("offers")
+}
+
+model Placement {
+  id            String         @id
+  tenantId      String         @map("tenant_id")
+  applicationId String         @map("application_id")
+  application   JobApplication @relation(fields: [applicationId], references: [id])
+  startDate     DateTime?      @map("start_date")
+  endDate       DateTime?      @map("end_date")
+  salary        Decimal?       @db.Decimal(15, 2)
+  currency      String?        @default("USD")
+  fee           Decimal?       @db.Decimal(15, 2)
+  feeType       FeeType?       @map("fee_type")
+  notes         String?
+  createdById   String         @map("created_by_id")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([tenantId, applicationId])
+  @@map("placements")
+}
+
+// ---------------------------------------------------------------------------
+// Gllue → Cura Migration Models
+// ---------------------------------------------------------------------------
+
+/// Idempotency map: every migrated Gllue record → Cura ULID.
+/// On re-run: check here first; only create/update if missing or checksum changed.
+model MigrationMapping {
+  id          String   @id
+  tenantId    String   @map("tenant_id")
+  sourceTable String   @map("source_table") // Gllue table name: 'candidate', 'client', 'joborder', ...
+  sourceId    String   @map("source_id")    // Gllue integer PK coerced to string
+  targetModel String   @map("target_model") // Cura model name: 'Candidate', 'Client', 'Job', ...
+  targetId    String   @map("target_id")    // Cura ULID
+  checksum    String?                        // MD5 of serialized source row for change detection
+  migratedAt  DateTime @default(now()) @map("migrated_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([sourceTable, sourceId, tenantId])
+  @@index([targetModel, targetId])
+  @@map("migration_mappings")
+}
+
+/// Per-table sync cursor. Tracks last successful sync time for incremental delta queries.
+model MigrationSyncCursor {
+  id              String   @id
+  tenantId        String   @map("tenant_id")
+  sourceTable     String   @map("source_table")
+  lastSyncAt      DateTime @default(dbgenerated("'1970-01-01 00:00:00+00'")) @map("last_sync_at")
+  lastProcessedId BigInt?  @map("last_processed_id")
+  errorCount      Int      @default(0) @map("error_count")
+  lastError       String?  @map("last_error")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, sourceTable])
+  @@map("migration_sync_cursors")
+}
+
+/// Per-tenant migration state: controls read-only enforcement and cutover.
+model MigrationConfig {
+  id              String          @id
+  tenantId        String          @unique @map("tenant_id")
+  gllueSchemaName String?         @map("gllue_schema_name")
+  status          MigrationStatus @default(ACTIVE)
+  readOnly        Boolean         @default(true) @map("read_only")
+  syncEnabled     Boolean         @default(true) @map("sync_enabled")
+  cutoverDate     DateTime?       @map("cutover_date")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@map("migration_configs")
 }
 
 /// Marketing waitlist — email sign-ups captured from the home page.

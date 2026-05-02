@@ -27,11 +27,26 @@ export class ClientModel {
   @Field(() => ClientStatus)
   status!: ClientStatus;
 
+  @Field(() => String, { nullable: true })
+  bdUserId!: string | null;
+
+  @Field(() => String, { nullable: true })
+  parentId!: string | null;
+
+  @Field(() => Number)
+  activeJobCount!: number;
+
+  @Field(() => Number)
+  totalJobCount!: number;
+
+  @Field(() => Date, { nullable: true })
+  deletedAt!: Date | null;
+
   @Field(() => Date)
   createdAt!: Date;
 
   @Field(() => Date)
   updatedAt!: Date;
 
-  // jobs: resolved via @ResolveField in ClientResolver using DataLoader
+  // jobs, contacts: resolved via @ResolveField in ClientResolver using DataLoader
 }
