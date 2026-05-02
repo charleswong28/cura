@@ -48,7 +48,7 @@ export class UserService {
     const db = this.prisma.forTenant(tenantId);
     return db.user.update({
       where: { id: user.id },
-      data: { role },
+      data: { legacyRole: role },
     });
   }
 }

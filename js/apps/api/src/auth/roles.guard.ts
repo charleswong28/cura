@@ -46,7 +46,7 @@ export class RolesGuard implements CanActivate {
     const db = this.prisma.forTenant(authUser.tenantId);
     const dbUser = await db.user.findFirst({
       where: { clerkUserId: authUser.clerkUserId },
-      select: { id: true, role: true },
+      select: { id: true, legacyRole: true },
     });
 
     if (!dbUser) {
@@ -56,7 +56,7 @@ export class RolesGuard implements CanActivate {
     // Attach dbUser to request for downstream reuse
     req.dbUser = dbUser;
 
-    if (!requiredRoles.includes(dbUser.role as UserRole)) {
+    if (!requiredRoles.includes(dbUser.legacyRole as unknown as UserRole)) {
       throw new ForbiddenException("Insufficient permissions");
     }
 

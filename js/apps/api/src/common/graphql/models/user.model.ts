@@ -18,8 +18,8 @@ export class UserModel {
   @Field(() => String)
   lastName!: string;
 
-  @Field(() => UserRole)
-  role!: UserRole;
+  @Field(() => UserRole, { nullable: true })
+  legacyRole?: UserRole | null;
 
   @Field(() => Date)
   createdAt!: Date;

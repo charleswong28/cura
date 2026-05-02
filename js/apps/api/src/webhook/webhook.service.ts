@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { generateId } from "../common/ulid";
-import { UserRole } from "../generated/prisma/client";
+import { OldUserRole } from "../generated/prisma/client";
 
 @Injectable()
 export class WebhookService {
@@ -13,12 +13,15 @@ export class WebhookService {
   async handleOrganizationCreated(data: { id: string; name: string }): Promise<void> {
     this.logger.log(`Creating tenant for Clerk org ${data.id}`);
 
+    // Derive a URL-safe slug from the Clerk org ID (fallback until first-party slug is set)
+    const slug = data.id.toLowerCase().replace(/[^a-z0-9]/g, "-");
     await this.prisma.tenant.upsert({
       where: { clerkOrgId: data.id },
       update: { name: data.name },
       create: {
         id: generateId(),
         clerkOrgId: data.id,
+        slug,
         name: data.name,
       },
     });
@@ -61,7 +64,7 @@ export class WebhookService {
       return;
     }
 
-    const role = data.role === "org:admin" ? UserRole.ADMIN : UserRole.RECRUITER;
+    const role = data.role === "org:admin" ? OldUserRole.ADMIN : OldUserRole.RECRUITER;
     const email = data.public_user_data.identifier;
     const firstName = data.public_user_data.first_name ?? "";
     const lastName = data.public_user_data.last_name ?? "";
@@ -72,7 +75,7 @@ export class WebhookService {
         email,
         firstName,
         lastName,
-        role,
+        legacyRole: role,
       },
       create: {
         id: generateId(),
@@ -81,7 +84,7 @@ export class WebhookService {
         email,
         firstName,
         lastName,
-        role,
+        legacyRole: role,
       },
     });
   }
