@@ -60,7 +60,7 @@ export class MfaService {
     private readonly redis: RedisService
   ) {}
 
-  // ── TASK-079: Enrolment ───────────────────────────────────────────────────
+  // ── Enrolment ───────────────────────────────────────────────────────────
 
   /** Step 1 of enrolment: generate a TOTP secret, return the otpauth URI. */
   async startEnrol(
@@ -83,7 +83,7 @@ export class MfaService {
 
   /**
    * Step 2 of enrolment: confirm a valid TOTP code, persist MfaDevice, return one-time backup codes.
-   * TASK-081: Generates 10 single-use backup codes stored as argon2id hashes.
+   * Generates 10 single-use backup codes stored as argon2id hashes.
    */
   async confirmEnrol(authIdentityId: string, totpCode: string): Promise<string[]> {
     const pending = await this.redis.getChallenge<EnrolPendingData>(`enrol:${authIdentityId}`);
@@ -121,7 +121,7 @@ export class MfaService {
     return backupCodes;
   }
 
-  // ── TASK-080: Challenge flow ─────────────────────────────────────────────
+  // ── Challenge flow ─────────────────────────────────────────────────────
 
   /** Creates a short-lived MFA challenge token after password verification. TTL: 5 min. */
   async createChallengeToken(authIdentityId: string, tenantSlug?: string): Promise<string> {
@@ -141,7 +141,7 @@ export class MfaService {
   /**
    * Verifies a TOTP code or backup code against the challenge token.
    * Locks after 3 failed attempts. Returns authIdentityId on success.
-   * TASK-081: Deletes the matching backup code hash on use.
+   * Deletes the matching backup code hash on use.
    */
   async verifyChallenge(challengeToken: string, code: string): Promise<string> {
     const challenge = await this.redis.getChallenge<MfaChallengeData>(challengeToken);
@@ -169,7 +169,7 @@ export class MfaService {
       return challenge.authIdentityId;
     }
 
-    // Try backup codes (TASK-081: single-use — delete the matching hash)
+    // Try backup codes (single-use — delete the matching hash)
     for (const hash of device.backupCodesHashed) {
       if (await argon2.verify(hash, code)) {
         const remaining = device.backupCodesHashed.filter((h) => h !== hash);

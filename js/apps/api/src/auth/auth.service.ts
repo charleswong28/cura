@@ -129,7 +129,7 @@ export class AuthService {
     return this.createSession(identity.id, user, ip, userAgent);
   }
 
-  // ── TASK-074: Refresh ────────────────────────────────────────────────────────
+  // ── Refresh ───────────────────────────────────────────────────────────────
 
   async refresh(rawRefreshToken: string, ip?: string): Promise<SessionResult> {
     const tokenHash = hashToken(rawRefreshToken);
@@ -186,7 +186,7 @@ export class AuthService {
     };
   }
 
-  // ── TASK-075: Logout ─────────────────────────────────────────────────────────
+  // ── Logout ────────────────────────────────────────────────────────────────
 
   /** Revokes the session identified by the raw refresh token. */
   async logout(rawRefreshToken: string): Promise<void> {
@@ -216,7 +216,7 @@ export class AuthService {
     await this.redis.incrUserVer(session.userId);
   }
 
-  // ── TASK-076: Password Reset Request ────────────────────────────────────────
+  // ── Password Reset Request ─────────────────────────────────────────────────
 
   async requestPasswordReset(email: string): Promise<void> {
     const count = await this.redis.incrementRateLimit(`pw_reset:${email}`);
@@ -244,7 +244,7 @@ export class AuthService {
     console.log(`[PasswordReset] Reset link for ${email}: ${resetUrl}`);
   }
 
-  // ── TASK-077: Password Reset Confirm ────────────────────────────────────────
+  // ── Password Reset Confirm ─────────────────────────────────────────────────
 
   async confirmPasswordReset(rawToken: string, newPassword: string): Promise<void> {
     const tokenHash = hashToken(rawToken);
@@ -339,7 +339,7 @@ export class AuthService {
       },
     });
 
-    // TASK-086: SET NX — init user_ver to 0 on very first login
+    // SET NX — init user_ver to 0 on very first login
     await this.redis.initUserVer(user.id);
 
     // Track first login timestamp (only if not already set)
