@@ -25,7 +25,31 @@ export class JobModel {
   priority!: JobPriority;
 
   @Field(() => String, { nullable: true })
+  ownerUserId!: string | null;
+
+  @Field(() => String, { nullable: true })
   assignedToId!: string | null;
+
+  @Field(() => Date, { nullable: true })
+  openDate!: Date | null;
+
+  @Field(() => Date, { nullable: true })
+  closeDate!: Date | null;
+
+  @Field(() => Number)
+  applicationCount!: number;
+
+  @Field(() => Number)
+  interviewCount!: number;
+
+  @Field(() => Number)
+  offerCount!: number;
+
+  @Field(() => Number)
+  placementCount!: number;
+
+  @Field(() => Date, { nullable: true })
+  deletedAt!: Date | null;
 
   @Field(() => Date)
   createdAt!: Date;
@@ -33,6 +57,5 @@ export class JobModel {
   @Field(() => Date)
   updatedAt!: Date;
 
-  // client: resolved via @ResolveField in JobResolver using DataLoader
-  // assignedTo: resolved via @ResolveField in JobResolver using DataLoader
+  // client, applications: resolved via @ResolveField in JobResolver using DataLoader
 }

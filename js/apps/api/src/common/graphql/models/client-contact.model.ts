@@ -1,13 +1,15 @@
 import { ObjectType, Field, ID } from "@nestjs/graphql";
-import { CandidateStatus } from "../enums";
 
 @ObjectType()
-export class CandidateModel {
+export class ClientContactModel {
   @Field(() => ID)
   id!: string;
 
   @Field(() => String)
   tenantId!: string;
+
+  @Field(() => String)
+  clientId!: string;
 
   @Field(() => String)
   firstName!: string;
@@ -16,25 +18,16 @@ export class CandidateModel {
   lastName!: string;
 
   @Field(() => String, { nullable: true })
+  title!: string | null;
+
+  @Field(() => String, { nullable: true })
   email!: string | null;
 
   @Field(() => String, { nullable: true })
   phone!: string | null;
 
-  @Field(() => String, { nullable: true })
-  currentCompany!: string | null;
-
-  @Field(() => String, { nullable: true })
-  currentTitle!: string | null;
-
-  @Field(() => String, { nullable: true })
-  location!: string | null;
-
-  @Field(() => CandidateStatus)
-  status!: CandidateStatus;
-
-  @Field(() => String, { nullable: true })
-  notes!: string | null;
+  @Field(() => Boolean)
+  isPrimary!: boolean;
 
   @Field(() => String, { nullable: true })
   ownerUserId!: string | null;
@@ -47,6 +40,4 @@ export class CandidateModel {
 
   @Field(() => Date)
   updatedAt!: Date;
-
-  // experiences, educations, languages, applications: resolved via @ResolveField
 }

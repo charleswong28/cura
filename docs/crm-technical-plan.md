@@ -607,6 +607,8 @@ model Offer {
 }
 ```
 
+> **Extended schema:** The Prisma schemas above are the baseline. Full production definitions — including `ClientContact`, resume sub-records (`CandidateExperience`, `CandidateEducation`, `CandidateLanguage`), `JobApplication` spine, `ApplicationStage`, `Interview`, `Offer`, `Placement`, and migration support models (`MigrationMapping`, `MigrationSyncCursor`, `MigrationConfig`) — are in `@docs/crm-core-technical-plan.md §1`.
+
 ### 3.6 Cross-cutting conventions (adopted from Gllue research §8)
 
 Every domain model carries:
@@ -949,3 +951,32 @@ ClientRevenueMonthly     (month, clientId, jobsOpen, placements, expectedRevenue
 **Decision:** Shared GraphQL ObjectType models in `src/common/graphql/models/` with registered enums in `src/common/graphql/enums.ts`.
 
 **Pattern:** Models declare scalar fields only. Relationship fields (Client→Jobs, Job→Client, Job→AssignedTo) are resolved via `@ResolveField()` in their respective resolvers using DataLoaders, avoiding circular imports and N+1 queries.
+
+---
+
+## 10. Gllue Migration (Parallel-Run Period)
+
+> **Full design:** `@docs/crm-core-technical-plan.md §3`
+
+During the parallel-run period, Cura mirrors Gllue data via one-directional cron sync. Summary of key decisions:
+
+| Concern | Decision |
+|---------|---------|
+| Source connection | `mysql2/promise` pool reading a Gllue MySQL read replica (`GLLUE_MYSQL_URL`) |
+| Sync strategy | Cursor-based incremental delta on `lastUpdateDate` / `dateAdded`; 500 rows per batch |
+| Idempotency | `MigrationMapping` table: `(sourceTable, sourceId, tenantId)` → Cura ULID + checksum |
+| Cron runner | `@nestjs/schedule` `@Cron` decorators in existing API process (no new infra) |
+| Read-only enforcement | `MigrationReadOnlyGuard` on all domain mutations; checks `MigrationConfig.readOnly` cached in Redis |
+| Cutover | Manual admin call to `MigrationService.initiateCutover(tenantId)` — runs final sync, flips `readOnly = false`, writes `AuditLog` |
+| Nightly reconciliation | Row-count comparison across all tables; alerts on drift |
+
+**Cron schedule:**
+
+| Cron | Gllue tables | Frequency |
+|------|-------------|-----------|
+| Identity | `baseuser`, `user`, `team*` | Daily 02:00 |
+| Clients | `client`, `clientcontact` | Every 30 min |
+| Candidates | `candidate`, `candidateexperience`, `candidateeducation`, `candidatelanguage` | Every 15 min |
+| Jobs | `joborder` | Every 30 min |
+| Applications | `jobsubmission`, `apply`, `cvsent`, `clientinterview`, `offersign`, `onboard` | Every 15 min |
+| Reconciliation | all | Daily 06:00 |

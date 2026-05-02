@@ -12,6 +12,11 @@ import { DataLoaderModule } from "./dataloader";
 import { GraphqlExceptionFilter } from "./common/filters";
 import { UserModule } from "./user/user.module";
 import { ActivityModule } from "./activity/activity.module";
+import { CandidateModule } from "./candidate/candidate.module";
+import { ClientModule } from "./client/client.module";
+import { JobModule } from "./job/job.module";
+import { JobApplicationModule } from "./job-application/job-application.module";
+import { MigrationModule } from "./migration/migration.module";
 
 @Module({
   imports: [
@@ -29,6 +34,11 @@ import { ActivityModule } from "./activity/activity.module";
     AuthModule,
     ActivityModule,
     UserModule,
+    CandidateModule,
+    ClientModule,
+    JobModule,
+    JobApplicationModule,
+    MigrationModule,
   ],
   providers: [
     {

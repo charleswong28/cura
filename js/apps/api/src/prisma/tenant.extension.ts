@@ -4,7 +4,27 @@ import { Prisma } from "../generated/prisma/client";
  * Models that carry a tenantId column.
  * Tenant itself is the root entity — it IS the tenant, so it is never scoped.
  */
-export const TENANT_SCOPED_MODELS = new Set(["User", "Candidate", "Client", "Job", "ActivityLog"]);
+export const TENANT_SCOPED_MODELS = new Set([
+  "User",
+  "Candidate",
+  "CandidateExperience",
+  "CandidateEducation",
+  "CandidateLanguage",
+  "Client",
+  "ClientContact",
+  "Job",
+  "JobApplication",
+  "ApplicationStage",
+  "Interview",
+  "Offer",
+  "Placement",
+  "Permission",
+  "PermissionGrant",
+  "ShareToken",
+  "AuditLog",
+  "Team",
+  "ActivityLog",
+]);
 
 const READ_OPS = new Set([
   "findMany",

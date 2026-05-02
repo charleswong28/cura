@@ -41,3 +41,28 @@ export enum ActivityAction {
   USER_INVITATION_REVOKED = "USER_INVITATION_REVOKED",
 }
 registerEnumType(ActivityAction, { name: "ActivityAction" });
+
+export enum ApplicationStageType {
+  APPLIED = "APPLIED",
+  LONGLIST = "LONGLIST",
+  CV_SENT = "CV_SENT",
+  INTERVIEW = "INTERVIEW",
+  OFFER = "OFFER",
+  PLACEMENT = "PLACEMENT",
+  REJECTED = "REJECTED",
+}
+registerEnumType(ApplicationStageType, { name: "ApplicationStageType" });
+
+export enum LanguageProficiency {
+  BASIC = "BASIC",
+  CONVERSATIONAL = "CONVERSATIONAL",
+  PROFESSIONAL = "PROFESSIONAL",
+  NATIVE = "NATIVE",
+}
+registerEnumType(LanguageProficiency, { name: "LanguageProficiency" });
+
+export enum FeeType {
+  FLAT = "FLAT",
+  PERCENTAGE = "PERCENTAGE",
+}
+registerEnumType(FeeType, { name: "FeeType" });
