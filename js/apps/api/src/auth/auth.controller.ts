@@ -18,7 +18,7 @@ export class AuthController {
     private readonly mfaService: MfaService
   ) {}
 
-  /** TASK-073: Login — returns session tokens or an MFA challenge. */
+  /** Login — returns session tokens or an MFA challenge. */
   @Post("login")
   @Public()
   async login(@Body() dto: LoginDto, @Req() req: Request) {
@@ -31,14 +31,14 @@ export class AuthController {
     );
   }
 
-  /** TASK-074: Refresh — rotates the refresh token and issues a new access token. */
+  /** Refresh — rotates the refresh token and issues a new access token. */
   @Post("refresh")
   @Public()
   async refresh(@Body() dto: RefreshDto, @Req() req: Request) {
     return this.authService.refresh(dto.refreshToken, req.ip);
   }
 
-  /** TASK-075: Logout — revokes the current session. */
+  /** Logout — revokes the current session. */
   @Post("logout")
   @Public()
   async logout(@Body() dto: LogoutDto) {
@@ -46,7 +46,7 @@ export class AuthController {
     return { success: true };
   }
 
-  /** TASK-075: Logout-all — revokes every active session for the user. */
+  /** Logout-all — revokes every active session for the user. */
   @Post("logout-all")
   @Public()
   async logoutAll(@Body() dto: LogoutDto) {
@@ -54,7 +54,7 @@ export class AuthController {
     return { success: true };
   }
 
-  /** TASK-076: Request a password-reset link (rate-limited, always returns 200). */
+  /** Request a password-reset link (rate-limited, always returns 200). */
   @Post("password-reset/request")
   @Public()
   async passwordResetRequest(@Body() dto: PasswordResetRequestDto) {
@@ -62,7 +62,7 @@ export class AuthController {
     return { success: true };
   }
 
-  /** TASK-077: Confirm a password reset with the token from the email link. */
+  /** Confirm a password reset with the token from the email link. */
   @Post("password-reset/confirm")
   @Public()
   async passwordResetConfirm(@Body() dto: PasswordResetConfirmDto) {
@@ -70,7 +70,7 @@ export class AuthController {
     return { success: true };
   }
 
-  /** TASK-080: Verify a TOTP code (or backup code) to complete an MFA-gated login. */
+  /** Verify a TOTP code (or backup code) to complete an MFA-gated login. */
   @Post("mfa/verify")
   @Public()
   async mfaVerify(@Body() dto: MfaVerifyDto, @Req() req: Request) {
@@ -83,8 +83,8 @@ export class AuthController {
   }
 
   /**
-   * TASK-079: Start TOTP enrolment — returns an otpauth URI for QR code display.
-   * Requires an authenticated user (Story 2.4 will enforce this via JwtAuthGuard).
+   * Start TOTP enrolment — returns an otpauth URI for QR code display.
+   * Requires an authenticated user (Story 2.4 will enforce this via JwtAuthCRard).
    * Accepts the userId in the body temporarily until the JWT guard is live.
    */
   @Post("mfa/enrol/start")
@@ -94,7 +94,7 @@ export class AuthController {
   }
 
   /**
-   * TASK-079: Confirm TOTP enrolment — validates a code, saves the device, and returns backup codes.
+   * Confirm TOTP enrolment — validates a code, saves the device, and returns backup codes.
    * Returns backup codes once — they must be saved by the user immediately.
    */
   @Post("mfa/enrol/confirm")
