@@ -104,22 +104,51 @@ POST /auth/password-reset/confirm  { token, newPassword }
 
 ### 2.6 JWT Access Token
 
+#### Field selection
+
+A claim belongs in the JWT only if it is needed on **every request** and changes infrequently enough to embed safely (staleness forces a version-triggered refresh rather than a per-request DB check).
+
+| Field | Type | Why embed | Staleness trigger |
+|-------|------|-----------|-------------------|
+| `sub` | ULID string | userId — direct DB/Redis key | — immutable |
+| `tid` | ULID string | tenantId — Prisma `forTenant()` scope | — immutable per session |
+| `sid` | ULID string | sessionId — Redis `session:{sid}` liveness check | — immutable per session |
+| `ver` | int | user state version — must match Redis `user_ver:{sub}` | `INCR` on any embedded-field change |
+| `teams` | `{id:int, r:"L"\|"M"}[]` | team memberships + role — needed for `can()` grantee resolution | team add/remove → ver bump |
+| `roles` | `string[]` | role names — keys the DB-ETag permission lookup | role assign/remove → ver bump |
+| `iat`, `exp` | int | standard JWT timing | — |
+
+**`sub`, `tid`, `sid` keep full ULIDs** — they are used as-is as Redis keys (`user_ver:{sub}`, `session:{sid}`) and Prisma tenant scopes. Any shortening would require an extra resolution step on the hot path.
+
+**`teams` uses `shortId` (auto-increment int)** — teams are resolved to ULIDs by `JwtAuthGuard` via an in-process permanent cache before the principal is built. `{id:7, r:"L"}` ≈ 14 chars vs `{"id":"01HX...","role":"LEAD"}` ≈ 32 chars; 5 teams saves ~90 chars.
+
+**`roles` keeps name strings** — role names (`"recruiter"`, `"admin"`) are already short, unique per tenant, and human-readable. Using a shortId here would save negligible space at the cost of debuggability.
+
+**Not embedded:** `permissions` (too many strings, too dynamic — DB-ETag cache), `loginable`/`deletedAt` (enforced at refresh time when ver bump triggers JWT_STALE), `email`, `displayName`.
+
+#### Payload
+
 ```jsonc
 // Header
 { "alg": "HS512", "typ": "JWT" }
 
-// Payload
+// Payload — 8 fields, ~200 chars for a typical user (5 teams, 2 roles)
 {
-  "sub": "01HV...",          // User ULID
-  "tid": "01HU...",          // Tenant ULID
-  "sid": "01HW...",          // Session ULID
-  "roles": ["recruiter"],    // Role names — coarse gating only
-  "iat": 1714000000,
-  "exp": 1714000900          // +15 min
+  "sub":   "01HV...",           // userId (ULID)
+  "tid":   "01HU...",           // tenantId (ULID)
+  "sid":   "01HW...",           // sessionId (ULID)
+  "ver":   12,                  // user state version
+  "teams": [                    // shortId (int) + abbreviated role
+    { "id": 7,  "r": "L" },     // L = LEAD
+    { "id": 12, "r": "M" }      // M = MEMBER
+  ],
+  "roles": ["recruiter"],       // role names (tenant-scoped)
+  "iat":   1714000000,
+  "exp":   1714000900           // +15 min
 }
 ```
 
-`tid` is embedded so the hot-path resolver never hits the DB to resolve the tenant. `roles` is a summary for guards that don't need per-record precision. Row-level checks always go to `PermissionService`, not the JWT.
+`teams` and `roles` are embedded so the guard never hits DB to resolve them per request. Any change to these fields increments `user_ver` in Redis — the next request receives `JWT_STALE` and the client uses its refresh token to obtain a new JWT with current embedded state (see §10).
 
 ---
 
@@ -139,6 +168,7 @@ enum TeamKind {
 
 model Team {
   id        String    @id @default(ulid())
+  shortId   Int       @unique @default(autoincrement()) // compact JWT encoding
   tenantId  String
   parentId  String?
   parent    Team?     @relation("TeamHierarchy", fields: [parentId], references: [id])
@@ -216,6 +246,7 @@ This is Cura's equivalent of Gllue's `accessgroup → actiondetail/actionmeta` a
 ```prisma
 model Role {
   id          String   @id @default(ulid())
+  shortId     Int      @unique @default(autoincrement()) // reserved for JWT embedding if needed
   tenantId    String?                   // null = system-wide built-in
   name        String
   description String?
@@ -657,18 +688,22 @@ interface RequestUser {
   userId: string;
   tenantId: string;
   sessionId: string;
-  roles: string[];                 // role names from JWT
-  permissions: Set<string>;        // expanded, hydrated by JwtAuthGuard
-  teamIds: string[];               // hydrated from DB (cached 5 min)
-  roleIds: string[];               // role ULIDs for Permission queries
+  version: number;                               // JWT ver — for audit / debug
+  teams: Array<{ id: string; role: TeamRole }>; // ULIDs, resolved from JWT shortIds
+  roles: string[];                               // role names from JWT
+  permissions: Set<string>;                      // hydrated via DB-ETag cache
 }
+
+// Derived helpers (computed inline, not stored)
+// teamIds:  user.teams.map(t => t.id)
+// leadIds:  user.teams.filter(t => t.role === 'LEAD').map(t => t.id)
 ```
 
 `JwtAuthGuard` (registered as `APP_GUARD`) runs on every request:
-1. Verify JWT signature + expiry.
-2. Attach `{ userId, tenantId, sessionId, roles }` from claims.
-3. Hydrate `permissions` by expanding role names → permission strings (in-memory cache).
-4. Hydrate `teamIds` and `roleIds` from a short-TTL cache (busted on team membership change).
+1. Verify JWT signature + expiry (no I/O).
+2. Redis `MGET [user_ver:{sub}, session:{sid}]` — version check + session liveness in one round-trip.
+3. Resolve `JWT.teams[].id` (shortIds) → ULIDs via in-process permanent cache.
+4. Hydrate `permissions` from DB-ETag cache (see §9.6 and §10).
 
 ### 9.3 Guard Stack Per Resolver
 
@@ -738,266 +773,237 @@ class PermissionService {
 
 ### 9.6 Caching Strategy
 
-| Cache | Scope | TTL | Invalidation |
-|-------|-------|-----|--------------|
-| User role + permission set | In-memory (Map) | 5 min | On role assignment change |
-| User teamIds + roleIds | In-memory (Map) | 5 min | On team membership change |
-| `can()` result per record | Request-scoped LRU | Request lifetime | N/A (fresh per request) |
-| `getExplicitlyGrantedIds()` | Request-scoped | Request lifetime | N/A |
+**Redis (shared across all NestJS instances):**
 
-Permission cache is deliberately **request-scoped** — the same principal can be denied before a grant is written and allowed after, within the same request, because the grant may occur mid-resolver chain (e.g., creating a record automatically grants owner access before the response is returned).
+| Key pattern | Type | Value | Written when |
+|-------------|------|-------|--------------|
+| `user_ver:{userId}` | INT | Atomic counter | `INCR` on team/role/deactivation/deletion change |
+| `session:{sid}` | string `"1"` | TTL = `Session.expiresAt − now` | `SET EX` on login/refresh; `DEL` on revoke |
+
+No Redis keys for permission data — permissions are validated against the DB's own timestamps.
+
+**In-process per NestJS instance:**
+
+| Cache | Key | Entry shape | Eviction |
+|-------|-----|-------------|----------|
+| `shortId → ULID` (teams) | `shortId: int` | `ulid: string` | Permanent (mapping is immutable) |
+| Functional permissions | `userId` | `{ perms: Set<string>, etag: string }` | ETag mismatch vs `MAX(GREATEST(UserRole.assignedAt, Role.updatedAt))` |
+| `can()` per record | `(userId, resourceType, resourceId)` | `AccessLevel \| null` | Request-scoped LRU |
+
+The shortId cache is loaded on demand and never evicted — `shortId → ULID` is immutable once a team is created. The permission cache has no TTL; it is valid until its stored ETag diverges from the DB's current `MAX` timestamp. The `can()` cache is **request-scoped** by design — a record created mid-request auto-grants owner access before the response returns, so cross-request caching would race against that grant.
 
 ---
 
 ## 10. JWT Validation and State Invalidation
 
-### 10.1 The Staleness Problem
+### 10.1 Design Overview
 
-A JWT is cryptographically self-contained. `JwtAuthGuard` can verify its signature and expiry with no DB round-trip — but that means the JWT's embedded state (`roles`, `tid`) can diverge from reality during the token's 15-minute lifetime:
+Two independent mechanisms handle the gap between JWT issuance and reality:
 
-| Event that changes state | What the JWT still claims | Consequence if not handled |
-|--------------------------|---------------------------|---------------------------|
-| Admin revokes user's session (logout-all, suspicious activity) | `sid` still looks valid | Revoked session still works for up to 15 min |
-| User deactivated (`loginable = false`) | `sub` still looks valid | Deactivated user still has API access |
-| User deleted (`deletedAt` set) | `sub` still looks valid | Deleted user still has API access |
-| User removed from tenant | `tid` still embedded | User accesses wrong tenant's data |
-| Role changed / removed | `roles: ['admin']` in JWT | Downgraded user keeps elevated permissions |
-| Row-level permission revoked | — | Not a JWT problem — already DB-backed |
+| Mechanism | What it guards | How |
+|-----------|---------------|-----|
+| **Redis version counter** | JWT-embedded fields (`teams`, `roles`, user status) | `INCR user_ver:{userId}` on change; guard compares JWT `ver` vs Redis; mismatch → `JWT_STALE` → client refreshes |
+| **DB-ETag permission cache** | Functional permission strings (role → permission expansion) | `SELECT MAX(GREATEST(UserRole.assignedAt, Role.updatedAt))` before cache hit; ETag mismatch → full DB fetch |
 
-**Design decision:** Cura accepts a configurable short staleness window (default 30 s) for session and user-status checks by using in-process caches with manual bust on mutation. Row-level permission changes are always reflected on the next request (request-scoped cache).
+Row-level permission checks (`Permission` table) are already request-scoped — always fresh, no caching across requests.
 
 ---
 
-### 10.2 Three-Layer Validation in JwtAuthGuard
+### 10.2 Redis Key Schema
 
-`JwtAuthGuard` runs **three validation layers** on every non-public request, in order:
+Only two key patterns. No Redis keys for permission data.
 
 ```
-Layer 1 — Crypto (no DB)
-  jwtService.verifyAsync(token)
-    → verify HS512 signature
-    → verify exp > now
-    → extract { sub, tid, sid, roles }
+user_ver:{userId}    INT    Atomic counter. INCR when any JWT-embedded field changes.
+                            Checked on every request. JWT.ver mismatch → JWT_STALE.
 
-Layer 2 — Session liveness (DB, cached 30 s)
-  sessionService.isValid(sid)
-    → SELECT id FROM Session
-      WHERE id = sid AND revokedAt IS NULL AND expiresAt > NOW()
-    → cache hit: skip DB if seen within 30 s
-    → cache miss / expired: query DB, cache result
-    → FAIL → 401 "Session revoked or expired"
-
-Layer 3 — User status (DB, cached 30 s)
-  userService.isActive(sub, tid)
-    → SELECT id FROM User
-      WHERE id = sub AND tenantId = tid
-        AND loginable = true AND deletedAt IS NULL
-    → cache hit: skip DB if seen within 30 s
-    → FAIL → 401 "Account inactive"
-
-Then hydrate RequestUser:
-  permissions ← functional permission cache (5 min TTL, bustable)
-  teamIds     ← team membership cache (5 min TTL, bustable)
-  roleIds     ← derived from permissions cache
+session:{sid}        "1"    Presence = valid. TTL = Session.expiresAt − now (seconds).
+                            SET EX on login/refresh. DEL on explicit revoke.
+                            Missing on check → session revoked.
 ```
-
-**Layer 2 is the primary kill switch.** Revoking a Session is immediate — the next request carrying that JWT fails, regardless of the JWT's remaining lifetime.
-
-**Layer 3 catches the deactivation/deletion case** where all sessions are also revoked (belt + braces).
 
 ---
 
-### 10.3 Cache Design
+### 10.3 JwtAuthGuard: Two Checks, One Redis Round-Trip
 
-**Phase 1 — Single-instance, in-process:**
+```
+1. Crypto verify (no I/O)
+   → HS512 signature + exp
+   → Extract { sub, tid, sid, ver, teams, roles }
+
+2. Redis MGET [user_ver:{sub}, session:{sid}]  — 1 round-trip
+   → user_ver missing OR != JWT.ver  →  throw JwtStaleException   { code: 'JWT_STALE' }
+   → session:{sid} missing           →  throw UnauthorizedException { code: 'SESSION_REVOKED' }
+
+3. Resolve JWT teams[].id (shortIds) → ULIDs via in-process permanent cache
+   → cache miss: SELECT id, short_id FROM teams WHERE short_id IN (?)
+
+4. Build RequestUser from JWT claims + resolved ULIDs — zero further I/O
+
+5. Hydrate functional permissions via DB-ETag cache
+   → SELECT MAX(GREATEST(ur.assigned_at, r.updated_at)) AS etag
+     FROM user_roles ur JOIN roles r ON ur.role_id = r.id
+     WHERE ur.user_id = ?
+   → ETag matches in-process cache → return cached Set<string>
+   → ETag differs → full fetch → update cache
+```
+
+Total I/O on the happy path: **1 Redis MGET + 1 DB `SELECT MAX`**. When the ETag matches (the common case), no further DB queries for auth on that request.
+
+---
+
+### 10.4 JWT_STALE Client Flow
+
+`JWT_STALE` is not a hard error — it means the token is cryptographically valid but the embedded state is outdated. The client responds by using its refresh token to get a new JWT, then retries the original request transparently.
+
+```
+Client receives  401 { code: 'JWT_STALE' }
+→ POST /auth/refresh { refreshToken }
+    Server:
+      1. Look up Session by refreshTokenHash (DB: revokedAt IS NULL, expiresAt > now)
+      2. Check User.loginable AND !deletedAt  ← deactivation enforced here
+      3. GET Redis user_ver:{userId}           ← read current version
+      4. SELECT TeamMember rows               ← latest team memberships
+      5. SELECT UserRole rows                 ← latest roles
+      6. Issue new JWT: latest ver, teams[], roles[]
+      7. Rotate refresh token (new hash in Session row)
+→ Client retries original request with new access token
+```
+
+This is the same endpoint as normal token expiry refresh — `JWT_STALE` is just an additional trigger. Deactivation is enforced at step 2: a deactivated user's refresh is rejected, the client is forced to re-authenticate (and fails login).
+
+---
+
+### 10.5 DB-ETag Permission Cache
+
+Functional permissions (role names → permission string set):
 
 ```typescript
-// All three caches live in AuthCacheService (singleton)
-@Injectable()
-export class AuthCacheService {
-  // Key: sessionId  →  { valid: boolean, cachedAt: number }
-  private readonly sessionCache = new Map<string, SessionCacheEntry>();
-  private readonly SESSION_TTL_MS = 30_000;
+async getFunctionalPermissions(userId: string): Promise<Set<string>> {
+  // Lightweight check — one indexed query, returns a single timestamp
+  const [{ etag }] = await db.$queryRaw<[{ etag: string | null }]>`
+    SELECT MAX(GREATEST(ur.assigned_at, r.updated_at))::text AS etag
+    FROM   user_roles ur
+    JOIN   roles r ON ur.role_id = r.id
+    WHERE  ur.user_id = ${userId}
+  `;
 
-  // Key: `${userId}:${tenantId}`  →  { active: boolean, cachedAt: number }
-  private readonly userStatusCache = new Map<string, UserStatusEntry>();
-  private readonly USER_STATUS_TTL_MS = 30_000;
+  const cached = this.permCache.get(userId);
+  if (cached && cached.etag === (etag ?? '')) return cached.perms;
 
-  // Key: userId  →  { permissions: Set<string>, roleIds: string[], cachedAt: number }
-  private readonly permissionCache = new Map<string, PermissionCacheEntry>();
-  private readonly PERMISSION_TTL_MS = 5 * 60_000;
-
-  isSessionValid(sid: string): boolean | undefined {
-    const entry = this.sessionCache.get(sid);
-    if (!entry || Date.now() - entry.cachedAt > this.SESSION_TTL_MS) return undefined; // miss
-    return entry.valid;
-  }
-
-  setSessionValid(sid: string, valid: boolean): void {
-    this.sessionCache.set(sid, { valid, cachedAt: Date.now() });
-  }
-
-  bustSession(sid: string): void {
-    this.sessionCache.delete(sid);  // next request hits DB immediately
-  }
-
-  bustAllSessionsForUser(userId: string): void {
-    // Called on logout-all / deactivation — invalidate all cached entries for this user.
-    // In-process: we can't enumerate by userId without a secondary index.
-    // Two options:
-    //   (a) Store userId → Set<sid> reverse index in the cache service.
-    //   (b) Accept up to SESSION_TTL_MS (30 s) staleness on cached entries.
-    // Phase 1 uses (a): O(sessions-per-user) bust on mutation.
-    const sids = this.userSessionIndex.get(userId) ?? new Set();
-    for (const sid of sids) this.sessionCache.delete(sid);
-    this.userSessionIndex.delete(userId);
-  }
-
-  bustUserStatus(userId: string, tenantId: string): void {
-    this.userStatusCache.delete(`${userId}:${tenantId}`);
-  }
-
-  bustPermissions(userId: string): void {
-    this.permissionCache.delete(userId);
-  }
+  // ETag changed (or cold start) — full fetch
+  const rows = await db.userRole.findMany({
+    where: { userId },
+    include: { role: true },
+  });
+  const perms = new Set(rows.flatMap(ur => ur.role.permissions as string[]));
+  this.permCache.set(userId, { perms, etag: etag ?? '' });
+  return perms;
 }
 ```
 
-**Phase 2 — Multi-instance (Redis):**
+The `SELECT MAX(GREATEST(...))` hits indexes on `user_roles.user_id` and `roles.id` — both are required anyway for the full fetch. Full fetch only runs when something actually changed.
 
-```
-Session validity:   Redis SET  session:{sid}  "1|0"  EX 30
-User status:        Redis SET  user_status:{userId}:{tenantId}  "1|0"  EX 30
-Permission set:     Redis SET  user_perms:{userId}  <json>  EX 300
-
-Bust on mutation:
-  DEL session:{sid}                      ← explicit session revoke
-  DEL session:{sid} for each sid         ← logout-all (via userSessionIndex in Redis Set)
-  DEL user_status:{userId}:{tenantId}    ← deactivate / delete / tenant removal
-  DEL user_perms:{userId}                ← role change
-```
-
-No pub/sub needed — each instance independently caches and busts. A bust on instance A causes instance B to get a cache miss on next request, which refreshes from DB.
+**Row-level permissions** — request-scoped `can()` cache is unchanged. For future cross-request row-level caching (Phase 2+), use `MAX(Permission.createdAt) WHERE granteeId IN (userId, ...teamIds)` as the ETag.
 
 ---
 
-### 10.4 Invalidation by Event
+### 10.6 Mutation → Redis + DB Writes
 
-Every mutation that changes auth state **must** bust the relevant cache entry (and, where appropriate, write DB revocations) before returning.
+Every mutation that changes JWT-embedded state or session validity **must** write to both DB and Redis atomically (in a single service call) before returning.
 
-| Event | DB write | Cache bust |
-|-------|----------|------------|
-| `POST /auth/logout` | `Session.revokedAt = now` | `bustSession(sid)` |
-| `POST /auth/logout-all` | `Session.revokedAt = now` for all user Sessions | `bustAllSessionsForUser(userId)` |
-| `User.deactivate()` | `User.loginable = false` + revoke all Sessions | `bustAllSessionsForUser(userId)` + `bustUserStatus(userId, tenantId)` |
-| `User.delete()` | `User.deletedAt = now` + revoke all Sessions | `bustAllSessionsForUser(userId)` + `bustUserStatus(userId, tenantId)` |
-| `TenantMembership.remove(userId, tenantId)` | Revoke Sessions where `tenantId = tid` | `bustUserStatus(userId, tenantId)` |
-| `AuthIdentity.lock()` (brute-force) | `lockedUntil = now + lockDuration` | Sessions still valid; user can't re-login or refresh, existing tokens fail at Layer 3 if `loginable` is also set false |
-| `User.passwordChange()` | new `passwordHash`, revoke all Sessions | `bustAllSessionsForUser(userId)` |
-| Refresh-token reuse detected | Revoke all Sessions for userId | `bustAllSessionsForUser(userId)` |
-| `UserRole.assign(userId, roleId)` | Insert `UserRole` row | `bustPermissions(userId)` |
-| `UserRole.remove(userId, roleId)` | Delete `UserRole` row | `bustPermissions(userId)` |
-| `Role.updatePermissions(roleId, perms)` | Update `Role.permissions` | `bustPermissions` for every userId holding that roleId¹ |
-| `TeamMember.add(teamId, userId)` | Insert `TeamMember` row | `bustPermissions(userId)` (teamIds re-hydrated next request) |
-| `TeamMember.remove(teamId, userId)` | Delete `TeamMember` row | `bustPermissions(userId)` |
-| `Permission.revoke(permissionId)` | Delete `Permission` row + write `PermissionGrant` audit | No cross-request bust needed (request-scoped cache) |
+| Event | Redis | DB |
+|-------|-------|----|
+| Login / token refresh | `SET session:{sid} "1" EX <ttl>` | `Session` insert / rotate |
+| Logout | `DEL session:{sid}` | `Session.revokedAt = now` |
+| Logout-all | `DEL session:{sid}` for each active sid | `Session.revokedAt = now` for all |
+| Team membership add | `INCR user_ver:{userId}` | `TeamMember` insert |
+| Team membership remove | `INCR user_ver:{userId}` | `TeamMember` delete |
+| Role assigned to user | `INCR user_ver:{userId}` | `UserRole` insert |
+| Role removed from user | `INCR user_ver:{userId}` | `UserRole` delete |
+| `Role.permissions` updated | `INCR user_ver:{u}` for all holders¹ | `Role.updatedAt` bumped |
+| User deactivated (immediate) | `INCR user_ver:{userId}`; `DEL session:{sid}` all | `User.loginable=false`; `Session.revokedAt` all |
+| User deactivated (eventual) | `INCR user_ver:{userId}` | `User.loginable=false` |
+| User deleted | `INCR user_ver:{userId}`; `DEL session:{sid}` all | `User.deletedAt`; `Session.revokedAt` all |
+| Password changed | `INCR user_ver:{userId}`; `DEL session:{sid}` all | `Session.revokedAt` all; `passwordHash` |
+| Refresh token reuse detected | `DEL session:{sid}` all for user | `Session.revokedAt` all |
+| Permission granted/revoked | (none — DB `createdAt` is the ETag for row-level) | `Permission` write |
 
-¹ Bulk-busting all holders of a role requires a `SELECT userId FROM UserRole WHERE roleId = ?` lookup — cheap at CRM scale. If a role has thousands of users, defer to TTL expiry instead.
-
----
-
-### 10.5 The `roles` Claim Is Decorative
-
-The `roles: ['recruiter']` array embedded in the JWT **is not used for permission decisions**. It exists only for logging, tracing, and client-side UI hints (e.g., "show admin menu"). Actual functional permission checks always go through the `permissionCache`, which is loaded from DB and busted on role change.
-
-This is the key reason role changes do **not** require session revocation. The JWT's `roles` claim becoming stale has no security consequence because no guard trusts it.
-
-```typescript
-// WRONG — do not do this
-if (user.roles.includes('admin')) allowExport();
-
-// RIGHT
-if (user.permissions.has('candidate:export')) allowExport();
-// user.permissions comes from permissionCache, not the JWT
-```
+¹ `SELECT userId FROM UserRole WHERE roleId = ?` — cheap at CRM scale (roles have few holders).
 
 ---
 
-### 10.6 High-Security Operations: Cache Bypass
+### 10.7 Deactivation Enforcement Timing
 
-For operations where even 30 seconds of staleness is unacceptable (salary export, offer amount view, audit log access), resolvers can force a cache bypass:
+| Method | Effective |
+|--------|-----------|
+| `INCR user_ver` + `DEL session:{sid}` (all) | **Immediate** — next request fails session check |
+| `INCR user_ver` only | **≤15 min** — JWT_STALE triggers refresh; refresh rejects at `User.loginable` check |
 
-```typescript
-@Mutation()
-@RequirePermission('candidate:export')
-async exportCandidates(@CurrentUser() user: RequestUser, @Args() args: ExportArgs) {
-  // Force fresh session + user status check, bypassing 30s cache
-  await this.authService.assertSessionFresh(user.sessionId, user.userId, user.tenantId);
-  // ...rest of export logic
-}
-```
-
-`assertSessionFresh` queries the DB directly and throws if the session or user is no longer valid, regardless of cache state.
+Default on `User.deactivate()`: use the immediate method (both Redis writes + DB revoke). Eventual enforcement is available for non-critical bulk operations (e.g., nightly cleanup of inactive users).
 
 ---
 
-### 10.7 Updated JwtAuthGuard Implementation
+### 10.8 JwtAuthGuard Implementation
 
 ```typescript
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
-    private readonly sessionService: SessionService,
-    private readonly userService: UserService,
-    private readonly authCache: AuthCacheService,
+    private readonly redis: RedisService,
+    private readonly teamCache: TeamShortIdCache,   // in-process permanent Map
+    private readonly permCache: PermissionCacheService,
     private readonly reflector: Reflector,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    const req = ctx.switchToHttp().getRequest();
+    const req = GqlExecutionContext.create(ctx).getContext().req;
 
-    // Allow @Public() routes through
-    if (this.reflector.getAllAndOverride('isPublic', [ctx.getHandler(), ctx.getClass()])) {
+    if (this.reflector.getAllAndOverride<boolean>('isPublic', [ctx.getHandler(), ctx.getClass()])) {
       return true;
     }
 
-    // Layer 1 — Crypto validation (no DB)
-    const token = this.extractBearerToken(req);
+    const token = extractBearerToken(req);
     if (!token) throw new UnauthorizedException('Missing token');
 
     let payload: JwtPayload;
     try {
-      payload = await this.jwtService.verifyAsync(token);
+      payload = await this.jwtService.verifyAsync<JwtPayload>(token);
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    // Layer 2 — Session liveness (cached 30 s, busted on revoke)
-    const sessionValid = await this.sessionService.isValid(payload.sid);
-    if (!sessionValid) throw new UnauthorizedException('Session revoked');
+    // Single Redis round-trip: version check + session check
+    const [redisVer, sessionFlag] = await this.redis.mget(
+      `user_ver:${payload.sub}`,
+      `session:${payload.sid}`,
+    );
 
-    // Layer 3 — User status (cached 30 s, busted on deactivation/deletion)
-    const userActive = await this.userService.isActive(payload.sub, payload.tid);
-    if (!userActive) throw new UnauthorizedException('Account inactive');
+    if (redisVer === null || Number(redisVer) !== payload.ver) {
+      throw new JwtStaleException(); // client uses refresh token
+    }
+    if (sessionFlag === null) {
+      throw new UnauthorizedException('Session revoked');
+    }
 
-    // Hydrate principal (permissions from 5-min cache)
-    req.user = await this.buildRequestUser(payload);
-    return true;
-  }
+    // Resolve team shortIds → ULIDs (in-process permanent cache)
+    const teams = await this.teamCache.resolve(payload.teams);
 
-  private async buildRequestUser(payload: JwtPayload): Promise<RequestUser> {
-    const { permissions, roleIds } = await this.authCache.getPermissions(payload.sub);
-    const teamIds = await this.authCache.getTeamIds(payload.sub, payload.tid);
-    return {
-      userId: payload.sub,
-      tenantId: payload.tid,
+    // Hydrate functional permissions (DB-ETag cache)
+    const permissions = await this.permCache.getFunctionalPermissions(payload.sub);
+
+    req.user = {
+      userId:    payload.sub,
+      tenantId:  payload.tid,
       sessionId: payload.sid,
-      roles: payload.roles,        // decorative only
-      permissions,                 // live from cache
-      teamIds,
-      roleIds,
-    };
+      version:   payload.ver,
+      teams,                  // [{ id: ULID, role: 'LEAD'|'MEMBER' }]
+      roles:     payload.roles,
+      permissions,
+    } satisfies RequestUser;
+
+    return true;
   }
 }
 ```
@@ -1008,36 +1014,47 @@ export class JwtAuthGuard implements CanActivate {
 
 > For the invalidation flow that precedes this, see §10.
 
-**Scenario:** Alice (recruiter, in Team T1 and Team T2) queries `candidate(id: "C1")`.
+**Scenario:** Alice (recruiter, in Team TM1 as LEAD and Team TM2 as MEMBER) queries `candidate(id: "C1")`.
 
 ```
 1. JwtAuthGuard
-   → verifies JWT
-   → hydrates req.user = { userId: "U_ALICE", tenantId: "T_ACME", roles: ["recruiter"],
-                            permissions: Set{"candidate:view_all", "job:create", ...},
-                            teamIds: ["TM1", "TM2"], roleIds: ["R_RECRUITER"] }
+   → crypto verify — JWT contains:
+       sub="U_ALICE", tid="T_ACME", sid="S1", ver=5,
+       teams=[{id:7,r:"L"},{id:12,r:"M"}], roles=["recruiter"]
+   → Redis MGET [user_ver:U_ALICE, session:S1]
+       user_ver = 5 ✓ matches JWT.ver
+       session:S1 = "1" ✓ present
+   → resolve shortIds 7→"TM1", 12→"TM2" (in-process cache hit)
+   → DB-ETag check: MAX(GREATEST(assignedAt, updatedAt)) for Alice's roles
+       ETag matches in-process cache → permissions = Set{"candidate:view_all", "job:create", ...}
+   → req.user = {
+       userId: "U_ALICE", tenantId: "T_ACME", sessionId: "S1", version: 5,
+       teams: [{id:"TM1",role:"LEAD"},{id:"TM2",role:"MEMBER"}],
+       roles: ["recruiter"], permissions: Set{...}
+     }
 
-2. No @RequirePermission on this query (view_all covers it — functional guard passes)
+2. No @RequirePermission on this resolver (view_all covers listing — functional guard passes)
 
 3. CandidateResolver.candidate() runs
-   → db.candidate.findFirst({ where: { id: "C1", tenantId: "T_ACME" } })  ← scoped query
+   → db.candidate.findFirst({ where: { id: "C1", tenantId: "T_ACME" } })
 
 4. permissionService.assertCan(alice, "Candidate", "C1", VIEW)
 
-5. PermissionService queries:
+5. PermissionService collects grantees:
+   grantees = [USER:U_ALICE, TEAM:TM1, TEAM:TM2, ROLE:<recruiter-ulid>]
+
    SELECT MAX(accessLevel) FROM Permission
    WHERE tenantId = 'T_ACME'
-     AND resourceType = 'Candidate'
-     AND resourceId   = 'C1'
-     AND ((granteeType='USER' AND granteeId='U_ALICE')
-       OR (granteeType='TEAM' AND granteeId IN ('TM1','TM2'))
-       OR (granteeType='ROLE' AND granteeId='R_RECRUITER'))
+     AND resourceType = 'Candidate' AND resourceId = 'C1'
+     AND (granteeType, granteeId) IN (grantees)
      AND (expiresAt IS NULL OR expiresAt > NOW())
-   → returns EDIT (Alice's team TM1 was granted EDIT when a colleague in TM1 created C1)
+   → returns EDIT (team TM1 was auto-granted EDIT when a TM1 colleague created C1)
+
+   Alice is LEAD of TM1 → EDIT level preserved (MEMBER would cap at EDIT too; OWNER would be capped)
 
 6. EDIT >= VIEW → ALLOW. Candidate returned.
 
-7. Result cached in request-scoped LRU for any subsequent check on ("U_ALICE", "Candidate", "C1") in this request.
+7. Result cached in request-scoped LRU: key=(U_ALICE, Candidate, C1) → EDIT
 ```
 
 ---

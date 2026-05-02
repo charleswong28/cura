@@ -294,6 +294,7 @@ model Tenant {
 // `kind` lets one matrix org coexist: Sales (BUSINESS) × APAC (REGION) × Healthcare (PRACTICE).
 model Team {
   id          String   @id @default(ulid())
+  shortId     Int      @unique @default(autoincrement()) // compact JWT claim encoding
   tenantId    String
   parentId    String?
   parent      Team?    @relation("TeamHierarchy", fields: [parentId], references: [id])
@@ -327,10 +328,12 @@ Replaces the 14+ `*privilege` / `*uniqueprivilege` pairs Gllue carries. One poly
 ```prisma
 model Role {
   id          String   @id @default(ulid())
+  shortId     Int      @unique @default(autoincrement()) // reserved for JWT embedding
   tenantId    String?                            // null = built-in / system role
   name        String
   permissions Json                               // ['candidate:export', 'job:approve']
   builtin     Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
   @@unique([tenantId, name])
 }
 
