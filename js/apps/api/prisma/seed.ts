@@ -157,7 +157,6 @@ async function main() {
       email: "admin@acmerecruiting.com",
       firstName: "Alice",
       lastName: "Admin",
-      legacyRole: "ADMIN",
     },
   });
 
@@ -171,7 +170,6 @@ async function main() {
       email: "bob@acmerecruiting.com",
       firstName: "Bob",
       lastName: "Recruiter",
-      legacyRole: "RECRUITER",
     },
   });
   console.log(`  Users: ${admin.firstName} (admin), ${recruiter.firstName} (recruiter)`);

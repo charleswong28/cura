@@ -34,12 +34,6 @@ export enum JobPriority {
 }
 registerEnumType(JobPriority, { name: "JobPriority" });
 
-export enum UserRole {
-  ADMIN = "ADMIN",
-  RECRUITER = "RECRUITER",
-}
-registerEnumType(UserRole, { name: "UserRole" });
-
 export enum ActivityAction {
   USER_UPDATED_PROFILE = "USER_UPDATED_PROFILE",
   USER_ROLE_CHANGED = "USER_ROLE_CHANGED",

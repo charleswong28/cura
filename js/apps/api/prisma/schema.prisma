@@ -18,13 +18,6 @@ datasource db {
 // Enums
 // ---------------------------------------------------------------------------
 
-// Legacy simple role — kept for Clerk-era compatibility during migration to
-// the new Role/UserRole permission system. Will be removed in Sprint 3.
-enum OldUserRole {
-  ADMIN
-  RECRUITER
-}
-
 enum CandidateStatus {
   ACTIVE
   INACTIVE
@@ -115,12 +108,11 @@ enum GrantAction {
 
 /// Represents a headhunting firm / organisation (the tenant boundary).
 model Tenant {
-  id         String    @id
-  slug       String    @unique              // used for multi-tenant login (tenantSlug in JWT)
-  clerkOrgId String?   @unique @map("clerk_org_id") // null for first-party-auth tenants
-  name       String
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  id        String   @id
+  slug      String   @unique // used for multi-tenant login (tenantSlug in JWT)
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   users        User[]
   clients      Client[]
@@ -133,22 +125,20 @@ model Tenant {
 
 /// Recruiter or admin belonging to a tenant. One AuthIdentity → many Users (one per tenant).
 model User {
-  id              String        @id
-  tenantId        String        @map("tenant_id")
-  tenant          Tenant        @relation(fields: [tenantId], references: [id])
-  authIdentityId  String?       @unique @map("auth_identity_id")
-  authIdentity    AuthIdentity? @relation(fields: [authIdentityId], references: [id])
-  clerkUserId     String?       @unique @map("clerk_user_id") // null for first-party-auth users
-  email           String
-  firstName       String        @map("first_name")
-  lastName        String        @map("last_name")
-  legacyRole      OldUserRole?  @default(RECRUITER) @map("legacy_role") // Clerk-era role; superseded by UserRole
-  loginable       Boolean       @default(true)       // false = deactivated
-  firstLogin      DateTime?     @map("first_login")
-  lastInactiveAt  DateTime?     @map("last_inactive_at")
-  deletedAt       DateTime?     @map("deleted_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id             String        @id
+  tenantId       String        @map("tenant_id")
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  authIdentityId String?       @unique @map("auth_identity_id")
+  authIdentity   AuthIdentity? @relation(fields: [authIdentityId], references: [id])
+  email          String
+  firstName      String        @map("first_name")
+  lastName       String        @map("last_name")
+  loginable      Boolean       @default(true) // false = deactivated
+  firstLogin     DateTime?     @map("first_login")
+  lastInactiveAt DateTime?     @map("last_inactive_at")
+  deletedAt      DateTime?     @map("deleted_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   sessions          Session[]
   userRoles         UserRole[]

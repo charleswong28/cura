@@ -6,49 +6,29 @@ import { UpdateProfileInput } from "./dto/update-profile.input";
 export class UserService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async findByClerkUserId(clerkUserId: string, tenantId: string) {
-    const db = this.prisma.forTenant(tenantId);
-    const user = await db.user.findFirst({
-      where: { clerkUserId },
-    });
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-    return user;
-  }
-
   async findAll(tenantId: string) {
-    const db = this.prisma.forTenant(tenantId);
-    return db.user.findMany({ orderBy: { createdAt: "asc" } });
+    return this.prisma.forTenant(tenantId).user.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: "asc" },
+    });
   }
 
   async findById(id: string, tenantId: string) {
-    const db = this.prisma.forTenant(tenantId);
-    const user = await db.user.findFirst({ where: { id } });
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
+    const user = await this.prisma.forTenant(tenantId).user.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!user) throw new NotFoundException("User not found");
     return user;
   }
 
-  async updateProfile(clerkUserId: string, tenantId: string, input: UpdateProfileInput) {
-    const user = await this.findByClerkUserId(clerkUserId, tenantId);
-    const db = this.prisma.forTenant(tenantId);
-    return db.user.update({
-      where: { id: user.id },
+  async updateProfile(userId: string, tenantId: string, input: UpdateProfileInput) {
+    await this.findById(userId, tenantId);
+    return this.prisma.forTenant(tenantId).user.update({
+      where: { id: userId },
       data: {
         ...(input.firstName !== undefined && { firstName: input.firstName }),
         ...(input.lastName !== undefined && { lastName: input.lastName }),
       },
-    });
-  }
-
-  async updateRole(userId: string, tenantId: string, role: "ADMIN" | "RECRUITER") {
-    const user = await this.findById(userId, tenantId);
-    const db = this.prisma.forTenant(tenantId);
-    return db.user.update({
-      where: { id: user.id },
-      data: { legacyRole: role },
     });
   }
 }
