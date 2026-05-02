@@ -50,7 +50,7 @@ export class AuthService {
     private readonly mfa: MfaService
   ) {}
 
-  // ── TASK-073: Login ──────────────────────────────────────────────────────────
+  // ── Login ──────────────────────────────────────────────────────────────────
 
   async login(
     email: string,
