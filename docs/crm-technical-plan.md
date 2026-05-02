@@ -31,6 +31,8 @@ The auth service is a **first-party module inside the NestJS API** (not a separa
 
 ### 2.1 Identity, Authentication, Authorization — First-Party
 
+> **Deep-dive:** Full flows, team permission model, functional vs. row-level permission design, resolution algorithm, and NestJS wiring are in `docs/authn-authz-technical-plan.md`. This section is the decision summary only.
+
 **Decision:** Cura builds its own authn/authz layer. No Clerk, no Auth0, no third-party identity provider in the request path.
 
 **Why first-party:**
