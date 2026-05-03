@@ -162,8 +162,8 @@
 - [x] **TASK-082:** Implement `JwtAuthGuard` — HS512 verify, Redis `GET user_ver:{sub}` version check (mismatch → `JWT_STALE` 401), resolve team shortIds → ULIDs, hydrate `permissions`, assemble `RequestUser` on `req.user`
 - [x] **TASK-083:** Implement `TeamShortIdCache` — in-process permanent `Map<shortId, ULID>`, lazy DB load on miss (`SELECT id, short_id FROM teams WHERE short_id = ANY($1)`), never evicted
 - [x] **TASK-084:** Implement `PermissionCacheService.getFunctionalPermissions()` — `SELECT MAX(GREATEST(ur.assigned_at, r.updated_at)) AS etag`, compare to in-process cache, full fetch only on ETag mismatch
-- [ ] **TASK-085:** Implement `FunctionalPermissionGuard` and `@RequirePermission('resource:action')` decorator
-- [ ] **TASK-086:** Implement `@Public()` and `@CurrentUser()` decorators; seed Redis `user_ver:{userId}` to `0` on first login (`SET NX`)
+- [x] **TASK-085:** Implement `FunctionalPermissionGuard` and `@RequirePermission('resource:action')` decorator
+- [x] **TASK-086:** Implement `@Public()` and `@CurrentUser()` decorators; seed Redis `user_ver:{userId}` to `0` on first login (`SET NX`)
 
 #### Story 2.5: Permission Service — Row-Level Checks (BE)
 
@@ -476,14 +476,14 @@
 
 - **EPICs:** 0/6 Complete
 - **Stories:** 10/34 Complete
-- **Tasks:** 44/165 Complete (17 BE + 27 FE)
+- **Tasks:** 46/165 Complete (19 BE + 27 FE)
 
 > Note: Sprint 1 FE stories remain complete. Clerk BE/FE work (Stories 2.1–2.3 old, TASK-048–064, WA-020–027) is superseded by the first-party auth plan. Task counts reset for EPIC-002 BE work.
 
 ### Current Sprint
 
-**Sprint:** Sprint 2
-**Active Stories:** Story 2.4 (JWT Guards & Principal Hydration) — next up
+**Sprint:** Sprint 3
+**Active Stories:** Story 2.5 (Permission Service — Row-Level Checks) — next up
 **Blocked Items:** None
 
 ---

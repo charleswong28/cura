@@ -54,13 +54,24 @@ export class PermissionCacheService {
     }
   }
 
-  /**
-   * Performs the full fetch of permissions.
-   * For now, this is a placeholder that will be implemented in TASK-087.
-   */
   private async performFullFetch(userId: string, tenantId: string): Promise<Set<string>> {
-    // In a real implementation, this would resolve all roles, teams, and direct permissions.
-    // For TASK-084, we just need the mechanism to be in place.
-    return new Set<string>();
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: { select: { permissions: true, tenantId: true } } },
+    });
+
+    const permissions = new Set<string>();
+    for (const { role } of userRoles) {
+      // Include built-in roles (tenantId = null) and roles scoped to this tenant
+      if (role.tenantId !== null && role.tenantId !== tenantId) continue;
+      for (const perm of role.permissions as string[]) {
+        if (perm === "*:*") {
+          // Admin short-circuit: wildcard covers everything
+          return new Set(["*:*"]);
+        }
+        permissions.add(perm);
+      }
+    }
+    return permissions;
   }
 }

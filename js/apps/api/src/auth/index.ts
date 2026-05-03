@@ -1,7 +1,8 @@
 export { JwtAuthGuard } from "./jwt-auth.guard";
+export { FunctionalPermissionGuard } from "./functional-permission.guard";
 export { ClerkAuthGuard } from "./clerk.guard"; // Story 2.4 removes this
 export { RolesGuard } from "./roles.guard"; // Story 2.4 removes this
-export { Public, CurrentUser, IS_PUBLIC_KEY } from "./auth.decorators";
+export { Public, CurrentUser, IS_PUBLIC_KEY, RequirePermission, REQUIRE_PERMISSION_KEY } from "./auth.decorators";
 export type { RequestUser } from "./auth.types";
 export { AuthModule } from "./auth.module";
 export { AuthService } from "./auth.service";
