@@ -44,8 +44,6 @@ export class UserResolver {
     return updated;
   }
 
-  // ── TASK-096: Invite ────────────────────────────────────────────────────
-
   @Mutation(() => UserModel, { description: "Invite a new user to the tenant" })
   @RequirePermission("user:invite")
   async inviteUser(
@@ -63,8 +61,6 @@ export class UserResolver {
     });
     return invited;
   }
-
-  // ── TASK-097: Role assignment ───────────────────────────────────────────
 
   @Mutation(() => UserModel, { description: "Assign a role to a user" })
   @RequirePermission("user:manage_roles")
@@ -101,8 +97,6 @@ export class UserResolver {
     });
     return updated;
   }
-
-  // ── TASK-098: Deactivation ──────────────────────────────────────────────
 
   @Mutation(() => UserModel, { description: "Deactivate a user — revokes all sessions" })
   @RequirePermission("user:deactivate")

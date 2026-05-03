@@ -54,8 +54,6 @@ export class UserService {
     });
   }
 
-  // ── TASK-096: User Invite ────────────────────────────────────────────────
-
   /**
    * Invites a user to the tenant:
    * - Reuses an existing AuthIdentity if the email is known, otherwise creates one.
@@ -165,8 +163,6 @@ export class UserService {
     return user;
   }
 
-  // ── TASK-097: UserRole Assignment ────────────────────────────────────────
-
   async assignRole(tenantId: string, actorId: string, input: AssignRoleInput) {
     await this.findById(input.userId, tenantId);
 
@@ -206,8 +202,6 @@ export class UserService {
 
     return this.findById(input.userId, tenantId);
   }
-
-  // ── TASK-098: User Deactivation ──────────────────────────────────────────
 
   async deactivate(userId: string, actorId: string, tenantId: string) {
     const user = await this.findById(userId, tenantId);
