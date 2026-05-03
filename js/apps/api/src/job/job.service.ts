@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { JobStatus, JobPriority } from "../generated/prisma/enums";
 import { PrismaService } from "../prisma/prisma.service";
 import { ClientService } from "../client/client.service";
+import { PermissionService } from "../permissions/permission.service";
 import { generateId } from "../common/ulid";
 import { CreateJobInput } from "./dto/create-job.input";
 import { UpdateJobInput } from "./dto/update-job.input";
@@ -12,7 +13,8 @@ const OPEN_STATUSES = new Set<JobStatus>([JobStatus.OPEN]);
 export class JobService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(ClientService) private readonly clientService: ClientService
+    @Inject(ClientService) private readonly clientService: ClientService,
+    @Inject(PermissionService) private readonly permissionService: PermissionService
   ) {}
 
   async findAll(tenantId: string) {
@@ -58,6 +60,14 @@ export class JobService {
         data: { totalJobCount: { increment: 1 }, activeJobCount: { decrement: 1 } },
       });
     }
+
+    await this.permissionService.autoGrantOnJobCreate(
+      tenantId,
+      userId,
+      job.id,
+      job.ownerUserId ?? userId,
+      input.clientId
+    );
 
     return job;
   }

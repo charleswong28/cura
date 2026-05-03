@@ -1,12 +1,16 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { PermissionService } from "../permissions/permission.service";
 import { generateId } from "../common/ulid";
 import { CreateClientInput } from "./dto/create-client.input";
 import { UpdateClientInput } from "./dto/update-client.input";
 
 @Injectable()
 export class ClientService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(PermissionService) private readonly permissionService: PermissionService
+  ) {}
 
   async findAll(tenantId: string) {
     return this.prisma.forTenant(tenantId).client.findMany({
@@ -39,7 +43,8 @@ export class ClientService {
       },
     });
 
-    // Update totalJobCount is 0 on create; activeJobCount maintained by job service
+    await this.permissionService.autoGrantOnClientCreate(tenantId, userId, client.id, input.bdUserId ?? null);
+
     return client;
   }
 

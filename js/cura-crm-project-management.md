@@ -169,12 +169,12 @@
 
 > `PermissionService` core methods, resolution algorithm, cascade rules, system auto-grants per `authn-authz-technical-plan.md §5`.
 
-- [ ] **TASK-087:** Implement `PermissionService.can()` — collect grantees (USER + TEAM ids + ROLE ids), `SELECT MAX(accessLevel)` query, TEAM-role adjustment (LEAD keeps granted level; MEMBER capped below OWNER), request-scoped LRU cache per `(userId, resourceType, resourceId)`
-- [ ] **TASK-088:** Implement `PermissionService.assertCan()` (throws `ForbiddenException`) and `effectiveLevel()` (returns `AccessLevel | null`)
-- [ ] **TASK-089:** Implement cascade rule resolution (Step 4 of algorithm) — check `PermissionCascadeRule` where `fromResourceType = resourceType`, recurse via `can()` on parent resource
-- [ ] **TASK-090:** Implement `PermissionService.grant()` and `revoke()` — upsert `Permission` row, append `PermissionGrant` audit row, `adjustLevel()` for upgrades/downgrades
-- [ ] **TASK-091:** Implement `getDataScope()` (resolve highest `DataScopeType` across user's roles) and `getExplicitlyGrantedIds()` (for list-query OR clause)
-- [ ] **TASK-092:** Implement system auto-grants on record creation — `Candidate` (OWNER to creator, VIEW to creator's teams), `Job` (OWNER to creator, EDIT to `ownerUserId`, VIEW to client BD owner), `Client` (OWNER to `bdUserId`), `JobApplication` (EDIT to `ownerUserId`) per §5.5
+- [x] **TASK-087:** Implement `PermissionService.can()` — collect grantees (USER + TEAM ids + ROLE ids), `SELECT MAX(accessLevel)` query, TEAM-role adjustment (LEAD keeps granted level; MEMBER capped below OWNER), request-scoped LRU cache per `(userId, resourceType, resourceId)`
+- [x] **TASK-088:** Implement `PermissionService.assertCan()` (throws `ForbiddenException`) and `effectiveLevel()` (returns `AccessLevel | null`)
+- [x] **TASK-089:** Implement cascade rule resolution (Step 4 of algorithm) — check `PermissionCascadeRule` where `fromResourceType = resourceType`, recurse via `can()` on parent resource
+- [x] **TASK-090:** Implement `PermissionService.grant()` and `revoke()` — upsert `Permission` row, append `PermissionGrant` audit row, `adjustLevel()` for upgrades/downgrades
+- [x] **TASK-091:** Implement `getDataScope()` (resolve highest `DataScopeType` across user's roles) and `getExplicitlyGrantedIds()` (for list-query OR clause)
+- [x] **TASK-092:** Implement system auto-grants on record creation — `Candidate` (OWNER to creator, VIEW to creator's teams), `Job` (OWNER to creator, EDIT to `ownerUserId`, VIEW to client BD owner), `Client` (OWNER to `bdUserId`), `JobApplication` (EDIT to `ownerUserId`) per §5.5
 
 #### Story 2.6: Team Service & Resolver (BE)
 
@@ -476,14 +476,14 @@
 
 - **EPICs:** 0/6 Complete
 - **Stories:** 10/34 Complete
-- **Tasks:** 46/165 Complete (19 BE + 27 FE)
+- **Tasks:** 52/165 Complete (25 BE + 27 FE)
 
 > Note: Sprint 1 FE stories remain complete. Clerk BE/FE work (Stories 2.1–2.3 old, TASK-048–064, WA-020–027) is superseded by the first-party auth plan. Task counts reset for EPIC-002 BE work.
 
 ### Current Sprint
 
 **Sprint:** Sprint 3
-**Active Stories:** Story 2.5 (Permission Service — Row-Level Checks) — next up
+**Active Stories:** Story 2.6 (Team Service & Resolver) — next up
 **Blocked Items:** None
 
 ---

@@ -1,12 +1,16 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { PermissionService } from "../permissions/permission.service";
 import { generateId } from "../common/ulid";
 import { CreateCandidateInput } from "./dto/create-candidate.input";
 import { UpdateCandidateInput } from "./dto/update-candidate.input";
 
 @Injectable()
 export class CandidateService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(PermissionService) private readonly permissionService: PermissionService
+  ) {}
 
   async findAll(tenantId: string) {
     return this.prisma.forTenant(tenantId).candidate.findMany({
@@ -23,8 +27,8 @@ export class CandidateService {
     return candidate;
   }
 
-  async create(tenantId: string, userId: string, input: CreateCandidateInput) {
-    return this.prisma.forTenant(tenantId).candidate.create({
+  async create(tenantId: string, userId: string, input: CreateCandidateInput, teamIds: string[] = []) {
+    const candidate = await this.prisma.forTenant(tenantId).candidate.create({
       data: {
         id: generateId(),
         tenantId,
@@ -40,6 +44,10 @@ export class CandidateService {
         createdById: userId,
       },
     });
+
+    await this.permissionService.autoGrantOnCandidateCreate(tenantId, userId, candidate.id, teamIds);
+
+    return candidate;
   }
 
   async update(id: string, tenantId: string, userId: string, input: UpdateCandidateInput) {

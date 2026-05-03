@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { ApplicationStageType } from "../generated/prisma/enums";
 import { PrismaService } from "../prisma/prisma.service";
 import { JobService } from "../job/job.service";
+import { PermissionService } from "../permissions/permission.service";
 import { generateId } from "../common/ulid";
 import { CreateJobApplicationInput } from "./dto/create-job-application.input";
 import { AdvanceStageInput } from "./dto/advance-stage.input";
@@ -30,7 +31,8 @@ const COUNTER_MAP: Partial<
 export class JobApplicationService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(JobService) private readonly jobService: JobService
+    @Inject(JobService) private readonly jobService: JobService,
+    @Inject(PermissionService) private readonly permissionService: PermissionService
   ) {}
 
   async findById(id: string, tenantId: string) {
@@ -73,6 +75,13 @@ export class JobApplicationService {
     });
 
     await this.jobService.incrementCounter(input.jobId, tenantId, "applicationCount");
+
+    await this.permissionService.autoGrantOnJobApplicationCreate(
+      tenantId,
+      userId,
+      app.id,
+      app.ownerUserId ?? userId
+    );
 
     return app;
   }
