@@ -25,7 +25,7 @@ export class CandidateResolver {
     @CurrentUser() user: RequestUser,
     @Args("input") input: CreateCandidateInput
   ) {
-    return this.candidateService.create(user.tenantId, user.userId, input);
+    return this.candidateService.create(user.tenantId, user.userId, input, user.teams.map((t) => t.id));
   }
 
   @Mutation(() => CandidateModel, { description: "Update a candidate" })

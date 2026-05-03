@@ -5,6 +5,7 @@ import { GraphQLModule } from "@nestjs/graphql";
 import { ApolloDriver, ApolloDriverConfig } from "@nestjs/apollo";
 import { JwtAuthGuard, FunctionalPermissionGuard } from "./auth";
 import { AuthModule } from "./auth/auth.module";
+import { PermissionModule } from "./permissions/permission.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { WaitlistModule } from "./waitlist/waitlist.module";
@@ -32,6 +33,7 @@ import { MigrationModule } from "./migration/migration.module";
     HealthModule,
     WaitlistModule,
     AuthModule,
+    PermissionModule,
     ActivityModule,
     UserModule,
     CandidateModule,
