@@ -44,7 +44,7 @@ export class PermissionService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   // =========================================================================
-  // TASK-087: can() — row-level check with team-role adjustment
+  // Row-level checks
   // =========================================================================
 
   async can(
@@ -58,7 +58,7 @@ export class PermissionService {
   }
 
   // =========================================================================
-  // TASK-088: assertCan() + effectiveLevel()
+  // Enforcement helpers
   // =========================================================================
 
   async assertCan(
@@ -113,12 +113,11 @@ export class PermissionService {
     const direct = maxLevel(effectiveLevels);
     if (direct !== null) return direct;
 
-    // TASK-089: fall through to cascade rule check
     return this.checkCascade(user, resourceType, resourceId);
   }
 
   // =========================================================================
-  // TASK-089: cascade rule resolution
+  // Cascade rule resolution
   // =========================================================================
 
   private async checkCascade(
@@ -207,7 +206,7 @@ export class PermissionService {
   }
 
   // =========================================================================
-  // TASK-090: grant() + revoke() + adjustLevel()
+  // Grant management
   // =========================================================================
 
   async grant(input: GrantInput): Promise<void> {
@@ -336,7 +335,7 @@ export class PermissionService {
   }
 
   // =========================================================================
-  // TASK-091: getDataScope() + getExplicitlyGrantedIds()
+  // List-query scope helpers
   // =========================================================================
 
   async getDataScope(user: RequestUser, resourceType: string): Promise<DataScopeType> {
@@ -387,7 +386,7 @@ export class PermissionService {
   }
 
   // =========================================================================
-  // TASK-092: system auto-grants on record creation
+  // Auto-grants on record creation (§5.5)
   // =========================================================================
 
   async autoGrantOnCandidateCreate(
