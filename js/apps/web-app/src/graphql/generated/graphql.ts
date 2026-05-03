@@ -213,6 +213,7 @@ export type Query = {
   clients: ClientConnection;
   job?: Maybe<Job>;
   jobs: JobConnection;
+  me: User;
 };
 
 export type QueryCandidateArgs = {
@@ -295,10 +296,13 @@ export type UpdateJobInput = {
 
 export type User = {
   __typename?: "User";
+  createdAt: Scalars["DateTime"]["output"];
   email: Scalars["String"]["output"];
   firstName: Scalars["String"]["output"];
   id: Scalars["ID"]["output"];
   lastName: Scalars["String"]["output"];
+  loginable: Scalars["Boolean"]["output"];
+  updatedAt: Scalars["DateTime"]["output"];
 };
 
 export type CandidateFieldsFragment = {
@@ -699,6 +703,13 @@ export type JobQuery = {
     client: { __typename?: "Client"; id: string; name: string };
     assignedTo?: { __typename?: "User"; id: string; firstName: string; lastName: string } | null;
   } | null;
+};
+
+export type MeQueryVariables = Exact<{ [key: string]: never }>;
+
+export type MeQuery = {
+  __typename?: "Query";
+  me: { __typename?: "User"; id: string; email: string; firstName: string; lastName: string };
 };
 
 export const CandidateFieldsFragmentDoc = {
@@ -2098,3 +2109,31 @@ export const JobDocument = {
     },
   ],
 } as unknown as DocumentNode<JobQuery, JobQueryVariables>;
+export const MeDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "query",
+      name: { kind: "Name", value: "Me" },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "me" },
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "Field", name: { kind: "Name", value: "id" } },
+                { kind: "Field", name: { kind: "Name", value: "email" } },
+                { kind: "Field", name: { kind: "Name", value: "firstName" } },
+                { kind: "Field", name: { kind: "Name", value: "lastName" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<MeQuery, MeQueryVariables>;

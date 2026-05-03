@@ -23,6 +23,7 @@ type Documents = {
   "fragment JobFields on Job {\n  id\n  title\n  description\n  status\n  priority\n  client {\n    id\n    name\n  }\n  assignedTo {\n    id\n    firstName\n    lastName\n  }\n  createdAt\n  updatedAt\n}": typeof types.JobFieldsFragmentDoc;
   "mutation CreateJob($input: CreateJobInput!) {\n  createJob(input: $input) {\n    ...JobFields\n  }\n}\n\nmutation UpdateJob($id: ID!, $input: UpdateJobInput!) {\n  updateJob(id: $id, input: $input) {\n    ...JobFields\n  }\n}\n\nmutation DeleteJob($id: ID!) {\n  deleteJob(id: $id)\n}": typeof types.CreateJobDocument;
   "query Jobs($first: Int, $after: String, $search: String, $status: JobStatus, $priority: JobPriority, $sortBy: String, $sortOrder: String) {\n  jobs(\n    first: $first\n    after: $after\n    search: $search\n    status: $status\n    priority: $priority\n    sortBy: $sortBy\n    sortOrder: $sortOrder\n  ) {\n    edges {\n      cursor\n      node {\n        ...JobFields\n      }\n    }\n    pageInfo {\n      hasNextPage\n      endCursor\n    }\n    totalCount\n  }\n}\n\nquery Job($id: ID!) {\n  job(id: $id) {\n    ...JobFields\n  }\n}": typeof types.JobsDocument;
+  "query Me {\n  me {\n    id\n    email\n    firstName\n    lastName\n  }\n}": typeof types.MeDocument;
 };
 const documents: Documents = {
   "fragment CandidateFields on Candidate {\n  id\n  firstName\n  lastName\n  email\n  phone\n  currentCompany\n  currentTitle\n  location\n  status\n  notes\n  linkedinUrl\n  githubUrl\n  createdAt\n  updatedAt\n}":
@@ -43,6 +44,7 @@ const documents: Documents = {
     types.CreateJobDocument,
   "query Jobs($first: Int, $after: String, $search: String, $status: JobStatus, $priority: JobPriority, $sortBy: String, $sortOrder: String) {\n  jobs(\n    first: $first\n    after: $after\n    search: $search\n    status: $status\n    priority: $priority\n    sortBy: $sortBy\n    sortOrder: $sortOrder\n  ) {\n    edges {\n      cursor\n      node {\n        ...JobFields\n      }\n    }\n    pageInfo {\n      hasNextPage\n      endCursor\n    }\n    totalCount\n  }\n}\n\nquery Job($id: ID!) {\n  job(id: $id) {\n    ...JobFields\n  }\n}":
     types.JobsDocument,
+  "query Me {\n  me {\n    id\n    email\n    firstName\n    lastName\n  }\n}": types.MeDocument,
 };
 
 /**
@@ -113,6 +115,12 @@ export function graphql(
 export function graphql(
   source: "query Jobs($first: Int, $after: String, $search: String, $status: JobStatus, $priority: JobPriority, $sortBy: String, $sortOrder: String) {\n  jobs(\n    first: $first\n    after: $after\n    search: $search\n    status: $status\n    priority: $priority\n    sortBy: $sortBy\n    sortOrder: $sortOrder\n  ) {\n    edges {\n      cursor\n      node {\n        ...JobFields\n      }\n    }\n    pageInfo {\n      hasNextPage\n      endCursor\n    }\n    totalCount\n  }\n}\n\nquery Job($id: ID!) {\n  job(id: $id) {\n    ...JobFields\n  }\n}"
 ): (typeof documents)["query Jobs($first: Int, $after: String, $search: String, $status: JobStatus, $priority: JobPriority, $sortBy: String, $sortOrder: String) {\n  jobs(\n    first: $first\n    after: $after\n    search: $search\n    status: $status\n    priority: $priority\n    sortBy: $sortBy\n    sortOrder: $sortOrder\n  ) {\n    edges {\n      cursor\n      node {\n        ...JobFields\n      }\n    }\n    pageInfo {\n      hasNextPage\n      endCursor\n    }\n    totalCount\n  }\n}\n\nquery Job($id: ID!) {\n  job(id: $id) {\n    ...JobFields\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: "query Me {\n  me {\n    id\n    email\n    firstName\n    lastName\n  }\n}"
+): (typeof documents)["query Me {\n  me {\n    id\n    email\n    firstName\n    lastName\n  }\n}"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};
