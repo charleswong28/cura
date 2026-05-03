@@ -1,8 +1,10 @@
 query Me {
   me {
     id
+    authIdentityId
     email
     firstName
     lastName
+    mfaEnrolled
   }
 }

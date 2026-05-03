@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,15 @@ export default function LoginPage() {
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Signing in…" : "Sign in"}
           </Button>
+
+          <div className="text-center">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Forgot your password?
+            </Link>
+          </div>
         </form>
       ) : (
         <form onSubmit={handleMfa} className="space-y-4">

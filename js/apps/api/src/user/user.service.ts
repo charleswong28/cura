@@ -29,18 +29,21 @@ export class UserService {
   ) {}
 
   async findAll(tenantId: string) {
-    return this.prisma.forTenant(tenantId).user.findMany({
+    const users = await this.prisma.forTenant(tenantId).user.findMany({
       where: { deletedAt: null },
       orderBy: { createdAt: "asc" },
+      include: { authIdentity: { select: { mfaEnrolled: true } } },
     });
+    return users.map((u) => ({ ...u, mfaEnrolled: u.authIdentity?.mfaEnrolled ?? false }));
   }
 
   async findById(id: string, tenantId: string) {
     const user = await this.prisma.forTenant(tenantId).user.findFirst({
       where: { id, deletedAt: null },
+      include: { authIdentity: { select: { mfaEnrolled: true } } },
     });
     if (!user) throw new NotFoundException("User not found");
-    return user;
+    return { ...user, mfaEnrolled: user.authIdentity?.mfaEnrolled ?? false };
   }
 
   async updateProfile(userId: string, tenantId: string, input: UpdateProfileInput) {
