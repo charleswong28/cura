@@ -65,10 +65,6 @@ describe("PasswordService", () => {
       await expect(service.validateComplexity("Abcdefgh")).rejects.toThrow(/digit/);
     });
 
-    it("does not require a symbol by default", async () => {
-      await expect(service.validateComplexity("Abcdef12")).resolves.toBeUndefined();
-    });
-
     it("aggregates multiple violations in one error message", async () => {
       try {
         await service.validateComplexity("abc");

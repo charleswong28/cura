@@ -248,12 +248,15 @@ describe("AuthService", () => {
       expect(sessionData.refreshTokenHash).toMatch(/^[a-f0-9]{64}$/);
 
       // Tokens
-      const ok = "accessToken" in result;
-      expect(ok).toBe(true);
-      if (!("accessToken" in result)) return;
-      expect(result.refreshToken).toMatch(/^[a-f0-9]{96}$/);
+      expect("accessToken" in result).toBe(true);
+      const session = result as {
+        accessToken: string;
+        refreshToken: string;
+        user: { id: string; displayName: string; tenantId: string };
+      };
+      expect(session.refreshToken).toMatch(/^[a-f0-9]{96}$/);
 
-      const decoded = jwt.verify(result.accessToken, JWT_SECRET, {
+      const decoded = jwt.verify(session.accessToken, JWT_SECRET, {
         algorithms: ["HS512"],
       }) as Record<string, unknown>;
       expect(decoded.sub).toBe("user_1");
@@ -272,7 +275,7 @@ describe("AuthService", () => {
         data: { firstLogin: expect.any(Date) },
       });
 
-      expect(result.user).toEqual({
+      expect(session.user).toEqual({
         id: "user_1",
         displayName: "Ada Lovelace",
         tenantId: "tenant_1",
@@ -299,7 +302,10 @@ describe("AuthService", () => {
       const result = await service.completeMfaLogin("token_1", "123456");
 
       expect(mfa.verifyChallenge).toHaveBeenCalledWith("token_1", "123456");
-      expect("accessToken" in result).toBe(true);
+      expect(result).toMatchObject({
+        accessToken: expect.any(String),
+        refreshToken: expect.any(String),
+      });
     });
   });
 

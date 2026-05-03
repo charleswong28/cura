@@ -58,17 +58,15 @@ describe("JwtAuthGuard", () => {
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it("rejects an unverifiable JWT", async () => {
-    const ctx = buildContext({ headers: { authorization: "Bearer not-a-real-jwt" } });
-    await expect(guard.canActivate(ctx)).rejects.toThrow(/Invalid or expired token/);
-  });
+  it("rejects an unverifiable JWT (malformed or wrong secret)", async () => {
+    const malformed = buildContext({ headers: { authorization: "Bearer not-a-real-jwt" } });
+    await expect(guard.canActivate(malformed)).rejects.toThrow(/Invalid or expired token/);
 
-  it("rejects a JWT signed with the wrong secret", async () => {
-    const wrong = jwt.sign({ sub: "u1" }, "another-secret-of-sufficient-length", {
+    const wrongSecret = jwt.sign({ sub: "u1" }, "another-secret-of-sufficient-length", {
       algorithm: "HS512",
     });
-    const ctx = buildContext({ headers: { authorization: `Bearer ${wrong}` } });
-    await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(UnauthorizedException);
+    const wrongSecretCtx = buildContext({ headers: { authorization: `Bearer ${wrongSecret}` } });
+    await expect(guard.canActivate(wrongSecretCtx)).rejects.toThrow(/Invalid or expired token/);
   });
 
   it("flags JWT_STALE when the Redis user_ver disagrees with the token", async () => {

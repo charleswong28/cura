@@ -34,7 +34,6 @@ describe("RedisService", () => {
 
   describe("getUserVer", () => {
     it("returns 0 when the key does not exist", async () => {
-      fakeRedisInstance.get.mockResolvedValueOnce(null);
       expect(await service.getUserVer("u1")).toBe(0);
       expect(fakeRedisInstance.get).toHaveBeenCalledWith("user_ver:u1");
     });
@@ -99,7 +98,6 @@ describe("RedisService", () => {
     });
 
     it("returns null when the challenge is missing", async () => {
-      fakeRedisInstance.get.mockResolvedValueOnce(null);
       expect(await service.getChallenge<unknown>("tok_1")).toBeNull();
     });
 
