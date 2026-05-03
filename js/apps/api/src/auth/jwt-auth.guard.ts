@@ -55,15 +55,15 @@ export class JwtAuthGuard implements CanActivate {
       throw error;
     }
 
-    // 2. Resolve team shortIds -> ULIDs
+    // 2. Resolve team shortIds -> ULIDs (shortId is stored/encoded as a number)
     const resolvedTeams = await Promise.all(
-      (teams || []).map(async (team: { id: string; r: string }) => {
+      (teams || []).map(async (team: { id: number; r: string }) => {
         const teamRecord = await this.prisma.team.findUnique({
           where: { shortId: team.id },
           select: { id: true },
         });
         return {
-          id: teamRecord?.id ?? team.id,
+          id: teamRecord?.id ?? String(team.id),
           role: team.r === "L" ? "LEAD" : "MEMBER",
         };
       })
