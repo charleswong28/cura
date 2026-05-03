@@ -1,10 +1,13 @@
 import { Inject } from "@nestjs/common";
-import { Resolver, Query, Mutation, Args } from "@nestjs/graphql";
+import { Resolver, Query, Mutation, Args, ID } from "@nestjs/graphql";
 import { UserModel } from "../common/graphql";
-import { CurrentUser } from "../auth";
+import { CurrentUser, RequirePermission } from "../auth";
 import type { RequestUser } from "../auth";
 import { UserService } from "./user.service";
 import { UpdateProfileInput } from "./dto/update-profile.input";
+import { InviteUserInput } from "./dto/invite-user.input";
+import { AssignRoleInput } from "./dto/assign-role.input";
+import { RemoveRoleInput } from "./dto/remove-role.input";
 import { ActivityLogService } from "../activity/activity.service";
 
 @Resolver(() => UserModel)
@@ -39,5 +42,99 @@ export class UserResolver {
       metadata: { fields: Object.keys(input).filter((k) => (input as any)[k] !== undefined) },
     });
     return updated;
+  }
+
+  // ── TASK-096: Invite ────────────────────────────────────────────────────
+
+  @Mutation(() => UserModel, { description: "Invite a new user to the tenant" })
+  @RequirePermission("user:invite")
+  async inviteUser(
+    @CurrentUser() user: RequestUser,
+    @Args("input") input: InviteUserInput
+  ) {
+    const invited = await this.userService.invite(user.tenantId, user.userId, input);
+    await this.activityLogService.log({
+      tenantId: user.tenantId,
+      userId: user.userId,
+      action: "USER_INVITED",
+      entityType: "User",
+      entityId: invited.id,
+      metadata: { email: input.email, roleNames: input.roleNames },
+    });
+    return invited;
+  }
+
+  // ── TASK-097: Role assignment ───────────────────────────────────────────
+
+  @Mutation(() => UserModel, { description: "Assign a role to a user" })
+  @RequirePermission("user:manage_roles")
+  async assignRole(
+    @CurrentUser() user: RequestUser,
+    @Args("input") input: AssignRoleInput
+  ) {
+    const updated = await this.userService.assignRole(user.tenantId, user.userId, input);
+    await this.activityLogService.log({
+      tenantId: user.tenantId,
+      userId: user.userId,
+      action: "USER_ROLE_CHANGED",
+      entityType: "User",
+      entityId: input.userId,
+      metadata: { roleId: input.roleId, change: "assigned" },
+    });
+    return updated;
+  }
+
+  @Mutation(() => UserModel, { description: "Remove a role from a user" })
+  @RequirePermission("user:manage_roles")
+  async removeRole(
+    @CurrentUser() user: RequestUser,
+    @Args("input") input: RemoveRoleInput
+  ) {
+    const updated = await this.userService.removeRole(user.tenantId, input);
+    await this.activityLogService.log({
+      tenantId: user.tenantId,
+      userId: user.userId,
+      action: "USER_ROLE_CHANGED",
+      entityType: "User",
+      entityId: input.userId,
+      metadata: { roleId: input.roleId, change: "removed" },
+    });
+    return updated;
+  }
+
+  // ── TASK-098: Deactivation ──────────────────────────────────────────────
+
+  @Mutation(() => UserModel, { description: "Deactivate a user — revokes all sessions" })
+  @RequirePermission("user:deactivate")
+  async deactivateUser(
+    @Args("userId", { type: () => ID }) userId: string,
+    @CurrentUser() user: RequestUser
+  ) {
+    const deactivated = await this.userService.deactivate(userId, user.userId, user.tenantId);
+    await this.activityLogService.log({
+      tenantId: user.tenantId,
+      userId: user.userId,
+      action: "USER_DEACTIVATED",
+      entityType: "User",
+      entityId: userId,
+    });
+    return deactivated;
+  }
+
+  @Mutation(() => UserModel, { description: "Reactivate a previously deactivated user" })
+  @RequirePermission("user:deactivate")
+  async reactivateUser(
+    @Args("userId", { type: () => ID }) userId: string,
+    @CurrentUser() user: RequestUser
+  ) {
+    const reactivated = await this.userService.reactivate(userId, user.tenantId);
+    await this.activityLogService.log({
+      tenantId: user.tenantId,
+      userId: user.userId,
+      action: "USER_REACTIVATED",
+      entityType: "User",
+      entityId: userId,
+    });
+    return reactivated;
   }
 }
