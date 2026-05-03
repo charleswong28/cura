@@ -85,6 +85,9 @@ type User {
   email: String!
   firstName: String!
   lastName: String!
+  loginable: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
 
 # ---------------------------------------------------------------------------
@@ -245,6 +248,8 @@ type Query {
   ): JobConnection!
 
   job(id: ID!): Job
+
+  me: User!
 }
 
 type Mutation {

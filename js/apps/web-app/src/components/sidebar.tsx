@@ -11,12 +11,13 @@ import {
   PanelLeftClose,
   PanelLeft,
   Menu,
+  LogOut,
 } from "lucide-react";
-import { OrganizationSwitcher } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { useAuth } from "@/lib/auth-context";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -35,6 +36,39 @@ interface SidebarProps {
 interface MobileSidebarProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function UserSection({ collapsed }: { collapsed: boolean }) {
+  const { user, logout } = useAuth();
+
+  const initials = user
+    ? `${user.displayName.split(" ")[0]?.[0] ?? ""}${user.displayName.split(" ")[1]?.[0] ?? ""}`.toUpperCase()
+    : "?";
+
+  return (
+    <div className={cn("flex items-center gap-2 px-2 py-3", collapsed ? "flex-col" : "flex-row")}>
+      {/* Avatar */}
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
+        {initials}
+      </div>
+
+      {!collapsed && (
+        <span className="flex-1 truncate text-sm font-medium text-sidebar-foreground">
+          {user?.displayName ?? "—"}
+        </span>
+      )}
+
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={logout}
+        title="Sign out"
+        className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+      >
+        <LogOut className="h-4 w-4" />
+      </Button>
+    </div>
+  );
 }
 
 function SidebarNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
@@ -110,23 +144,8 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
       <Separator />
 
-      {/* Organization switcher */}
-      <div className={cn("px-2 py-3", collapsed && "flex justify-center")}>
-        <OrganizationSwitcher
-          hidePersonal
-          afterSelectOrganizationUrl="/dashboard"
-          afterCreateOrganizationUrl="/dashboard"
-          appearance={{
-            elements: {
-              rootBox: cn("w-full", collapsed && "w-auto"),
-              organizationSwitcherTrigger: cn(
-                "w-full rounded-md border-sidebar-border",
-                collapsed && "w-auto px-1 [&>span]:hidden [&>svg:last-child]:hidden"
-              ),
-            },
-          }}
-        />
-      </div>
+      {/* User info + logout */}
+      <UserSection collapsed={collapsed} />
 
       <Separator />
 
@@ -173,20 +192,8 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
 
         <Separator />
 
-        {/* Organization switcher */}
-        <div className="px-2 py-3">
-          <OrganizationSwitcher
-            hidePersonal
-            afterSelectOrganizationUrl="/dashboard"
-            afterCreateOrganizationUrl="/dashboard"
-            appearance={{
-              elements: {
-                rootBox: "w-full",
-                organizationSwitcherTrigger: "w-full rounded-md",
-              },
-            }}
-          />
-        </div>
+        {/* User info + logout */}
+        <UserSection collapsed={false} />
 
         <Separator />
 

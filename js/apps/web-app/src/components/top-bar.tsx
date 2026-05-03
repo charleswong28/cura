@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -61,7 +60,7 @@ export function TopBar({ onCommandPaletteOpen, mobileNavTrigger }: TopBarProps) 
         </Breadcrumb>
       </div>
 
-      {/* Right side: search trigger + user avatar */}
+      {/* Right side: search trigger (user avatar/logout lives in sidebar) */}
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -78,11 +77,6 @@ export function TopBar({ onCommandPaletteOpen, mobileNavTrigger }: TopBarProps) 
         <Button variant="ghost" size="icon-sm" className="sm:hidden" onClick={onCommandPaletteOpen}>
           <Search className="h-4 w-4" />
         </Button>
-        <UserButton
-          appearance={{
-            elements: { avatarBox: "h-8 w-8" },
-          }}
-        />
       </div>
     </header>
   );
