@@ -8,6 +8,9 @@ export class UserModel {
   @Field()
   tenantId!: string;
 
+  @Field({ nullable: true })
+  authIdentityId!: string | null;
+
   @Field()
   email!: string;
 
@@ -19,6 +22,9 @@ export class UserModel {
 
   @Field()
   loginable!: boolean;
+
+  @Field({ description: "Whether TOTP MFA is enrolled for this user" })
+  mfaEnrolled!: boolean;
 
   @Field(() => Date, { nullable: true, description: "Timestamp of the user's first login" })
   firstLogin!: Date | null;

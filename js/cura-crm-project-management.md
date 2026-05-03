@@ -209,10 +209,10 @@
 
 > TOTP enrolment flow and password reset pages.
 
-- [ ] **WA-086:** Create MFA enrolment page — display QR code URI as scannable image, confirm a TOTP code to activate enrolment
-- [ ] **WA-087:** Display backup codes after enrolment with one-time download prompt (plaintext list)
-- [ ] **WA-088:** Create forgot-password page (`/forgot-password`) — email input, submit to `POST /auth/password-reset/request`, show confirmation message
-- [ ] **WA-089:** Create reset-password page (`/reset-password?token=...`) — new password + confirm form, submit to `POST /auth/password-reset/confirm`, redirect to login on success
+- [x] **WA-086:** Create MFA enrolment page — display QR code URI as scannable image, confirm a TOTP code to activate enrolment
+- [x] **WA-087:** Display backup codes after enrolment with one-time download prompt (plaintext list)
+- [x] **WA-088:** Create forgot-password page (`/forgot-password`) — email input, submit to `POST /auth/password-reset/request`, show confirmation message
+- [x] **WA-089:** Create reset-password page (`/reset-password?token=...`) — new password + confirm form, submit to `POST /auth/password-reset/confirm`, redirect to login on success
 
 #### Story 2.10: Multi-tenancy & Org Switching (FE)
 
@@ -483,7 +483,7 @@
 ### Current Sprint
 
 **Sprint:** Sprint 3
-**Active Stories:** Story 2.9 (Frontend — MFA Enrolment & Password Reset) — next up
+**Active Stories:** Story 2.10 (Multi-tenancy & Org Switching) — next up
 **Blocked Items:** None
 
 ---

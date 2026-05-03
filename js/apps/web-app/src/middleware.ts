@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 const REFRESH_COOKIE = "cura_refresh";
 
 // Paths that don't require authentication
-const PUBLIC_PREFIXES = ["/login", "/api/auth/"];
+const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/api/auth/"];
 
 // Static asset extensions matched by the config below, but kept here for clarity
 function isPublic(pathname: string): boolean {

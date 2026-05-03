@@ -82,10 +82,12 @@ type Job {
 
 type User {
   id: ID!
+  authIdentityId: String
   email: String!
   firstName: String!
   lastName: String!
   loginable: Boolean!
+  mfaEnrolled: Boolean!
   createdAt: DateTime!
   updatedAt: DateTime!
 }
