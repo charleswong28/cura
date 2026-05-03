@@ -12,6 +12,6 @@ import { FunctionalPermissionGuard } from "./functional-permission.guard";
   imports: [PrismaModule],
   controllers: [AuthController],
   providers: [AuthService, PasswordService, RedisService, MfaService, PermissionCacheService, FunctionalPermissionGuard],
-  exports: [AuthService, RedisService, PermissionCacheService, FunctionalPermissionGuard],
+  exports: [AuthService, PasswordService, RedisService, PermissionCacheService, FunctionalPermissionGuard],
 })
 export class AuthModule {}

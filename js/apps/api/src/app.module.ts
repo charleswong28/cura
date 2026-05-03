@@ -19,6 +19,7 @@ import { JobModule } from "./job/job.module";
 import { JobApplicationModule } from "./job-application/job-application.module";
 import { MigrationModule } from "./migration/migration.module";
 import { TeamModule } from "./team/team.module";
+import { RoleModule } from "./role/role.module";
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { TeamModule } from "./team/team.module";
     JobApplicationModule,
     MigrationModule,
     TeamModule,
+    RoleModule,
   ],
   providers: [
     {

@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "ActivityAction" ADD VALUE 'USER_DEACTIVATED';
+ALTER TYPE "ActivityAction" ADD VALUE 'USER_REACTIVATED';

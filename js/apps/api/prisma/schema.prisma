@@ -50,6 +50,8 @@ enum ActivityAction {
   USER_ROLE_CHANGED
   USER_INVITED
   USER_INVITATION_REVOKED
+  USER_DEACTIVATED
+  USER_REACTIVATED
 }
 
 // ---------------------------------------------------------------------------

@@ -11,5 +11,6 @@ export {
   PlacementModel,
 } from "./job-application.model";
 export { UserModel } from "./user.model";
+export { RoleModel } from "./role.model";
 export { TeamModel } from "./team.model";
 export { TeamMemberModel } from "./team-member.model";

@@ -188,11 +188,11 @@
 
 > User invite, role assignment, deactivation, custom roles per `authn-authz-technical-plan.md §4`.
 
-- [ ] **TASK-096:** Implement user invite flow — create `AuthIdentity` + `User`, send email with temporary password link; `TASK-053` superseded
-- [ ] **TASK-097:** Implement `UserRole` assignment and removal — write DB row, `INCR user_ver:{userId}`; `TASK-054` superseded
-- [ ] **TASK-098:** Implement user deactivation — `User.loginable = false`, `Session.revokedAt = now` (all), `INCR user_ver`; `TASK-055` superseded
-- [ ] **TASK-099:** Implement tenant custom role CRUD — create/update `Role` with `tenantId` set; built-in roles (`tenantId = null`) are read-only
-- [ ] **TASK-100:** Add user activity tracking — `User.lastInactiveAt`, `User.firstLogin`; `TASK-056` superseded
+- [x] **TASK-096:** Implement user invite flow — create `AuthIdentity` + `User`, send email with temporary password link; `TASK-053` superseded
+- [x] **TASK-097:** Implement `UserRole` assignment and removal — write DB row, `INCR user_ver:{userId}`; `TASK-054` superseded
+- [x] **TASK-098:** Implement user deactivation — `User.loginable = false`, `Session.revokedAt = now` (all), `INCR user_ver`; `TASK-055` superseded
+- [x] **TASK-099:** Implement tenant custom role CRUD — create/update `Role` with `tenantId` set; built-in roles (`tenantId = null`) are read-only
+- [x] **TASK-100:** Add user activity tracking — `User.lastInactiveAt`, `User.firstLogin`; `TASK-056` superseded
 
 #### Story 2.8: Frontend — Login & Session Management (FE)
 
@@ -475,15 +475,15 @@
 ### Completion Status
 
 - **EPICs:** 0/6 Complete
-- **Stories:** 10/34 Complete
-- **Tasks:** 52/165 Complete (25 BE + 27 FE)
+- **Stories:** 11/34 Complete
+- **Tasks:** 57/165 Complete (30 BE + 27 FE)
 
 > Note: Sprint 1 FE stories remain complete. Clerk BE/FE work (Stories 2.1–2.3 old, TASK-048–064, WA-020–027) is superseded by the first-party auth plan. Task counts reset for EPIC-002 BE work.
 
 ### Current Sprint
 
 **Sprint:** Sprint 3
-**Active Stories:** Story 2.7 (User & Role Management) — next up
+**Active Stories:** Story 2.8 (Frontend — Login & Session Management) — next up
 **Blocked Items:** None
 
 ---
@@ -526,6 +526,7 @@
 | 2026-05-02 | Replaced Clerk with first-party auth system            | EPIC-002 rewritten: 10 stories (2.1–2.10), 36 new tasks (TASK-065–100, WA-080–092); Clerk stories/tasks superseded; Sprint 3 added for auth guards + FE auth; sprints renumbered 2–7; story count 34, task count 165                                                                                                                                                                                                                                                                     |
 | 2026-05-02 | Story 2.1 complete — Auth & Permission database schema | Added 16 new models (AuthIdentity, Session, MfaDevice, PasswordResetToken, PasswordHistory, PasswordPolicy, Role, UserRole, RoleDataScope, Team, TeamMember, Permission, PermissionGrant, PermissionCascadeRule, PermissionInheritance, ShareToken, AuditLog) + 7 new enums; updated Tenant (slug), User (loginable, firstLogin, authIdentityId), Candidate/Client/Job (ownerUserId, createdById); seeded 4 built-in roles + 12 data scope rows + 5 cascade rules; TASK-065–072 complete |
 | 2026-05-02 | Stories 2.2 + 2.3 complete — Auth Service, MFA         | AuthService (login, refresh, logout×2, password-reset request+confirm), PasswordService (Argon2id hash/verify, complexity, history), MfaService (TOTP enrol, AES-256-GCM secret encryption, challenge-based verify, 10 single-use backup codes), RedisService (user_ver, rate-limit, challenge store); REST controller at `/auth/*`; deps: argon2, jsonwebtoken, ioredis, otplib; seed real Argon2id hash; TASK-073–081 complete                                                         |
+| 2026-05-03 | Story 2.7 complete — User & Role Management             | UserService (invite with PasswordResetToken invite link, assignRole + removeRole with INCR user_ver, deactivate + reactivate with session revocation); RoleModule (RoleService + RoleResolver: findAll/findById/create/update/delete for tenant-scoped custom roles, built-in guard, bumps user_ver for all role holders on update/delete); UserModel gains `firstLogin` + `lastInactiveAt` fields; `ActivityAction` enum extended with USER_DEACTIVATED + USER_REACTIVATED; PasswordService exported from AuthModule; TASK-096–100 complete |
 
 ---
 
