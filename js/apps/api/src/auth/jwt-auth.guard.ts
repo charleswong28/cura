@@ -3,6 +3,7 @@ import { Reflector } from "@nestjs/core";
 import * as jwt from "jsonwebtoken";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "./redis.service";
+import { PermissionCacheService } from "./permission-cache.service";
 import { IS_PUBLIC_KEY } from "./auth.decorators";
 import { RequestUser } from "./auth.types";
 
@@ -11,7 +12,8 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService
+    private readonly redis: RedisService,
+    private readonly permCache: PermissionCacheService
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -19,7 +21,7 @@ export class JwtAuthGuard implements CanActivate {
       ctx.getHandler(),
       ctx.getClass(),
     ]);
-    if (isPublic ?? true) {
+    if (isPublic) {
       return true;
     }
 
@@ -61,13 +63,16 @@ export class JwtAuthGuard implements CanActivate {
           select: { id: true },
         });
         return {
-          id: teamRecord?.id ?? team.id, // Fallback to shortId if not found, though it should exist
+          id: teamRecord?.id ?? team.id,
           role: team.r === "L" ? "LEAD" : "MEMBER",
         };
       })
     );
 
-    // 3. Assemble RequestUser
+    // 3. Hydrate functional permissions from DB-ETag cache
+    const permissions = await this.permCache.getFunctionalPermissions(userId, tenantId);
+
+    // 4. Assemble RequestUser
     const requestUser: RequestUser = {
       userId,
       tenantId,
@@ -75,7 +80,7 @@ export class JwtAuthGuard implements CanActivate {
       version: userVer,
       teams: resolvedTeams,
       roles: roles || [],
-      permissions: new Set<string>(), // To be hydrated by PermissionCacheService/FunctionalPermissionGuard
+      permissions,
     };
 
     request.user = requestUser;

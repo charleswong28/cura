@@ -3,9 +3,14 @@ import { GqlExecutionContext } from "@nestjs/graphql";
 import type { RequestUser } from "./auth.types";
 
 export const IS_PUBLIC_KEY = "isPublic";
+export const REQUIRE_PERMISSION_KEY = "requirePermission";
 
 /** Marks a resolver or controller method as publicly accessible (no auth required). */
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
+
+/** Gates a resolver/controller method behind a functional permission string (e.g. 'candidate:view_all'). */
+export const RequirePermission = (permission: string) =>
+  SetMetadata(REQUIRE_PERMISSION_KEY, permission);
 
 /**
  * Extracts the authenticated RequestUser from the request context.

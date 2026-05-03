@@ -3,7 +3,7 @@ import { Module } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { GraphQLModule } from "@nestjs/graphql";
 import { ApolloDriver, ApolloDriverConfig } from "@nestjs/apollo";
-import { JwtAuthGuard } from "./auth";
+import { JwtAuthGuard, FunctionalPermissionGuard } from "./auth";
 import { AuthModule } from "./auth/auth.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -44,6 +44,10 @@ import { MigrationModule } from "./migration/migration.module";
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: FunctionalPermissionGuard,
     },
     {
       provide: APP_FILTER,
