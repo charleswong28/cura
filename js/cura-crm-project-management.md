@@ -180,9 +180,9 @@
 
 > Team CRUD, hierarchy expansion, member management per `authn-authz-technical-plan.md §3`.
 
-- [ ] **TASK-093:** Implement `TeamService` — create/update/delete team; `expandTeamTree(teamIds)` via recursive CTE; `getMemberIds(teamIds)` via `SELECT user_id FROM team_members WHERE team_id = ANY($1)`
-- [ ] **TASK-094:** Implement `TeamResolver` — GraphQL queries (`teams`, `team`) and mutations (`createTeam`, `updateTeam`, `addTeamMember`, `removeTeamMember`)
-- [ ] **TASK-095:** Wire all team membership changes to `INCR user_ver:{userId}` in Redis (add member, remove member, change role)
+- [x] **TASK-093:** Implement `TeamService` — create/update/delete team; `expandTeamTree(teamIds)` via recursive CTE; `getMemberIds(teamIds)` via `SELECT user_id FROM team_members WHERE team_id = ANY($1)`
+- [x] **TASK-094:** Implement `TeamResolver` — GraphQL queries (`teams`, `team`) and mutations (`createTeam`, `updateTeam`, `addTeamMember`, `removeTeamMember`)
+- [x] **TASK-095:** Wire all team membership changes to `INCR user_ver:{userId}` in Redis (add member, remove member, change role)
 
 #### Story 2.7: User & Role Management (BE)
 
@@ -483,7 +483,7 @@
 ### Current Sprint
 
 **Sprint:** Sprint 3
-**Active Stories:** Story 2.6 (Team Service & Resolver) — next up
+**Active Stories:** Story 2.7 (User & Role Management) — next up
 **Blocked Items:** None
 
 ---

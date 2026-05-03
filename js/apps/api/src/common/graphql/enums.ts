@@ -66,3 +66,17 @@ export enum FeeType {
   PERCENTAGE = "PERCENTAGE",
 }
 registerEnumType(FeeType, { name: "FeeType" });
+
+export enum TeamKind {
+  BUSINESS = "BUSINESS",
+  REGION = "REGION",
+  PRACTICE = "PRACTICE",
+  OTHER = "OTHER",
+}
+registerEnumType(TeamKind, { name: "TeamKind" });
+
+export enum TeamRole {
+  LEAD = "LEAD",
+  MEMBER = "MEMBER",
+}
+registerEnumType(TeamRole, { name: "TeamRole" });
