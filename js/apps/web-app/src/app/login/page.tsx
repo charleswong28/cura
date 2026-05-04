@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 type Step = "credentials" | "mfa";
 
-export default function LoginPage() {
+function LoginForm() {
   const { login, completeMfa } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -164,5 +164,13 @@ export default function LoginPage() {
         </form>
       )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
