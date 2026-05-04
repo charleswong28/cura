@@ -511,6 +511,8 @@ model Candidate {
   currentCompany String?         @map("current_company")
   currentTitle   String?         @map("current_title")
   location       String?
+  linkedinUrl    String?         @map("linkedin_url")
+  githubUrl      String?         @map("github_url")
   status         CandidateStatus @default(ACTIVE)
   notes          String?
   updatedById    String?         @map("updated_by_id")

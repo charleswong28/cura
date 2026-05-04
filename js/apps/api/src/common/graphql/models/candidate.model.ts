@@ -30,6 +30,12 @@ export class CandidateModel {
   @Field(() => String, { nullable: true })
   location!: string | null;
 
+  @Field(() => String, { nullable: true })
+  linkedinUrl!: string | null;
+
+  @Field(() => String, { nullable: true })
+  githubUrl!: string | null;
+
   @Field(() => CandidateStatus)
   status!: CandidateStatus;
 
