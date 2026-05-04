@@ -73,7 +73,7 @@ export class CandidateService {
 
     if (input.email) {
       const existing = await db.candidate.findFirst({
-        where: { email: input.email, deletedAt: null },
+        where: { email: { equals: input.email, mode: "insensitive" }, deletedAt: null },
         select: { id: true },
       });
       if (existing) throw new ConflictException("A candidate with this email already exists");
@@ -115,7 +115,7 @@ export class CandidateService {
 
     if (input.email !== undefined && input.email !== null) {
       const conflict = await this.prisma.forTenant(user.tenantId).candidate.findFirst({
-        where: { email: input.email, deletedAt: null, NOT: { id } },
+        where: { email: { equals: input.email, mode: "insensitive" }, deletedAt: null, NOT: { id } },
         select: { id: true },
       });
       if (conflict) throw new ConflictException("A candidate with this email already exists");
