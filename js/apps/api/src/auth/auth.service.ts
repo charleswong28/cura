@@ -216,6 +216,44 @@ export class AuthService {
     await this.redis.incrUserVer(session.userId);
   }
 
+  // ── Tenant Switch ─────────────────────────────────────────────────────────
+
+  /**
+   * Switches the active tenant for an authenticated session.
+   * Validates the existing refresh token, resolves the user record in the target
+   * tenant, revokes the old session, and creates a fresh session.
+   */
+  async switchTenant(
+    rawRefreshToken: string,
+    tenantSlug: string,
+    ip?: string
+  ): Promise<SessionResult> {
+    const tokenHash = hashToken(rawRefreshToken);
+
+    const session = await this.prisma.session.findUnique({
+      where: { refreshTokenHash: tokenHash },
+      include: { authIdentity: true },
+    });
+
+    if (!session) throw new UnauthorizedException("Invalid refresh token.");
+    if (session.revokedAt) throw new UnauthorizedException("Session has been revoked.");
+    if (session.expiresAt < new Date())
+      throw new UnauthorizedException("Refresh token has expired.");
+
+    const targetUser = await this.resolveUser(session.authIdentity.id, tenantSlug);
+    if (!targetUser.loginable || targetUser.deletedAt)
+      throw new ForbiddenException("Account has been deactivated.");
+
+    // Revoke the current session — a new one is issued for the target tenant
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { revokedAt: new Date() },
+    });
+    await this.redis.incrUserVer(session.userId);
+
+    return this.createSession(session.authIdentity.id, targetUser, ip);
+  }
+
   // ── Password Reset Request ─────────────────────────────────────────────────
 
   async requestPasswordReset(email: string): Promise<void> {

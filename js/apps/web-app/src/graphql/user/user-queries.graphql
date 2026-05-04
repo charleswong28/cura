@@ -8,3 +8,11 @@ query Me {
     mfaEnrolled
   }
 }
+
+query MyTenants {
+  myTenants {
+    id
+    name
+    slug
+  }
+}

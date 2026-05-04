@@ -1,6 +1,6 @@
 import { Inject } from "@nestjs/common";
 import { Resolver, Query, Mutation, Args, ID } from "@nestjs/graphql";
-import { UserModel } from "../common/graphql";
+import { TenantModel, UserModel } from "../common/graphql";
 import { CurrentUser, RequirePermission } from "../auth";
 import type { RequestUser } from "../auth";
 import { UserService } from "./user.service";
@@ -20,6 +20,11 @@ export class UserResolver {
   @Query(() => UserModel, { description: "Current user's profile" })
   async me(@CurrentUser() user: RequestUser) {
     return this.userService.findById(user.userId, user.tenantId);
+  }
+
+  @Query(() => [TenantModel], { description: "All tenants the current auth identity belongs to" })
+  async myTenants(@CurrentUser() user: RequestUser) {
+    return this.userService.findMyTenants(user.userId);
   }
 
   @Query(() => [UserModel], { description: "All team members in this tenant" })

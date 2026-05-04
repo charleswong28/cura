@@ -10,6 +10,7 @@ export {
   OfferModel,
   PlacementModel,
 } from "./job-application.model";
+export { TenantModel } from "./tenant.model";
 export { UserModel } from "./user.model";
 export { RoleModel } from "./role.model";
 export { TeamModel } from "./team.model";
