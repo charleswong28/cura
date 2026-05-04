@@ -234,10 +234,10 @@
 
 #### Story 3.2: Candidate API — Validation (BE)
 
-- [ ] **TASK-020:** Implement email validation and uniqueness check
-- [ ] **TASK-021:** Add phone number formatting and validation
-- [ ] **TASK-022:** Create required field validation
-- [ ] **TASK-023:** Implement data sanitization
+- [x] **TASK-020:** Implement email validation and uniqueness check
+- [x] **TASK-021:** Add phone number formatting and validation
+- [x] **TASK-022:** Create required field validation
+- [x] **TASK-023:** Implement data sanitization
 
 #### Story 3.3: Candidate API — Search & Filtering (BE)
 
@@ -476,14 +476,14 @@
 
 - **EPICs:** 0/6 Complete
 - **Stories:** 12/34 Complete
-- **Tasks:** 63/165 Complete (30 BE + 33 FE)
+- **Tasks:** 67/165 Complete (34 BE + 33 FE)
 
 > Note: Sprint 1 FE stories remain complete. Clerk BE/FE work (Stories 2.1–2.3 old, TASK-048–064, WA-020–027) is superseded by the first-party auth plan. Task counts reset for EPIC-002 BE work.
 
 ### Current Sprint
 
 **Sprint:** Sprint 4 — In Progress
-**Active Stories:** Story 3.1 complete; Story 3.2 (Candidate Validation), 3.4 (List Page), 3.6 (Create & Edit) next
+**Active Stories:** Stories 3.1 + 3.2 complete; Story 3.4 (List Page), 3.6 (Create & Edit) next
 **Blocked Items:** None
 
 ---
@@ -529,6 +529,7 @@
 | 2026-05-03 | Story 2.7 complete — User & Role Management              | UserService (invite with PasswordResetToken invite link, assignRole + removeRole with INCR user_ver, deactivate + reactivate with session revocation); RoleModule (RoleService + RoleResolver: findAll/findById/create/update/delete for tenant-scoped custom roles, built-in guard, bumps user_ver for all role holders on update/delete); UserModel gains `firstLogin` + `lastInactiveAt` fields; `ActivityAction` enum extended with USER_DEACTIVATED + USER_REACTIVATED; PasswordService exported from AuthModule; TASK-096–100 complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 2026-05-03 | Story 2.8 complete — Frontend Login & Session Management | Replaced Clerk with first-party auth across the web-app shell. Next.js route handlers (`/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, `/api/auth/mfa-verify`) proxy to NestJS and own the httpOnly `cura_refresh` cookie lifecycle. `token-store.ts`: module-level access token (survives re-renders, readable by Apollo). `auth-context.tsx`: React context for user info + login/logout/completeMfa actions. Apollo auth link rebuilt — injects memory token, detects `JWT_STALE` GraphQL error, refreshes via `/api/auth/refresh`, retries once. `middleware.ts` replaced `clerkMiddleware` with refresh-cookie presence check. Sidebar `UserSection` shows initials avatar + display name + logout button. `/login` page with inline MFA TOTP step on `mfaRequired: true`. Old Clerk pages (`/sign-in`, `/sign-up`, `/org-setup`) redirect to `/login`/`/dashboard`. `me` query added to schema + codegen regenerated; WA-080–085 complete                                                                                                                                        |
 | 2026-05-04 | Story 3.1 complete — Candidate API CRUD                  | `linkedinUrl` + `githubUrl` added to Prisma schema + migration; `CandidateModel` GraphQL type updated; `CreateCandidateInput` gains URL validation (https-only `IsUrl`), `MaxLength` guards, `status` field; `UpdateCandidateInput` simplified to pure `PartialType`; `CandidateService` refactored to accept `RequestUser` throughout — `findAll` applies data-scope filtering (ALL/TEAM_TREE/MY_TEAMS/MINE/EXPLICIT), `findById` + `update` + `softDelete` call `assertCan` for row-level checks, `create` + `update` enforce email uniqueness with `ConflictException`; `CandidateResolver` adds `@RequirePermission("candidate:create")` and `@RequirePermission("candidate:delete")`; TASK-014, TASK-015, TASK-019 complete                                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-05-04 | Story 3.2 complete — Candidate API Validation            | `@IsNotEmpty` on `firstName`/`lastName` (TASK-022); `@Matches(/^\+?[1-9][\d\s\-(). ]{5,28}$/)` replaces bare `@IsString` on `phone` (TASK-021); `@Transform` on all string inputs — trim whitespace, lowercase email, blank optional strings normalised to `undefined` (TASK-023); email uniqueness queries use Prisma `mode:'insensitive'` in both `create` and `update` paths; email stored pre-lowercased by DTO transform (TASK-020); TASK-020–023 complete |
 | 2026-05-04 | Story 2.10 complete — Multi-tenancy & Org Switching      | **Backend:** `TenantModel` GraphQL type; `myTenants` query on `UserResolver` (cross-tenant lookup via `authIdentityId`); `POST /auth/switch-tenant` endpoint (validates refresh token, resolves user in target tenant, revokes old session, issues new one); new `TenantModule` with `TenantService.create()` + `createTenant` GraphQL mutation for org setup. **Frontend:** `Tenant` type + `myTenants` query + `CreateTenant` mutation added to `schema.graphql` + codegen run; Apollo singleton extracted to `apollo-instance.ts` (shared by `ApolloProvider` and `auth-context`); `switchTenant(slug)` added to `auth-context` — calls `/api/auth/switch-tenant`, sets new token, calls `apolloClient.resetStore()` to re-fetch with new tenant; `/api/auth/switch-tenant` Next.js proxy route; `TenantSwitcher` Popover component in sidebar (shows org name + checkmark on current, lists all orgs, "Create organization" link); `/org-setup` page rebuilt — name + auto-slug form, `createTenant` mutation, then `switchTenant` to land in new org; WA-090–092 complete. Sprint 3 complete. |
 
 ---
