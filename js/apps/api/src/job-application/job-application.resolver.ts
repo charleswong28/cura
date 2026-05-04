@@ -36,7 +36,7 @@ export class JobApplicationResolver {
   @Mutation(() => JobApplicationModel, { description: "Create a new job application" })
   async createJobApplication(
     @CurrentUser() user: RequestUser,
-    @Args("input") input: CreateJobApplicationInput
+    @Args("input", { type: () => CreateJobApplicationInput }) input: CreateJobApplicationInput
   ) {
     return this.appService.create(user.tenantId, user.userId, input);
   }
@@ -47,7 +47,7 @@ export class JobApplicationResolver {
   async advanceApplicationStage(
     @CurrentUser() user: RequestUser,
     @Args("id", { type: () => ID }) id: string,
-    @Args("input") input: AdvanceStageInput
+    @Args("input", { type: () => AdvanceStageInput }) input: AdvanceStageInput
   ) {
     return this.appService.advanceStage(id, user.tenantId, user.userId, input);
   }
@@ -56,7 +56,7 @@ export class JobApplicationResolver {
   async addInterview(
     @CurrentUser() user: RequestUser,
     @Args("applicationId", { type: () => ID }) applicationId: string,
-    @Args("input") input: AddInterviewInput
+    @Args("input", { type: () => AddInterviewInput }) input: AddInterviewInput
   ) {
     return this.appService.addInterview(applicationId, user.tenantId, user.userId, input);
   }
@@ -65,7 +65,7 @@ export class JobApplicationResolver {
   async completeInterview(
     @CurrentUser() user: RequestUser,
     @Args("interviewId", { type: () => ID }) interviewId: string,
-    @Args("input") input: CompleteInterviewInput
+    @Args("input", { type: () => CompleteInterviewInput }) input: CompleteInterviewInput
   ) {
     return this.appService.completeInterview(interviewId, user.tenantId, input);
   }
@@ -74,7 +74,7 @@ export class JobApplicationResolver {
   async addOffer(
     @CurrentUser() user: RequestUser,
     @Args("applicationId", { type: () => ID }) applicationId: string,
-    @Args("input") input: AddOfferInput
+    @Args("input", { type: () => AddOfferInput }) input: AddOfferInput
   ) {
     return this.appService.addOffer(applicationId, user.tenantId, user.userId, input);
   }

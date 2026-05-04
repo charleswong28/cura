@@ -5,31 +5,34 @@ export class UserModel {
   @Field(() => ID)
   id!: string;
 
-  @Field()
+  @Field(() => String)
   tenantId!: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   authIdentityId!: string | null;
 
-  @Field()
+  @Field(() => String)
   email!: string;
 
-  @Field()
+  @Field(() => String)
   firstName!: string;
 
-  @Field()
+  @Field(() => String)
   lastName!: string;
 
-  @Field()
+  @Field(() => Boolean)
   loginable!: boolean;
 
-  @Field({ description: "Whether TOTP MFA is enrolled for this user" })
+  @Field(() => Boolean, { description: "Whether TOTP MFA is enrolled for this user" })
   mfaEnrolled!: boolean;
 
   @Field(() => Date, { nullable: true, description: "Timestamp of the user's first login" })
   firstLogin!: Date | null;
 
-  @Field(() => Date, { nullable: true, description: "Timestamp when the user was last deactivated" })
+  @Field(() => Date, {
+    nullable: true,
+    description: "Timestamp when the user was last deactivated",
+  })
   lastInactiveAt!: Date | null;
 
   @Field(() => Date)

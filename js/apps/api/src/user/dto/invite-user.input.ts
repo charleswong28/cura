@@ -2,13 +2,13 @@ import { InputType, Field } from "@nestjs/graphql";
 
 @InputType()
 export class InviteUserInput {
-  @Field()
+  @Field(() => String)
   email!: string;
 
-  @Field()
+  @Field(() => String)
   firstName!: string;
 
-  @Field()
+  @Field(() => String)
   lastName!: string;
 
   @Field(() => [String], { nullable: true, description: "Role names to assign on invite" })

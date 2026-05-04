@@ -20,22 +20,215 @@ type ActivityLogModel {
   userId: String
 }
 
+input AddInterviewInput {
+  interviewerUserId: String
+  round: Int!
+  scheduledAt: DateTime!
+}
+
+input AddOfferInput {
+  amount: Float
+  currency: String
+  startDate: DateTime
+}
+
+input AddTeamMemberInput {
+  role: TeamRole!
+  userId: ID!
+}
+
+input AdvanceStageInput {
+  note: String
+  stage: ApplicationStageType!
+}
+
+type ApplicationStageModel {
+  applicationId: String!
+  enteredAt: DateTime!
+  enteredById: String!
+  id: ID!
+  note: String
+  stage: ApplicationStageType!
+  tenantId: String!
+}
+
+enum ApplicationStageType {
+  APPLIED
+  CV_SENT
+  INTERVIEW
+  LONGLIST
+  OFFER
+  PLACEMENT
+  REJECTED
+}
+
+input AssignRoleInput {
+  roleId: String!
+  userId: String!
+}
+
+type CandidateModel {
+  createdAt: DateTime!
+  currentCompany: String
+  currentTitle: String
+  deletedAt: DateTime
+  email: String
+  firstName: String!
+  id: ID!
+  lastName: String!
+  location: String
+  notes: String
+  ownerUserId: String
+  phone: String
+  status: CandidateStatus!
+  tenantId: String!
+  updatedAt: DateTime!
+}
+
+enum CandidateStatus {
+  ACTIVE
+  BLACKLISTED
+  INACTIVE
+  PLACED
+}
+
+type ClientContactModel {
+  clientId: String!
+  createdAt: DateTime!
+  deletedAt: DateTime
+  email: String
+  firstName: String!
+  id: ID!
+  isPrimary: Boolean!
+  lastName: String!
+  ownerUserId: String
+  phone: String
+  tenantId: String!
+  title: String
+  updatedAt: DateTime!
+}
+
+type ClientModel {
+  activeJobCount: Float!
+  address: String
+  bdUserId: String
+  contacts: [ClientContactModel!]!
+  createdAt: DateTime!
+  deletedAt: DateTime
+  id: ID!
+  industry: String
+  jobs: [JobModel!]!
+  name: String!
+  parentId: String
+  phone: String
+  status: ClientStatus!
+  tenantId: String!
+  totalJobCount: Float!
+  updatedAt: DateTime!
+  website: String
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+}
+
+input CompleteInterviewInput {
+  feedback: String
+  rating: Int
+}
+
+input CreateCandidateInput {
+  currentCompany: String
+  currentTitle: String
+  email: String
+  firstName: String!
+  lastName: String!
+  location: String
+  notes: String
+  ownerUserId: String
+  phone: String
+}
+
+input CreateClientContactInput {
+  clientId: String!
+  email: String
+  firstName: String!
+  isPrimary: Boolean
+  lastName: String!
+  phone: String
+  title: String
+}
+
+input CreateClientInput {
+  address: String
+  bdUserId: String
+  industry: String
+  name: String!
+  parentId: String
+  phone: String
+  website: String
+}
+
+input CreateJobApplicationInput {
+  candidateId: String!
+  jobId: String!
+  ownerUserId: String
+  source: String
+}
+
+input CreateJobInput {
+  assignedToId: String
+  clientId: String!
+  closeDate: DateTime
+  description: String
+  openDate: DateTime
+  ownerUserId: String
+  priority: JobPriority
+  status: JobStatus
+  title: String!
+}
+
+input CreateRoleInput {
+  description: String
+  name: String!
+
+  """Permission strings e.g. ['candidate:view_all', 'job:create']"""
+  permissions: [String!]!
+}
+
+input CreateTeamInput {
+  kind: TeamKind!
+  name: String!
+  parentId: ID
+}
+
 """
 A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
 """
 scalar DateTime
 
-type InvitationModel {
+type InterviewModel {
+  applicationId: String!
+  completedAt: DateTime
   createdAt: DateTime!
-  emailAddress: String!
+  feedback: String
   id: ID!
-  role: String!
-  status: String!
+  interviewerUserId: String
+  rating: Float
+  round: Float!
+  scheduledAt: DateTime!
+  tenantId: String!
 }
 
 input InviteUserInput {
   email: String!
-  role: UserRole!
+  firstName: String!
+  lastName: String!
+
+  """Role names to assign on invite"""
+  roleNames: [String!]
 }
 
 """
@@ -43,33 +236,309 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://
 """
 scalar JSON
 
-type Mutation {
-  """Invite a user to the organization"""
-  inviteUser(input: InviteUserInput!): InvitationModel!
+type JobApplicationModel {
+  candidateId: String!
+  createdAt: DateTime!
+  deletedAt: DateTime
+  id: ID!
+  interviews: [InterviewModel!]!
+  isActive: Boolean!
+  jobId: String!
+  matchScore: Float
+  maxStage: ApplicationStageType!
+  offers: [OfferModel!]!
+  ownerUserId: String
+  source: String
+  stages: [ApplicationStageModel!]!
+  tenantId: String!
+  updatedAt: DateTime!
+}
 
-  """Revoke a pending invitation"""
-  revokeInvitation(invitationId: String!): InvitationModel!
+type JobModel {
+  applicationCount: Float!
+  assignedToId: String
+  client: ClientModel!
+  clientId: String!
+  closeDate: DateTime
+  createdAt: DateTime!
+  deletedAt: DateTime
+  description: String
+  id: ID!
+  interviewCount: Float!
+  offerCount: Float!
+  openDate: DateTime
+  ownerUserId: String
+  placementCount: Float!
+  priority: JobPriority!
+  status: JobStatus!
+  tenantId: String!
+  title: String!
+  updatedAt: DateTime!
+}
+
+enum JobPriority {
+  HIGH
+  LOW
+  MEDIUM
+  URGENT
+}
+
+enum JobStatus {
+  CLOSED
+  FILLED
+  ON_HOLD
+  OPEN
+}
+
+type Mutation {
+  """Schedule an interview for this application"""
+  addInterview(applicationId: ID!, input: AddInterviewInput!): InterviewModel!
+
+  """Add an offer to an application"""
+  addOffer(applicationId: ID!, input: AddOfferInput!): OfferModel!
+
+  """Add a member to a team"""
+  addTeamMember(input: AddTeamMemberInput!, teamId: ID!): TeamMemberModel!
+
+  """Advance application to a new pipeline stage"""
+  advanceApplicationStage(id: ID!, input: AdvanceStageInput!): JobApplicationModel!
+
+  """Assign a role to a user"""
+  assignRole(input: AssignRoleInput!): UserModel!
+
+  """Record interview outcome"""
+  completeInterview(input: CompleteInterviewInput!, interviewId: ID!): InterviewModel!
+
+  """Create a new candidate"""
+  createCandidate(input: CreateCandidateInput!): CandidateModel!
+
+  """Create a new client"""
+  createClient(input: CreateClientInput!): ClientModel!
+
+  """Add a contact to a client"""
+  createClientContact(input: CreateClientContactInput!): ClientContactModel!
+
+  """Create a new job"""
+  createJob(input: CreateJobInput!): JobModel!
+
+  """Create a new job application"""
+  createJobApplication(input: CreateJobApplicationInput!): JobApplicationModel!
+
+  """Create a tenant-scoped custom role"""
+  createRole(input: CreateRoleInput!): RoleModel!
+
+  """Create a new team"""
+  createTeam(input: CreateTeamInput!): TeamModel!
+
+  """Deactivate a user — revokes all sessions"""
+  deactivateUser(userId: ID!): UserModel!
+
+  """Soft-delete a candidate"""
+  deleteCandidate(id: ID!): CandidateModel!
+
+  """Soft-delete a client"""
+  deleteClient(id: ID!): ClientModel!
+
+  """Remove a client contact"""
+  deleteClientContact(id: ID!): ClientContactModel!
+
+  """Soft-delete a job"""
+  deleteJob(id: ID!): JobModel!
+
+  """Delete a custom role (built-ins cannot be deleted)"""
+  deleteRole(id: ID!): RoleModel!
+
+  """Soft-delete a team"""
+  deleteTeam(id: ID!): TeamModel!
+
+  """Invite a new user to the tenant"""
+  inviteUser(input: InviteUserInput!): UserModel!
+
+  """Reactivate a previously deactivated user"""
+  reactivateUser(userId: ID!): UserModel!
+
+  """Remove a role from a user"""
+  removeRole(input: RemoveRoleInput!): UserModel!
+
+  """Remove a member from a team"""
+  removeTeamMember(teamId: ID!, userId: ID!): TeamMemberModel!
+
+  """Update a candidate"""
+  updateCandidate(id: ID!, input: UpdateCandidateInput!): CandidateModel!
+
+  """Update a client"""
+  updateClient(id: ID!, input: UpdateClientInput!): ClientModel!
+
+  """Update a job"""
+  updateJob(id: ID!, input: UpdateJobInput!): JobModel!
 
   """Update own profile"""
   updateMyProfile(input: UpdateProfileInput!): UserModel!
 
-  """Update a user's role (admin only)"""
-  updateUserRole(input: UpdateRoleInput!): UserModel!
+  """Update a custom role (built-ins are read-only)"""
+  updateRole(id: ID!, input: UpdateRoleInput!): RoleModel!
+
+  """Update a team"""
+  updateTeam(id: ID!, input: UpdateTeamInput!): TeamModel!
+
+  """Update a team member's role"""
+  updateTeamMemberRole(input: UpdateTeamMemberInput!, teamId: ID!, userId: ID!): TeamMemberModel!
+}
+
+type OfferModel {
+  amount: Float
+  applicationId: String!
+  createdAt: DateTime!
+  currency: String
+  declineReason: String
+  declinedAt: DateTime
+  id: ID!
+  signedAt: DateTime
+  startDate: DateTime
+  tenantId: String!
 }
 
 type Query {
   """Recent activity log entries"""
   activityLog(limit: Int! = 50, offset: Int! = 0): [ActivityLogModel!]!
 
+  """Get a candidate by ID"""
+  candidate(id: ID!): CandidateModel!
+
+  """List all candidates in the tenant"""
+  candidates: [CandidateModel!]!
+
+  """Get a client by ID"""
+  client(id: ID!): ClientModel!
+
+  """List all clients in the tenant"""
+  clients: [ClientModel!]!
+
+  """Get a job by ID"""
+  job(id: ID!): JobModel!
+
+  """Get a job application by ID"""
+  jobApplication(id: ID!): JobApplicationModel!
+
+  """List applications for a job"""
+  jobApplications(jobId: ID!): [JobApplicationModel!]!
+
+  """List all jobs in the tenant"""
+  jobs: [JobModel!]!
+
   """Current user's profile"""
   me: UserModel!
-
-  """List pending invitations"""
-  pendingInvitations: [InvitationModel!]!
   ping: String!
 
-  """All team members in tenant"""
+  """Single role by ID"""
+  role(id: ID!): RoleModel!
+
+  """All roles visible to this tenant (built-ins + custom)"""
+  roles: [RoleModel!]!
+
+  """Get a team by ID"""
+  team(id: ID!): TeamModel!
+
+  """List all teams in the tenant"""
+  teams: [TeamModel!]!
+
+  """All team members in this tenant"""
   users: [UserModel!]!
+}
+
+input RemoveRoleInput {
+  roleId: String!
+  userId: String!
+}
+
+type RoleModel {
+  builtin: Boolean!
+  createdAt: DateTime!
+  description: String
+  id: ID!
+  name: String!
+  permissions: [String!]!
+  shortId: Int!
+
+  """null for built-in roles"""
+  tenantId: String
+  updatedAt: DateTime!
+}
+
+enum TeamKind {
+  BUSINESS
+  OTHER
+  PRACTICE
+  REGION
+}
+
+type TeamMemberModel {
+  joinedAt: DateTime!
+  role: TeamRole!
+  teamId: ID!
+  userId: ID!
+}
+
+type TeamModel {
+  """Direct child teams"""
+  children: [TeamModel!]
+  createdAt: DateTime!
+  deletedAt: DateTime
+  id: ID!
+  kind: TeamKind!
+
+  """Members of this team"""
+  members: [TeamMemberModel!]!
+  name: String!
+
+  """Parent team"""
+  parent: TeamModel
+  parentId: ID
+  shortId: Int!
+  tenantId: String!
+  updatedAt: DateTime!
+}
+
+enum TeamRole {
+  LEAD
+  MEMBER
+}
+
+input UpdateCandidateInput {
+  currentCompany: String
+  currentTitle: String
+  email: String
+  firstName: String
+  lastName: String
+  location: String
+  notes: String
+  ownerUserId: String
+  phone: String
+  status: CandidateStatus
+  updatedById: String
+}
+
+input UpdateClientInput {
+  address: String
+  bdUserId: String
+  industry: String
+  name: String
+  parentId: String
+  phone: String
+  status: ClientStatus
+  website: String
+}
+
+input UpdateJobInput {
+  assignedToId: String
+  clientId: String
+  closeDate: DateTime
+  description: String
+  openDate: DateTime
+  ownerUserId: String
+  priority: JobPriority
+  status: JobStatus
+  title: String
 }
 
 input UpdateProfileInput {
@@ -78,22 +547,38 @@ input UpdateProfileInput {
 }
 
 input UpdateRoleInput {
-  role: UserRole!
-  userId: String!
+  description: String
+  name: String
+  permissions: [String!]
+}
+
+input UpdateTeamInput {
+  kind: TeamKind
+  name: String
+  parentId: ID
+}
+
+input UpdateTeamMemberInput {
+  role: TeamRole!
 }
 
 type UserModel {
+  authIdentityId: String
   createdAt: DateTime!
   email: String!
+
+  """Timestamp of the user's first login"""
+  firstLogin: DateTime
   firstName: String!
   id: ID!
+
+  """Timestamp when the user was last deactivated"""
+  lastInactiveAt: DateTime
   lastName: String!
-  role: UserRole!
+  loginable: Boolean!
+
+  """Whether TOTP MFA is enrolled for this user"""
+  mfaEnrolled: Boolean!
   tenantId: String!
   updatedAt: DateTime!
-}
-
-enum UserRole {
-  ADMIN
-  RECRUITER
 }

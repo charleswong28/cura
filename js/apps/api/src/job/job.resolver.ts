@@ -26,7 +26,10 @@ export class JobResolver {
   }
 
   @Mutation(() => JobModel, { description: "Create a new job" })
-  async createJob(@CurrentUser() user: RequestUser, @Args("input") input: CreateJobInput) {
+  async createJob(
+    @CurrentUser() user: RequestUser,
+    @Args("input", { type: () => CreateJobInput }) input: CreateJobInput
+  ) {
     return this.jobService.create(user.tenantId, user.userId, input);
   }
 
@@ -34,7 +37,7 @@ export class JobResolver {
   async updateJob(
     @CurrentUser() user: RequestUser,
     @Args("id", { type: () => ID }) id: string,
-    @Args("input") input: UpdateJobInput
+    @Args("input", { type: () => UpdateJobInput }) input: UpdateJobInput
   ) {
     return this.jobService.update(id, user.tenantId, user.userId, input);
   }

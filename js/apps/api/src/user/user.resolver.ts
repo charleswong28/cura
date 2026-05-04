@@ -48,7 +48,7 @@ export class UserResolver {
   @RequirePermission("user:invite")
   async inviteUser(
     @CurrentUser() user: RequestUser,
-    @Args("input") input: InviteUserInput
+    @Args("input", { type: () => InviteUserInput }) input: InviteUserInput
   ) {
     const invited = await this.userService.invite(user.tenantId, user.userId, input);
     await this.activityLogService.log({
@@ -66,7 +66,7 @@ export class UserResolver {
   @RequirePermission("user:manage_roles")
   async assignRole(
     @CurrentUser() user: RequestUser,
-    @Args("input") input: AssignRoleInput
+    @Args("input", { type: () => AssignRoleInput }) input: AssignRoleInput
   ) {
     const updated = await this.userService.assignRole(user.tenantId, user.userId, input);
     await this.activityLogService.log({
@@ -84,7 +84,7 @@ export class UserResolver {
   @RequirePermission("user:manage_roles")
   async removeRole(
     @CurrentUser() user: RequestUser,
-    @Args("input") input: RemoveRoleInput
+    @Args("input", { type: () => RemoveRoleInput }) input: RemoveRoleInput
   ) {
     const updated = await this.userService.removeRole(user.tenantId, input);
     await this.activityLogService.log({

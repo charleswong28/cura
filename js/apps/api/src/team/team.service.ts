@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ConflictException } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "../auth/redis.service";
 import { generateId } from "../common/ulid";
@@ -116,7 +116,12 @@ export class TeamService {
     return existing;
   }
 
-  async updateMemberRole(teamId: string, userId: string, tenantId: string, input: UpdateTeamMemberInput) {
+  async updateMemberRole(
+    teamId: string,
+    userId: string,
+    tenantId: string,
+    input: UpdateTeamMemberInput
+  ) {
     await this.findById(teamId, tenantId);
 
     const existing = await this.prisma.teamMember.findUnique({

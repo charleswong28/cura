@@ -28,7 +28,10 @@ export class ClientResolver {
   }
 
   @Mutation(() => ClientModel, { description: "Create a new client" })
-  async createClient(@CurrentUser() user: RequestUser, @Args("input") input: CreateClientInput) {
+  async createClient(
+    @CurrentUser() user: RequestUser,
+    @Args("input", { type: () => CreateClientInput }) input: CreateClientInput
+  ) {
     return this.clientService.create(user.tenantId, user.userId, input);
   }
 
@@ -36,7 +39,7 @@ export class ClientResolver {
   async updateClient(
     @CurrentUser() user: RequestUser,
     @Args("id", { type: () => ID }) id: string,
-    @Args("input") input: UpdateClientInput
+    @Args("input", { type: () => UpdateClientInput }) input: UpdateClientInput
   ) {
     return this.clientService.update(id, user.tenantId, user.userId, input);
   }
@@ -49,7 +52,7 @@ export class ClientResolver {
   @Mutation(() => ClientContactModel, { description: "Add a contact to a client" })
   async createClientContact(
     @CurrentUser() user: RequestUser,
-    @Args("input") input: CreateClientContactInput
+    @Args("input", { type: () => CreateClientContactInput }) input: CreateClientContactInput
   ) {
     return this.contactService.create(user.tenantId, user.userId, input);
   }

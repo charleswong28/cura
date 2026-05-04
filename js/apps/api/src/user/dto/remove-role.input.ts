@@ -2,9 +2,9 @@ import { InputType, Field } from "@nestjs/graphql";
 
 @InputType()
 export class RemoveRoleInput {
-  @Field()
+  @Field(() => String)
   userId!: string;
 
-  @Field()
+  @Field(() => String)
   roleId!: string;
 }

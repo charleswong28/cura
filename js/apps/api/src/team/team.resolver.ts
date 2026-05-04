@@ -19,10 +19,7 @@ export class TeamResolver {
   }
 
   @Query(() => TeamModel, { description: "Get a team by ID" })
-  async team(
-    @CurrentUser() user: RequestUser,
-    @Args("id", { type: () => ID }) id: string
-  ) {
+  async team(@CurrentUser() user: RequestUser, @Args("id", { type: () => ID }) id: string) {
     return this.teamService.findById(id, user.tenantId);
   }
 
@@ -30,7 +27,7 @@ export class TeamResolver {
   @RequirePermission("team:manage")
   async createTeam(
     @CurrentUser() user: RequestUser,
-    @Args("input") input: CreateTeamInput
+    @Args("input", { type: () => CreateTeamInput }) input: CreateTeamInput
   ) {
     return this.teamService.create(user.tenantId, input);
   }
@@ -40,17 +37,14 @@ export class TeamResolver {
   async updateTeam(
     @CurrentUser() user: RequestUser,
     @Args("id", { type: () => ID }) id: string,
-    @Args("input") input: UpdateTeamInput
+    @Args("input", { type: () => UpdateTeamInput }) input: UpdateTeamInput
   ) {
     return this.teamService.update(id, user.tenantId, input);
   }
 
   @Mutation(() => TeamModel, { description: "Soft-delete a team" })
   @RequirePermission("team:manage")
-  async deleteTeam(
-    @CurrentUser() user: RequestUser,
-    @Args("id", { type: () => ID }) id: string
-  ) {
+  async deleteTeam(@CurrentUser() user: RequestUser, @Args("id", { type: () => ID }) id: string) {
     return this.teamService.softDelete(id, user.tenantId);
   }
 
@@ -59,7 +53,7 @@ export class TeamResolver {
   async addTeamMember(
     @CurrentUser() user: RequestUser,
     @Args("teamId", { type: () => ID }) teamId: string,
-    @Args("input") input: AddTeamMemberInput
+    @Args("input", { type: () => AddTeamMemberInput }) input: AddTeamMemberInput
   ) {
     return this.teamService.addMember(teamId, user.tenantId, input);
   }
@@ -80,7 +74,7 @@ export class TeamResolver {
     @CurrentUser() user: RequestUser,
     @Args("teamId", { type: () => ID }) teamId: string,
     @Args("userId", { type: () => ID }) userId: string,
-    @Args("input") input: UpdateTeamMemberInput
+    @Args("input", { type: () => UpdateTeamMemberInput }) input: UpdateTeamMemberInput
   ) {
     return this.teamService.updateMemberRole(teamId, userId, user.tenantId, input);
   }

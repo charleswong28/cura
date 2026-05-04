@@ -9,13 +9,13 @@ export class TeamModel {
   @Field(() => Int)
   shortId!: number;
 
-  @Field()
+  @Field(() => String)
   tenantId!: string;
 
   @Field(() => ID, { nullable: true })
   parentId!: string | null;
 
-  @Field()
+  @Field(() => String)
   name!: string;
 
   @Field(() => TeamKind)

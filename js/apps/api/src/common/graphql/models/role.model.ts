@@ -11,7 +11,7 @@ export class RoleModel {
   @Field(() => String, { nullable: true, description: "null for built-in roles" })
   tenantId!: string | null;
 
-  @Field()
+  @Field(() => String)
   name!: string;
 
   @Field(() => String, { nullable: true })
@@ -20,7 +20,7 @@ export class RoleModel {
   @Field(() => [String])
   permissions!: string[];
 
-  @Field()
+  @Field(() => Boolean)
   builtin!: boolean;
 
   @Field(() => Date)

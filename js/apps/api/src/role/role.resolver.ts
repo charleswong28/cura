@@ -11,16 +11,15 @@ import { UpdateRoleInput } from "./dto/update-role.input";
 export class RoleResolver {
   constructor(@Inject(RoleService) private readonly roleService: RoleService) {}
 
-  @Query(() => [RoleModel], { description: "All roles visible to this tenant (built-ins + custom)" })
+  @Query(() => [RoleModel], {
+    description: "All roles visible to this tenant (built-ins + custom)",
+  })
   async roles(@CurrentUser() user: RequestUser) {
     return this.roleService.findAll(user.tenantId);
   }
 
   @Query(() => RoleModel, { description: "Single role by ID" })
-  async role(
-    @Args("id", { type: () => ID }) id: string,
-    @CurrentUser() user: RequestUser
-  ) {
+  async role(@Args("id", { type: () => ID }) id: string, @CurrentUser() user: RequestUser) {
     return this.roleService.findById(id, user.tenantId);
   }
 
@@ -28,7 +27,7 @@ export class RoleResolver {
   @RequirePermission("settings:manage_tenant")
   async createRole(
     @CurrentUser() user: RequestUser,
-    @Args("input") input: CreateRoleInput
+    @Args("input", { type: () => CreateRoleInput }) input: CreateRoleInput
   ) {
     return this.roleService.create(user.tenantId, input);
   }
@@ -38,17 +37,14 @@ export class RoleResolver {
   async updateRole(
     @Args("id", { type: () => ID }) id: string,
     @CurrentUser() user: RequestUser,
-    @Args("input") input: UpdateRoleInput
+    @Args("input", { type: () => UpdateRoleInput }) input: UpdateRoleInput
   ) {
     return this.roleService.update(id, user.tenantId, input);
   }
 
   @Mutation(() => RoleModel, { description: "Delete a custom role (built-ins cannot be deleted)" })
   @RequirePermission("settings:manage_tenant")
-  async deleteRole(
-    @Args("id", { type: () => ID }) id: string,
-    @CurrentUser() user: RequestUser
-  ) {
+  async deleteRole(@Args("id", { type: () => ID }) id: string, @CurrentUser() user: RequestUser) {
     return this.roleService.delete(id, user.tenantId);
   }
 }

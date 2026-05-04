@@ -1,5 +1,5 @@
 import { Inject } from "@nestjs/common";
-import { Resolver, Query, Mutation, Args, ID, ResolveField, Parent } from "@nestjs/graphql";
+import { Resolver, Query, Mutation, Args, ID } from "@nestjs/graphql";
 import { CandidateModel } from "../common/graphql/models/candidate.model";
 import { CurrentUser, type RequestUser } from "../auth";
 import { CandidateService } from "./candidate.service";
@@ -23,16 +23,21 @@ export class CandidateResolver {
   @Mutation(() => CandidateModel, { description: "Create a new candidate" })
   async createCandidate(
     @CurrentUser() user: RequestUser,
-    @Args("input") input: CreateCandidateInput
+    @Args("input", { type: () => CreateCandidateInput }) input: CreateCandidateInput
   ) {
-    return this.candidateService.create(user.tenantId, user.userId, input, user.teams.map((t) => t.id));
+    return this.candidateService.create(
+      user.tenantId,
+      user.userId,
+      input,
+      user.teams.map((t) => t.id)
+    );
   }
 
   @Mutation(() => CandidateModel, { description: "Update a candidate" })
   async updateCandidate(
     @CurrentUser() user: RequestUser,
     @Args("id", { type: () => ID }) id: string,
-    @Args("input") input: UpdateCandidateInput
+    @Args("input", { type: () => UpdateCandidateInput }) input: UpdateCandidateInput
   ) {
     return this.candidateService.update(id, user.tenantId, user.userId, input);
   }
@@ -43,20 +48,5 @@ export class CandidateResolver {
     @Args("id", { type: () => ID }) id: string
   ) {
     return this.candidateService.softDelete(id, user.tenantId, user.userId);
-  }
-
-  @ResolveField()
-  async experiences(@Parent() candidate: CandidateModel, @CurrentUser() user: RequestUser) {
-    return this.candidateService.findExperiences(candidate.id, user.tenantId);
-  }
-
-  @ResolveField()
-  async educations(@Parent() candidate: CandidateModel, @CurrentUser() user: RequestUser) {
-    return this.candidateService.findEducations(candidate.id, user.tenantId);
-  }
-
-  @ResolveField()
-  async languages(@Parent() candidate: CandidateModel, @CurrentUser() user: RequestUser) {
-    return this.candidateService.findLanguages(candidate.id, user.tenantId);
   }
 }
