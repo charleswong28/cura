@@ -10,6 +10,7 @@ import { MfaVerifyDto } from "./dto/mfa-verify.dto";
 import { PasswordResetConfirmDto } from "./dto/password-reset-confirm.dto";
 import { PasswordResetRequestDto } from "./dto/password-reset-request.dto";
 import { RefreshDto } from "./dto/refresh.dto";
+import { SwitchTenantDto } from "./dto/switch-tenant.dto";
 
 @Controller("auth")
 export class AuthController {
@@ -102,5 +103,12 @@ export class AuthController {
   async mfaEnrolConfirm(@Body() body: MfaEnrolConfirmDto & { authIdentityId: string }) {
     const backupCodes = await this.mfaService.confirmEnrol(body.authIdentityId, body.totpCode);
     return { backupCodes };
+  }
+
+  /** Switch tenant — revokes current session and issues a new one for the target tenant. */
+  @Post("switch-tenant")
+  @Public()
+  async switchTenant(@Body() dto: SwitchTenantDto, @Req() req: Request) {
+    return this.authService.switchTenant(dto.refreshToken, dto.tenantSlug, req.ip);
   }
 }

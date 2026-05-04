@@ -46,6 +46,23 @@ export class UserService {
     return { ...user, mfaEnrolled: user.authIdentity?.mfaEnrolled ?? false };
   }
 
+  /** Returns all tenants the current auth identity has a user record for. */
+  async findMyTenants(userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId },
+      select: { authIdentityId: true },
+    });
+    if (!user?.authIdentityId) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: { authIdentityId: user.authIdentityId, deletedAt: null, loginable: true },
+      include: { tenant: { select: { id: true, name: true, slug: true, createdAt: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return users.map((u) => u.tenant);
+  }
+
   async updateProfile(userId: string, tenantId: string, input: UpdateProfileInput) {
     await this.findById(userId, tenantId);
     return this.prisma.forTenant(tenantId).user.update({
@@ -72,7 +89,8 @@ export class UserService {
     const existing = await db.user.findFirst({
       where: { email: input.email, deletedAt: null },
     });
-    if (existing) throw new ConflictException("A user with this email already exists in this tenant");
+    if (existing)
+      throw new ConflictException("A user with this email already exists in this tenant");
 
     // Resolve or create AuthIdentity.
     // Phase 1 note: authIdentityId is @unique on User, so one AuthIdentity can link to at most

@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth-context";
+import { TenantSwitcher } from "@/components/tenant-switcher";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -144,6 +145,11 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
       <Separator />
 
+      {/* Tenant / org switcher */}
+      <TenantSwitcher collapsed={collapsed} />
+
+      <Separator />
+
       {/* User info + logout */}
       <UserSection collapsed={collapsed} />
 
@@ -189,6 +195,11 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
           <span className="text-lg font-semibold text-sidebar-primary">C</span>
           <span className="text-lg font-semibold text-sidebar-primary">Cura</span>
         </div>
+
+        <Separator />
+
+        {/* Tenant / org switcher */}
+        <TenantSwitcher collapsed={false} />
 
         <Separator />
 

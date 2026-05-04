@@ -80,6 +80,13 @@ type Job {
   updatedAt: DateTime!
 }
 
+type Tenant {
+  id: ID!
+  name: String!
+  slug: String!
+  createdAt: DateTime!
+}
+
 type User {
   id: ID!
   authIdentityId: String
@@ -139,6 +146,11 @@ type JobConnection {
 # ---------------------------------------------------------------------------
 # Inputs
 # ---------------------------------------------------------------------------
+
+input CreateTenantInput {
+  name: String!
+  slug: String!
+}
 
 input CreateCandidateInput {
   firstName: String!
@@ -252,9 +264,12 @@ type Query {
   job(id: ID!): Job
 
   me: User!
+  myTenants: [Tenant!]!
 }
 
 type Mutation {
+  createTenant(input: CreateTenantInput!): Tenant!
+
   createCandidate(input: CreateCandidateInput!): Candidate!
   updateCandidate(id: ID!, input: UpdateCandidateInput!): Candidate!
   deleteCandidate(id: ID!): Boolean!

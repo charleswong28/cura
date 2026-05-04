@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { setAccessToken } from "@/lib/token-store";
+import { apolloClient } from "@/lib/apollo-instance";
 
 export interface AuthUser {
   id: string;
@@ -19,6 +20,7 @@ interface AuthContextValue {
     tenantSlug?: string
   ) => Promise<{ mfaRequired: true; mfaChallengeToken: string } | { mfaRequired: false }>;
   completeMfa: (challengeToken: string, code: string) => Promise<void>;
+  switchTenant: (tenantSlug: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -76,6 +78,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user ?? null);
   }, []);
 
+  const switchTenant = useCallback(
+    async (tenantSlug: string) => {
+      const res = await fetch("/api/auth/switch-tenant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantSlug }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Tenant switch failed");
+
+      setAccessToken(data.accessToken);
+      setUser(data.user ?? null);
+
+      // WA-091: clear and re-fetch all active queries with the new tenant's access token
+      await apolloClient.resetStore();
+
+      router.push("/dashboard");
+    },
+    [router]
+  );
+
   const logout = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -87,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, completeMfa, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, completeMfa, switchTenant, logout }}>
       {children}
     </AuthContext.Provider>
   );
