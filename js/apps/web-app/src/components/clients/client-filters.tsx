@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,12 @@ interface ClientFiltersProps {
 }
 
 export function ClientFilters({ state, onChange }: ClientFiltersProps) {
+  // Mount-gate: Radix Select's useId hydrates inconsistently under
+  // <Suspense>+useSearchParams in React 19, causing aria-controls mismatches.
+  // Skip SSR for the filter row; height placeholder prevents layout shift.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const set = <K extends keyof ClientFiltersState>(key: K, value: ClientFiltersState[K]) =>
     onChange({ ...state, [key]: value });
 
@@ -49,6 +56,8 @@ export function ClientFilters({ state, onChange }: ClientFiltersProps) {
     state.status !== ANY_STATUS ||
     state.sortBy !== "UPDATED_AT" ||
     state.sortOrder !== "DESC";
+
+  if (!mounted) return <div className="h-9" />;
 
   return (
     <div className="flex flex-wrap items-center gap-2">

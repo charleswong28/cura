@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
@@ -45,16 +46,18 @@ export function TopBar({ onCommandPaletteOpen, mobileNavTrigger }: TopBarProps) 
               const isLast = index === segments.length - 1;
 
               return (
-                <BreadcrumbItem key={href}>
+                <Fragment key={href}>
                   {index > 0 && <BreadcrumbSeparator />}
-                  {isLast ? (
-                    <BreadcrumbPage>{label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink asChild>
-                      <Link href={href}>{label}</Link>
-                    </BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>
+                  <BreadcrumbItem>
+                    {isLast ? (
+                      <BreadcrumbPage>{label}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <Link href={href}>{label}</Link>
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </Fragment>
               );
             })}
           </BreadcrumbList>

@@ -121,6 +121,12 @@ enum CandidateStatus {
   PLACED
 }
 
+type ClientConnection {
+  edges: [ClientEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
 type ClientContactModel {
   clientId: String!
   createdAt: DateTime!
@@ -137,6 +143,19 @@ type ClientContactModel {
   updatedAt: DateTime!
 }
 
+type ClientEdge {
+  cursor: String!
+  node: ClientModel!
+}
+
+input ClientFilterInput {
+  industry: String
+
+  """Free-text match on name and industry"""
+  search: String
+  status: ClientStatus
+}
+
 type ClientModel {
   activeJobCount: Float!
   address: String
@@ -148,6 +167,7 @@ type ClientModel {
   industry: String
   jobs: [JobModel!]!
   name: String!
+  notes: String
   parentId: String
   phone: String
   status: ClientStatus!
@@ -157,10 +177,31 @@ type ClientModel {
   website: String
 }
 
+enum ClientSortField {
+  CREATED_AT
+  NAME
+  UPDATED_AT
+}
+
 enum ClientStatus {
   ACTIVE
   INACTIVE
   PROSPECT
+}
+
+type ClientTimelineEntry {
+  description: String
+  id: ID!
+  occurredAt: DateTime!
+  title: String!
+  type: ClientTimelineEventType!
+  userId: String
+}
+
+enum ClientTimelineEventType {
+  CLIENT_CREATED
+  CONTACT_ADDED
+  JOB_OPENED
 }
 
 input CompleteInterviewInput {
@@ -198,8 +239,10 @@ input CreateClientInput {
   bdUserId: String
   industry: String
   name: String!
+  notes: String
   parentId: String
   phone: String
+  status: ClientStatus
   website: String
 }
 
@@ -376,7 +419,7 @@ type Mutation {
   """Soft-delete a candidate"""
   deleteCandidate(id: ID!): CandidateModel!
 
-  """Soft-delete a client"""
+  """Soft-delete a client and cascade to linked jobs"""
   deleteClient(id: ID!): ClientModel!
 
   """Remove a client contact"""
@@ -458,8 +501,11 @@ type Query {
   """Get a client by ID"""
   client(id: ID!): ClientModel!
 
-  """List all clients in the tenant"""
-  clients: [ClientModel!]!
+  """Timeline of relationship events for a client"""
+  clientTimeline(id: ID!): [ClientTimelineEntry!]!
+
+  """List clients visible to the current user"""
+  clients(after: String, before: String, filter: ClientFilterInput, first: Int, last: Int, sortBy: ClientSortField, sortOrder: SortOrder): ClientConnection!
 
   """Get a job by ID"""
   job(id: ID!): JobModel!
@@ -586,6 +632,7 @@ input UpdateClientInput {
   bdUserId: String
   industry: String
   name: String
+  notes: String
   parentId: String
   phone: String
   status: ClientStatus
