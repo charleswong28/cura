@@ -332,14 +332,4 @@ export class ClientService {
 
     return entries.sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
   }
-
-  async adjustActiveJobCount(clientId: string, tenantId: string, delta: 1 | -1) {
-    await this.prisma.forTenant(tenantId).client.update({
-      where: { id: clientId },
-      data: {
-        activeJobCount: { increment: delta },
-        ...(delta === 1 && { totalJobCount: { increment: 1 } }),
-      },
-    });
-  }
 }

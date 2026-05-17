@@ -1,0 +1,65 @@
+query Jobs(
+  $first: Int
+  $after: String
+  $last: Int
+  $before: String
+  $filter: JobFilterInput
+  $sortBy: JobSortField
+  $sortOrder: SortOrder
+) {
+  jobs(
+    first: $first
+    after: $after
+    last: $last
+    before: $before
+    filter: $filter
+    sortBy: $sortBy
+    sortOrder: $sortOrder
+  ) {
+    edges {
+      cursor
+      node {
+        ...JobFields
+        client {
+          id
+          name
+        }
+        assignedTo {
+          id
+          firstName
+          lastName
+          email
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+    totalCount
+  }
+}
+
+query Job($id: ID!) {
+  job(id: $id) {
+    ...JobFields
+    client {
+      id
+      name
+    }
+    assignedTo {
+      id
+      firstName
+      lastName
+      email
+    }
+    ownerUser {
+      id
+      firstName
+      lastName
+      email
+    }
+  }
+}

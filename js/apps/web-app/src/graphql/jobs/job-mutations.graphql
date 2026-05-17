@@ -1,0 +1,43 @@
+mutation CreateJob($input: CreateJobInput!) {
+  createJob(input: $input) {
+    ...JobFields
+  }
+}
+
+mutation UpdateJob($id: ID!, $input: UpdateJobInput!) {
+  updateJob(id: $id, input: $input) {
+    ...JobFields
+  }
+}
+
+mutation DeleteJob($id: ID!) {
+  deleteJob(id: $id) {
+    id
+    deletedAt
+  }
+}
+
+mutation UpdateJobStatus($id: ID!, $status: JobStatus!) {
+  updateJobStatus(id: $id, status: $status) {
+    id
+    status
+    closeDate
+    updatedAt
+  }
+}
+
+mutation UpdateJobPriority($id: ID!, $priority: JobPriority!) {
+  updateJobPriority(id: $id, priority: $priority) {
+    id
+    priority
+    updatedAt
+  }
+}
+
+mutation AssignJob($id: ID!, $assignedToId: String) {
+  assignJob(id: $id, assignedToId: $assignedToId) {
+    id
+    assignedToId
+    updatedAt
+  }
+}

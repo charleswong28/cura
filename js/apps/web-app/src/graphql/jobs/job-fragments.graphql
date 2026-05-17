@@ -1,0 +1,19 @@
+fragment JobFields on JobModel {
+  id
+  clientId
+  title
+  description
+  requirements
+  status
+  priority
+  ownerUserId
+  assignedToId
+  openDate
+  closeDate
+  applicationCount
+  interviewCount
+  offerCount
+  placementCount
+  createdAt
+  updatedAt
+}

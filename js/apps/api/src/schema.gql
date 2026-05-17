@@ -261,6 +261,9 @@ input CreateJobInput {
   openDate: DateTime
   ownerUserId: String
   priority: JobPriority
+
+  """Job requirements (rich-text content)"""
+  requirements: String
   status: JobStatus
   title: String!
 }
@@ -334,8 +337,33 @@ type JobApplicationModel {
   updatedAt: DateTime!
 }
 
+type JobConnection {
+  edges: [JobEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type JobEdge {
+  cursor: String!
+  node: JobModel!
+}
+
+input JobFilterInput {
+  """Limit to jobs assigned to this user"""
+  assignedToId: String
+
+  """Limit results to a single client"""
+  clientId: String
+  priority: JobPriority
+
+  """Free-text match on title and description"""
+  search: String
+  status: JobStatus
+}
+
 type JobModel {
   applicationCount: Float!
+  assignedTo: UserModel
   assignedToId: String
   client: ClientModel!
   clientId: String!
@@ -347,9 +375,13 @@ type JobModel {
   interviewCount: Float!
   offerCount: Float!
   openDate: DateTime
+  ownerUser: UserModel
   ownerUserId: String
   placementCount: Float!
   priority: JobPriority!
+
+  """Job requirements (rich-text content)"""
+  requirements: String
   status: JobStatus!
   tenantId: String!
   title: String!
@@ -361,6 +393,13 @@ enum JobPriority {
   LOW
   MEDIUM
   URGENT
+}
+
+enum JobSortField {
+  CREATED_AT
+  PRIORITY
+  TITLE
+  UPDATED_AT
 }
 
 enum JobStatus {
@@ -382,6 +421,9 @@ type Mutation {
 
   """Advance application to a new pipeline stage"""
   advanceApplicationStage(id: ID!, input: AdvanceStageInput!): JobApplicationModel!
+
+  """Assign or unassign the recruiter working a job (null = unassign)"""
+  assignJob(assignedToId: String, id: ID!): JobModel!
 
   """Assign a role to a user"""
   assignRole(input: AssignRoleInput!): UserModel!
@@ -425,7 +467,7 @@ type Mutation {
   """Remove a client contact"""
   deleteClientContact(id: ID!): ClientContactModel!
 
-  """Soft-delete a job"""
+  """Soft-delete (archive) a job"""
   deleteJob(id: ID!): JobModel!
 
   """Delete a custom role (built-ins cannot be deleted)"""
@@ -454,6 +496,12 @@ type Mutation {
 
   """Update a job"""
   updateJob(id: ID!, input: UpdateJobInput!): JobModel!
+
+  """Change a job's priority"""
+  updateJobPriority(id: ID!, priority: JobPriority!): JobModel!
+
+  """Change a job's status (validates allowed transitions)"""
+  updateJobStatus(id: ID!, status: JobStatus!): JobModel!
 
   """Update own profile"""
   updateMyProfile(input: UpdateProfileInput!): UserModel!
@@ -516,8 +564,8 @@ type Query {
   """List applications for a job"""
   jobApplications(jobId: ID!): [JobApplicationModel!]!
 
-  """List all jobs in the tenant"""
-  jobs: [JobModel!]!
+  """List jobs visible to the current user"""
+  jobs(after: String, before: String, filter: JobFilterInput, first: Int, last: Int, sortBy: JobSortField, sortOrder: SortOrder): JobConnection!
 
   """Current user's profile"""
   me: UserModel!
@@ -647,6 +695,9 @@ input UpdateJobInput {
   openDate: DateTime
   ownerUserId: String
   priority: JobPriority
+
+  """Job requirements (rich-text content)"""
+  requirements: String
   status: JobStatus
   title: String
 }

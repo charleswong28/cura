@@ -6,6 +6,7 @@ export { ClientModel } from "./client.model";
 export { ClientConnection, ClientEdge } from "./client-connection.model";
 export { ClientContactModel } from "./client-contact.model";
 export { JobModel } from "./job.model";
+export { JobConnection, JobEdge } from "./job-connection.model";
 export {
   JobApplicationModel,
   ApplicationStageModel,

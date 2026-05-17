@@ -268,6 +268,8 @@ export type CreateJobInput = {
   openDate?: InputMaybe<Scalars["DateTime"]["input"]>;
   ownerUserId?: InputMaybe<Scalars["String"]["input"]>;
   priority?: InputMaybe<JobPriority>;
+  /** Job requirements (rich-text content) */
+  requirements?: InputMaybe<Scalars["String"]["input"]>;
   status?: InputMaybe<JobStatus>;
   title: Scalars["String"]["input"];
 };
@@ -331,9 +333,34 @@ export type JobApplicationModel = {
   updatedAt: Scalars["DateTime"]["output"];
 };
 
+export type JobConnection = {
+  __typename?: "JobConnection";
+  edges: Array<JobEdge>;
+  pageInfo: PageInfo;
+  totalCount: Scalars["Int"]["output"];
+};
+
+export type JobEdge = {
+  __typename?: "JobEdge";
+  cursor: Scalars["String"]["output"];
+  node: JobModel;
+};
+
+export type JobFilterInput = {
+  /** Limit to jobs assigned to this user */
+  assignedToId?: InputMaybe<Scalars["String"]["input"]>;
+  /** Limit results to a single client */
+  clientId?: InputMaybe<Scalars["String"]["input"]>;
+  priority?: InputMaybe<JobPriority>;
+  /** Free-text match on title and description */
+  search?: InputMaybe<Scalars["String"]["input"]>;
+  status?: InputMaybe<JobStatus>;
+};
+
 export type JobModel = {
   __typename?: "JobModel";
   applicationCount: Scalars["Float"]["output"];
+  assignedTo?: Maybe<UserModel>;
   assignedToId?: Maybe<Scalars["String"]["output"]>;
   client: ClientModel;
   clientId: Scalars["String"]["output"];
@@ -345,9 +372,12 @@ export type JobModel = {
   interviewCount: Scalars["Float"]["output"];
   offerCount: Scalars["Float"]["output"];
   openDate?: Maybe<Scalars["DateTime"]["output"]>;
+  ownerUser?: Maybe<UserModel>;
   ownerUserId?: Maybe<Scalars["String"]["output"]>;
   placementCount: Scalars["Float"]["output"];
   priority: JobPriority;
+  /** Job requirements (rich-text content) */
+  requirements?: Maybe<Scalars["String"]["output"]>;
   status: JobStatus;
   tenantId: Scalars["String"]["output"];
   title: Scalars["String"]["output"];
@@ -355,6 +385,8 @@ export type JobModel = {
 };
 
 export type JobPriority = "HIGH" | "LOW" | "MEDIUM" | "URGENT";
+
+export type JobSortField = "CREATED_AT" | "PRIORITY" | "TITLE" | "UPDATED_AT";
 
 export type JobStatus = "CLOSED" | "FILLED" | "ON_HOLD" | "OPEN";
 
@@ -368,6 +400,8 @@ export type Mutation = {
   addTeamMember: TeamMemberModel;
   /** Advance application to a new pipeline stage */
   advanceApplicationStage: JobApplicationModel;
+  /** Assign or unassign the recruiter working a job (null = unassign) */
+  assignJob: JobModel;
   /** Assign a role to a user */
   assignRole: UserModel;
   /** Record interview outcome */
@@ -392,11 +426,11 @@ export type Mutation = {
   deactivateUser: UserModel;
   /** Soft-delete a candidate */
   deleteCandidate: CandidateModel;
-  /** Soft-delete a client */
+  /** Soft-delete a client and cascade to linked jobs */
   deleteClient: ClientModel;
   /** Remove a client contact */
   deleteClientContact: ClientContactModel;
-  /** Soft-delete a job */
+  /** Soft-delete (archive) a job */
   deleteJob: JobModel;
   /** Delete a custom role (built-ins cannot be deleted) */
   deleteRole: RoleModel;
@@ -416,6 +450,10 @@ export type Mutation = {
   updateClient: ClientModel;
   /** Update a job */
   updateJob: JobModel;
+  /** Change a job's priority */
+  updateJobPriority: JobModel;
+  /** Change a job's status (validates allowed transitions) */
+  updateJobStatus: JobModel;
   /** Update own profile */
   updateMyProfile: UserModel;
   /** Update a custom role (built-ins are read-only) */
@@ -444,6 +482,11 @@ export type MutationAddTeamMemberArgs = {
 export type MutationAdvanceApplicationStageArgs = {
   id: Scalars["ID"]["input"];
   input: AdvanceStageInput;
+};
+
+export type MutationAssignJobArgs = {
+  assignedToId?: InputMaybe<Scalars["String"]["input"]>;
+  id: Scalars["ID"]["input"];
 };
 
 export type MutationAssignRoleArgs = {
@@ -547,6 +590,16 @@ export type MutationUpdateJobArgs = {
   input: UpdateJobInput;
 };
 
+export type MutationUpdateJobPriorityArgs = {
+  id: Scalars["ID"]["input"];
+  priority: JobPriority;
+};
+
+export type MutationUpdateJobStatusArgs = {
+  id: Scalars["ID"]["input"];
+  status: JobStatus;
+};
+
 export type MutationUpdateMyProfileArgs = {
   input: UpdateProfileInput;
 };
@@ -609,8 +662,8 @@ export type Query = {
   jobApplication: JobApplicationModel;
   /** List applications for a job */
   jobApplications: Array<JobApplicationModel>;
-  /** List all jobs in the tenant */
-  jobs: Array<JobModel>;
+  /** List jobs visible to the current user */
+  jobs: JobConnection;
   /** Current user's profile */
   me: UserModel;
   /** All tenants the current auth identity belongs to */
@@ -675,6 +728,16 @@ export type QueryJobApplicationArgs = {
 
 export type QueryJobApplicationsArgs = {
   jobId: Scalars["ID"]["input"];
+};
+
+export type QueryJobsArgs = {
+  after?: InputMaybe<Scalars["String"]["input"]>;
+  before?: InputMaybe<Scalars["String"]["input"]>;
+  filter?: InputMaybe<JobFilterInput>;
+  first?: InputMaybe<Scalars["Int"]["input"]>;
+  last?: InputMaybe<Scalars["Int"]["input"]>;
+  sortBy?: InputMaybe<JobSortField>;
+  sortOrder?: InputMaybe<SortOrder>;
 };
 
 export type QueryRoleArgs = {
@@ -780,6 +843,8 @@ export type UpdateJobInput = {
   openDate?: InputMaybe<Scalars["DateTime"]["input"]>;
   ownerUserId?: InputMaybe<Scalars["String"]["input"]>;
   priority?: InputMaybe<JobPriority>;
+  /** Job requirements (rich-text content) */
+  requirements?: InputMaybe<Scalars["String"]["input"]>;
   status?: InputMaybe<JobStatus>;
   title?: InputMaybe<Scalars["String"]["input"]>;
 };
@@ -1139,6 +1204,239 @@ export type ClientTimelineQuery = {
   }>;
 };
 
+export type JobFieldsFragment = {
+  __typename?: "JobModel";
+  id: string;
+  clientId: string;
+  title: string;
+  description?: string | null;
+  requirements?: string | null;
+  status: JobStatus;
+  priority: JobPriority;
+  ownerUserId?: string | null;
+  assignedToId?: string | null;
+  openDate?: string | null;
+  closeDate?: string | null;
+  applicationCount: number;
+  interviewCount: number;
+  offerCount: number;
+  placementCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateJobMutationVariables = Exact<{
+  input: CreateJobInput;
+}>;
+
+export type CreateJobMutation = {
+  __typename?: "Mutation";
+  createJob: {
+    __typename?: "JobModel";
+    id: string;
+    clientId: string;
+    title: string;
+    description?: string | null;
+    requirements?: string | null;
+    status: JobStatus;
+    priority: JobPriority;
+    ownerUserId?: string | null;
+    assignedToId?: string | null;
+    openDate?: string | null;
+    closeDate?: string | null;
+    applicationCount: number;
+    interviewCount: number;
+    offerCount: number;
+    placementCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+};
+
+export type UpdateJobMutationVariables = Exact<{
+  id: Scalars["ID"]["input"];
+  input: UpdateJobInput;
+}>;
+
+export type UpdateJobMutation = {
+  __typename?: "Mutation";
+  updateJob: {
+    __typename?: "JobModel";
+    id: string;
+    clientId: string;
+    title: string;
+    description?: string | null;
+    requirements?: string | null;
+    status: JobStatus;
+    priority: JobPriority;
+    ownerUserId?: string | null;
+    assignedToId?: string | null;
+    openDate?: string | null;
+    closeDate?: string | null;
+    applicationCount: number;
+    interviewCount: number;
+    offerCount: number;
+    placementCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+};
+
+export type DeleteJobMutationVariables = Exact<{
+  id: Scalars["ID"]["input"];
+}>;
+
+export type DeleteJobMutation = {
+  __typename?: "Mutation";
+  deleteJob: { __typename?: "JobModel"; id: string; deletedAt?: string | null };
+};
+
+export type UpdateJobStatusMutationVariables = Exact<{
+  id: Scalars["ID"]["input"];
+  status: JobStatus;
+}>;
+
+export type UpdateJobStatusMutation = {
+  __typename?: "Mutation";
+  updateJobStatus: {
+    __typename?: "JobModel";
+    id: string;
+    status: JobStatus;
+    closeDate?: string | null;
+    updatedAt: string;
+  };
+};
+
+export type UpdateJobPriorityMutationVariables = Exact<{
+  id: Scalars["ID"]["input"];
+  priority: JobPriority;
+}>;
+
+export type UpdateJobPriorityMutation = {
+  __typename?: "Mutation";
+  updateJobPriority: {
+    __typename?: "JobModel";
+    id: string;
+    priority: JobPriority;
+    updatedAt: string;
+  };
+};
+
+export type AssignJobMutationVariables = Exact<{
+  id: Scalars["ID"]["input"];
+  assignedToId?: InputMaybe<Scalars["String"]["input"]>;
+}>;
+
+export type AssignJobMutation = {
+  __typename?: "Mutation";
+  assignJob: {
+    __typename?: "JobModel";
+    id: string;
+    assignedToId?: string | null;
+    updatedAt: string;
+  };
+};
+
+export type JobsQueryVariables = Exact<{
+  first?: InputMaybe<Scalars["Int"]["input"]>;
+  after?: InputMaybe<Scalars["String"]["input"]>;
+  last?: InputMaybe<Scalars["Int"]["input"]>;
+  before?: InputMaybe<Scalars["String"]["input"]>;
+  filter?: InputMaybe<JobFilterInput>;
+  sortBy?: InputMaybe<JobSortField>;
+  sortOrder?: InputMaybe<SortOrder>;
+}>;
+
+export type JobsQuery = {
+  __typename?: "Query";
+  jobs: {
+    __typename?: "JobConnection";
+    totalCount: number;
+    edges: Array<{
+      __typename?: "JobEdge";
+      cursor: string;
+      node: {
+        __typename?: "JobModel";
+        id: string;
+        clientId: string;
+        title: string;
+        description?: string | null;
+        requirements?: string | null;
+        status: JobStatus;
+        priority: JobPriority;
+        ownerUserId?: string | null;
+        assignedToId?: string | null;
+        openDate?: string | null;
+        closeDate?: string | null;
+        applicationCount: number;
+        interviewCount: number;
+        offerCount: number;
+        placementCount: number;
+        createdAt: string;
+        updatedAt: string;
+        client: { __typename?: "ClientModel"; id: string; name: string };
+        assignedTo?: {
+          __typename?: "UserModel";
+          id: string;
+          firstName: string;
+          lastName: string;
+          email: string;
+        } | null;
+      };
+    }>;
+    pageInfo: {
+      __typename?: "PageInfo";
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      startCursor?: string | null;
+      endCursor?: string | null;
+    };
+  };
+};
+
+export type JobQueryVariables = Exact<{
+  id: Scalars["ID"]["input"];
+}>;
+
+export type JobQuery = {
+  __typename?: "Query";
+  job: {
+    __typename?: "JobModel";
+    id: string;
+    clientId: string;
+    title: string;
+    description?: string | null;
+    requirements?: string | null;
+    status: JobStatus;
+    priority: JobPriority;
+    ownerUserId?: string | null;
+    assignedToId?: string | null;
+    openDate?: string | null;
+    closeDate?: string | null;
+    applicationCount: number;
+    interviewCount: number;
+    offerCount: number;
+    placementCount: number;
+    createdAt: string;
+    updatedAt: string;
+    client: { __typename?: "ClientModel"; id: string; name: string };
+    assignedTo?: {
+      __typename?: "UserModel";
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    } | null;
+    ownerUser?: {
+      __typename?: "UserModel";
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    } | null;
+  };
+};
+
 export type CreateTenantMutationVariables = Exact<{
   input: CreateTenantInput;
 }>;
@@ -1247,6 +1545,38 @@ export const ClientFieldsFragmentDoc = {
     },
   ],
 } as unknown as DocumentNode<ClientFieldsFragment, unknown>;
+export const JobFieldsFragmentDoc = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "JobFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "JobModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "clientId" } },
+          { kind: "Field", name: { kind: "Name", value: "title" } },
+          { kind: "Field", name: { kind: "Name", value: "description" } },
+          { kind: "Field", name: { kind: "Name", value: "requirements" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "priority" } },
+          { kind: "Field", name: { kind: "Name", value: "ownerUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "assignedToId" } },
+          { kind: "Field", name: { kind: "Name", value: "openDate" } },
+          { kind: "Field", name: { kind: "Name", value: "closeDate" } },
+          { kind: "Field", name: { kind: "Name", value: "applicationCount" } },
+          { kind: "Field", name: { kind: "Name", value: "interviewCount" } },
+          { kind: "Field", name: { kind: "Name", value: "offerCount" } },
+          { kind: "Field", name: { kind: "Name", value: "placementCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<JobFieldsFragment, unknown>;
 export const CreateCandidateDocument = {
   kind: "Document",
   definitions: [
@@ -2120,6 +2450,654 @@ export const ClientTimelineDocument = {
     },
   ],
 } as unknown as DocumentNode<ClientTimelineQuery, ClientTimelineQueryVariables>;
+export const CreateJobDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "CreateJob" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "input" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "CreateJobInput" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "createJob" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "input" },
+                value: { kind: "Variable", name: { kind: "Name", value: "input" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [{ kind: "FragmentSpread", name: { kind: "Name", value: "JobFields" } }],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "JobFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "JobModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "clientId" } },
+          { kind: "Field", name: { kind: "Name", value: "title" } },
+          { kind: "Field", name: { kind: "Name", value: "description" } },
+          { kind: "Field", name: { kind: "Name", value: "requirements" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "priority" } },
+          { kind: "Field", name: { kind: "Name", value: "ownerUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "assignedToId" } },
+          { kind: "Field", name: { kind: "Name", value: "openDate" } },
+          { kind: "Field", name: { kind: "Name", value: "closeDate" } },
+          { kind: "Field", name: { kind: "Name", value: "applicationCount" } },
+          { kind: "Field", name: { kind: "Name", value: "interviewCount" } },
+          { kind: "Field", name: { kind: "Name", value: "offerCount" } },
+          { kind: "Field", name: { kind: "Name", value: "placementCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<CreateJobMutation, CreateJobMutationVariables>;
+export const UpdateJobDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "UpdateJob" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "input" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "UpdateJobInput" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "updateJob" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "input" },
+                value: { kind: "Variable", name: { kind: "Name", value: "input" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [{ kind: "FragmentSpread", name: { kind: "Name", value: "JobFields" } }],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "JobFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "JobModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "clientId" } },
+          { kind: "Field", name: { kind: "Name", value: "title" } },
+          { kind: "Field", name: { kind: "Name", value: "description" } },
+          { kind: "Field", name: { kind: "Name", value: "requirements" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "priority" } },
+          { kind: "Field", name: { kind: "Name", value: "ownerUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "assignedToId" } },
+          { kind: "Field", name: { kind: "Name", value: "openDate" } },
+          { kind: "Field", name: { kind: "Name", value: "closeDate" } },
+          { kind: "Field", name: { kind: "Name", value: "applicationCount" } },
+          { kind: "Field", name: { kind: "Name", value: "interviewCount" } },
+          { kind: "Field", name: { kind: "Name", value: "offerCount" } },
+          { kind: "Field", name: { kind: "Name", value: "placementCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateJobMutation, UpdateJobMutationVariables>;
+export const DeleteJobDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "DeleteJob" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "deleteJob" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "Field", name: { kind: "Name", value: "id" } },
+                { kind: "Field", name: { kind: "Name", value: "deletedAt" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<DeleteJobMutation, DeleteJobMutationVariables>;
+export const UpdateJobStatusDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "UpdateJobStatus" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "status" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "JobStatus" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "updateJobStatus" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "status" },
+                value: { kind: "Variable", name: { kind: "Name", value: "status" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "Field", name: { kind: "Name", value: "id" } },
+                { kind: "Field", name: { kind: "Name", value: "status" } },
+                { kind: "Field", name: { kind: "Name", value: "closeDate" } },
+                { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateJobStatusMutation, UpdateJobStatusMutationVariables>;
+export const UpdateJobPriorityDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "UpdateJobPriority" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "priority" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "JobPriority" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "updateJobPriority" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "priority" },
+                value: { kind: "Variable", name: { kind: "Name", value: "priority" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "Field", name: { kind: "Name", value: "id" } },
+                { kind: "Field", name: { kind: "Name", value: "priority" } },
+                { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateJobPriorityMutation, UpdateJobPriorityMutationVariables>;
+export const AssignJobDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "AssignJob" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "assignedToId" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "String" } },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "assignJob" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "assignedToId" },
+                value: { kind: "Variable", name: { kind: "Name", value: "assignedToId" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "Field", name: { kind: "Name", value: "id" } },
+                { kind: "Field", name: { kind: "Name", value: "assignedToId" } },
+                { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<AssignJobMutation, AssignJobMutationVariables>;
+export const JobsDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "query",
+      name: { kind: "Name", value: "Jobs" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "first" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "Int" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "after" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "String" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "last" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "Int" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "before" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "String" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "filter" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "JobFilterInput" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "sortBy" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "JobSortField" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "sortOrder" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "SortOrder" } },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "jobs" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "first" },
+                value: { kind: "Variable", name: { kind: "Name", value: "first" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "after" },
+                value: { kind: "Variable", name: { kind: "Name", value: "after" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "last" },
+                value: { kind: "Variable", name: { kind: "Name", value: "last" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "before" },
+                value: { kind: "Variable", name: { kind: "Name", value: "before" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "filter" },
+                value: { kind: "Variable", name: { kind: "Name", value: "filter" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "sortBy" },
+                value: { kind: "Variable", name: { kind: "Name", value: "sortBy" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "sortOrder" },
+                value: { kind: "Variable", name: { kind: "Name", value: "sortOrder" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                {
+                  kind: "Field",
+                  name: { kind: "Name", value: "edges" },
+                  selectionSet: {
+                    kind: "SelectionSet",
+                    selections: [
+                      { kind: "Field", name: { kind: "Name", value: "cursor" } },
+                      {
+                        kind: "Field",
+                        name: { kind: "Name", value: "node" },
+                        selectionSet: {
+                          kind: "SelectionSet",
+                          selections: [
+                            { kind: "FragmentSpread", name: { kind: "Name", value: "JobFields" } },
+                            {
+                              kind: "Field",
+                              name: { kind: "Name", value: "client" },
+                              selectionSet: {
+                                kind: "SelectionSet",
+                                selections: [
+                                  { kind: "Field", name: { kind: "Name", value: "id" } },
+                                  { kind: "Field", name: { kind: "Name", value: "name" } },
+                                ],
+                              },
+                            },
+                            {
+                              kind: "Field",
+                              name: { kind: "Name", value: "assignedTo" },
+                              selectionSet: {
+                                kind: "SelectionSet",
+                                selections: [
+                                  { kind: "Field", name: { kind: "Name", value: "id" } },
+                                  { kind: "Field", name: { kind: "Name", value: "firstName" } },
+                                  { kind: "Field", name: { kind: "Name", value: "lastName" } },
+                                  { kind: "Field", name: { kind: "Name", value: "email" } },
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+                {
+                  kind: "Field",
+                  name: { kind: "Name", value: "pageInfo" },
+                  selectionSet: {
+                    kind: "SelectionSet",
+                    selections: [
+                      { kind: "Field", name: { kind: "Name", value: "hasNextPage" } },
+                      { kind: "Field", name: { kind: "Name", value: "hasPreviousPage" } },
+                      { kind: "Field", name: { kind: "Name", value: "startCursor" } },
+                      { kind: "Field", name: { kind: "Name", value: "endCursor" } },
+                    ],
+                  },
+                },
+                { kind: "Field", name: { kind: "Name", value: "totalCount" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "JobFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "JobModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "clientId" } },
+          { kind: "Field", name: { kind: "Name", value: "title" } },
+          { kind: "Field", name: { kind: "Name", value: "description" } },
+          { kind: "Field", name: { kind: "Name", value: "requirements" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "priority" } },
+          { kind: "Field", name: { kind: "Name", value: "ownerUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "assignedToId" } },
+          { kind: "Field", name: { kind: "Name", value: "openDate" } },
+          { kind: "Field", name: { kind: "Name", value: "closeDate" } },
+          { kind: "Field", name: { kind: "Name", value: "applicationCount" } },
+          { kind: "Field", name: { kind: "Name", value: "interviewCount" } },
+          { kind: "Field", name: { kind: "Name", value: "offerCount" } },
+          { kind: "Field", name: { kind: "Name", value: "placementCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<JobsQuery, JobsQueryVariables>;
+export const JobDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "query",
+      name: { kind: "Name", value: "Job" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "job" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "FragmentSpread", name: { kind: "Name", value: "JobFields" } },
+                {
+                  kind: "Field",
+                  name: { kind: "Name", value: "client" },
+                  selectionSet: {
+                    kind: "SelectionSet",
+                    selections: [
+                      { kind: "Field", name: { kind: "Name", value: "id" } },
+                      { kind: "Field", name: { kind: "Name", value: "name" } },
+                    ],
+                  },
+                },
+                {
+                  kind: "Field",
+                  name: { kind: "Name", value: "assignedTo" },
+                  selectionSet: {
+                    kind: "SelectionSet",
+                    selections: [
+                      { kind: "Field", name: { kind: "Name", value: "id" } },
+                      { kind: "Field", name: { kind: "Name", value: "firstName" } },
+                      { kind: "Field", name: { kind: "Name", value: "lastName" } },
+                      { kind: "Field", name: { kind: "Name", value: "email" } },
+                    ],
+                  },
+                },
+                {
+                  kind: "Field",
+                  name: { kind: "Name", value: "ownerUser" },
+                  selectionSet: {
+                    kind: "SelectionSet",
+                    selections: [
+                      { kind: "Field", name: { kind: "Name", value: "id" } },
+                      { kind: "Field", name: { kind: "Name", value: "firstName" } },
+                      { kind: "Field", name: { kind: "Name", value: "lastName" } },
+                      { kind: "Field", name: { kind: "Name", value: "email" } },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "JobFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "JobModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "clientId" } },
+          { kind: "Field", name: { kind: "Name", value: "title" } },
+          { kind: "Field", name: { kind: "Name", value: "description" } },
+          { kind: "Field", name: { kind: "Name", value: "requirements" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "priority" } },
+          { kind: "Field", name: { kind: "Name", value: "ownerUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "assignedToId" } },
+          { kind: "Field", name: { kind: "Name", value: "openDate" } },
+          { kind: "Field", name: { kind: "Name", value: "closeDate" } },
+          { kind: "Field", name: { kind: "Name", value: "applicationCount" } },
+          { kind: "Field", name: { kind: "Name", value: "interviewCount" } },
+          { kind: "Field", name: { kind: "Name", value: "offerCount" } },
+          { kind: "Field", name: { kind: "Name", value: "placementCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<JobQuery, JobQueryVariables>;
 export const CreateTenantDocument = {
   kind: "Document",
   definitions: [

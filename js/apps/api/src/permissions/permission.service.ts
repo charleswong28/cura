@@ -1,5 +1,11 @@
 import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
-import { AccessLevel, DataScopeType, GrantAction, GranteeType, GrantSource } from "../generated/prisma/enums";
+import {
+  AccessLevel,
+  DataScopeType,
+  GrantAction,
+  GranteeType,
+  GrantSource,
+} from "../generated/prisma/enums";
 import { PrismaService } from "../prisma/prisma.service";
 import { RequestUser } from "../auth/auth.types";
 import { generateId } from "../common/ulid";
@@ -113,7 +119,16 @@ export class PermissionService {
     const direct = maxLevel(effectiveLevels);
     if (direct !== null) return direct;
 
-    return this.checkCascade(user, resourceType, resourceId);
+    const cascadeLevel = await this.checkCascade(user, resourceType, resourceId);
+    if (cascadeLevel !== null) return cascadeLevel;
+
+    // Data-scope ALL grants implicit VIEW on every record of the resource type.
+    // Without this, admin roles can list rows (data-scope filter passes) but
+    // can't traverse to them via ResolveField (which calls assertCan(VIEW)).
+    const scope = await this.getDataScope(user, resourceType);
+    if (scope === DataScopeType.ALL) return AccessLevel.VIEW;
+
+    return null;
   }
 
   // =========================================================================
@@ -268,7 +283,12 @@ export class PermissionService {
     });
   }
 
-  async revoke(permissionId: string, tenantId: string, actorId: string, reason?: string): Promise<void> {
+  async revoke(
+    permissionId: string,
+    tenantId: string,
+    actorId: string,
+    reason?: string
+  ): Promise<void> {
     const db = this.prisma.forTenant(tenantId);
 
     const existing = await db.permission.findFirst({ where: { id: permissionId } });

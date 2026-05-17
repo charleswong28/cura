@@ -18,6 +18,9 @@ export class JobModel {
   @Field(() => String, { nullable: true })
   description!: string | null;
 
+  @Field(() => String, { nullable: true, description: "Job requirements (rich-text content)" })
+  requirements!: string | null;
+
   @Field(() => JobStatus)
   status!: JobStatus;
 

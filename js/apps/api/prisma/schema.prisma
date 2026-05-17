@@ -580,6 +580,7 @@ model Job {
   createdBy    User?       @relation("JobCreator", fields: [createdById], references: [id])
   title        String
   description      String?
+  requirements     String?
   status           JobStatus   @default(OPEN)
   priority         JobPriority @default(MEDIUM)
   assignedToId     String?     @map("assigned_to_id")
