@@ -1,5 +1,7 @@
 export { ActivityLogModel } from "./activity-log.model";
 export { CandidateModel } from "./candidate.model";
+export { CandidateConnection, CandidateEdge } from "./candidate-connection.model";
+export { PageInfo } from "./page-info.model";
 export { ClientModel } from "./client.model";
 export { ClientContactModel } from "./client-contact.model";
 export { JobModel } from "./job.model";

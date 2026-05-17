@@ -67,6 +67,27 @@ input AssignRoleInput {
   userId: String!
 }
 
+type CandidateConnection {
+  edges: [CandidateEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type CandidateEdge {
+  cursor: String!
+  node: CandidateModel!
+}
+
+input CandidateFilterInput {
+  currentCompany: String
+  currentTitle: String
+  location: String
+
+  """Free-text match on name, email, company, title"""
+  search: String
+  status: CandidateStatus
+}
+
 type CandidateModel {
   createdAt: DateTime!
   currentCompany: String
@@ -85,6 +106,12 @@ type CandidateModel {
   status: CandidateStatus!
   tenantId: String!
   updatedAt: DateTime!
+}
+
+enum CandidateSortField {
+  CREATED_AT
+  NAME
+  UPDATED_AT
 }
 
 enum CandidateStatus {
@@ -411,6 +438,13 @@ type OfferModel {
   tenantId: String!
 }
 
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+}
+
 type Query {
   """Recent activity log entries"""
   activityLog(limit: Int! = 50, offset: Int! = 0): [ActivityLogModel!]!
@@ -419,7 +453,7 @@ type Query {
   candidate(id: ID!): CandidateModel!
 
   """List candidates visible to the current user"""
-  candidates: [CandidateModel!]!
+  candidates(after: String, before: String, filter: CandidateFilterInput, first: Int, last: Int, sortBy: CandidateSortField, sortOrder: SortOrder): CandidateConnection!
 
   """Get a client by ID"""
   client(id: ID!): ClientModel!
@@ -479,6 +513,11 @@ type RoleModel {
   """null for built-in roles"""
   tenantId: String
   updatedAt: DateTime!
+}
+
+enum SortOrder {
+  ASC
+  DESC
 }
 
 enum TeamKind {

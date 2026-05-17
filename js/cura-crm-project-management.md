@@ -241,10 +241,10 @@
 
 #### Story 3.3: Candidate API — Search & Filtering (BE)
 
-- [ ] **TASK-024:** Implement basic text search across candidate fields
-- [ ] **TASK-025:** Add filtering by company, title, location
-- [ ] **TASK-026:** Create sorting options (name, created date, updated date)
-- [ ] **TASK-027:** Implement pagination with proper GraphQL cursors
+- [x] **TASK-024:** Implement basic text search across candidate fields
+- [x] **TASK-025:** Add filtering by company, title, location
+- [x] **TASK-026:** Create sorting options (name, created date, updated date)
+- [x] **TASK-027:** Implement pagination with proper GraphQL cursors
 
 #### Story 3.4: Candidate List Page (FE)
 
@@ -475,15 +475,15 @@
 ### Completion Status
 
 - **EPICs:** 0/6 Complete
-- **Stories:** 12/34 Complete
-- **Tasks:** 67/165 Complete (34 BE + 33 FE)
+- **Stories:** 13/34 Complete
+- **Tasks:** 71/165 Complete (38 BE + 33 FE)
 
 > Note: Sprint 1 FE stories remain complete. Clerk BE/FE work (Stories 2.1–2.3 old, TASK-048–064, WA-020–027) is superseded by the first-party auth plan. Task counts reset for EPIC-002 BE work.
 
 ### Current Sprint
 
 **Sprint:** Sprint 4 — In Progress
-**Active Stories:** Stories 3.1 + 3.2 complete; Story 3.4 (List Page), 3.6 (Create & Edit) next
+**Active Stories:** Stories 3.1 + 3.2 + 3.3 complete; Story 3.4 (List Page), 3.6 (Create & Edit) next
 **Blocked Items:** None
 
 ---
@@ -529,7 +529,8 @@
 | 2026-05-03 | Story 2.7 complete — User & Role Management              | UserService (invite with PasswordResetToken invite link, assignRole + removeRole with INCR user_ver, deactivate + reactivate with session revocation); RoleModule (RoleService + RoleResolver: findAll/findById/create/update/delete for tenant-scoped custom roles, built-in guard, bumps user_ver for all role holders on update/delete); UserModel gains `firstLogin` + `lastInactiveAt` fields; `ActivityAction` enum extended with USER_DEACTIVATED + USER_REACTIVATED; PasswordService exported from AuthModule; TASK-096–100 complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 2026-05-03 | Story 2.8 complete — Frontend Login & Session Management | Replaced Clerk with first-party auth across the web-app shell. Next.js route handlers (`/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, `/api/auth/mfa-verify`) proxy to NestJS and own the httpOnly `cura_refresh` cookie lifecycle. `token-store.ts`: module-level access token (survives re-renders, readable by Apollo). `auth-context.tsx`: React context for user info + login/logout/completeMfa actions. Apollo auth link rebuilt — injects memory token, detects `JWT_STALE` GraphQL error, refreshes via `/api/auth/refresh`, retries once. `middleware.ts` replaced `clerkMiddleware` with refresh-cookie presence check. Sidebar `UserSection` shows initials avatar + display name + logout button. `/login` page with inline MFA TOTP step on `mfaRequired: true`. Old Clerk pages (`/sign-in`, `/sign-up`, `/org-setup`) redirect to `/login`/`/dashboard`. `me` query added to schema + codegen regenerated; WA-080–085 complete                                                                                                                                        |
 | 2026-05-04 | Story 3.1 complete — Candidate API CRUD                  | `linkedinUrl` + `githubUrl` added to Prisma schema + migration; `CandidateModel` GraphQL type updated; `CreateCandidateInput` gains URL validation (https-only `IsUrl`), `MaxLength` guards, `status` field; `UpdateCandidateInput` simplified to pure `PartialType`; `CandidateService` refactored to accept `RequestUser` throughout — `findAll` applies data-scope filtering (ALL/TEAM_TREE/MY_TEAMS/MINE/EXPLICIT), `findById` + `update` + `softDelete` call `assertCan` for row-level checks, `create` + `update` enforce email uniqueness with `ConflictException`; `CandidateResolver` adds `@RequirePermission("candidate:create")` and `@RequirePermission("candidate:delete")`; TASK-014, TASK-015, TASK-019 complete                                                                                                                                                                                                                                                                                                                                                                   |
-| 2026-05-04 | Story 3.2 complete — Candidate API Validation            | `@IsNotEmpty` on `firstName`/`lastName` (TASK-022); `@Matches(/^\+?[1-9][\d\s\-(). ]{5,28}$/)` replaces bare `@IsString` on `phone` (TASK-021); `@Transform` on all string inputs — trim whitespace, lowercase email, blank optional strings normalised to `undefined` (TASK-023); email uniqueness queries use Prisma `mode:'insensitive'` in both `create` and `update` paths; email stored pre-lowercased by DTO transform (TASK-020); TASK-020–023 complete |
+| 2026-05-04 | Story 3.2 complete — Candidate API Validation            | `@IsNotEmpty` on `firstName`/`lastName` (TASK-022); `@Matches(/^\+?[1-9][\d\s\-(). ]{5,28}$/)` replaces bare `@IsString` on `phone` (TASK-021); `@Transform` on all string inputs — trim whitespace, lowercase email, blank optional strings normalised to `undefined` (TASK-023); email uniqueness queries use Prisma `mode:'insensitive'` in both `create` and `update` paths; email stored pre-lowercased by DTO transform (TASK-020); TASK-020–023 complete                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2026-05-17 | Story 3.3 complete — Candidate API Search & Filtering    | `candidates` query now returns Relay-style `CandidateConnection` (`edges{cursor node}`, `pageInfo{hasNextPage,hasPreviousPage,startCursor,endCursor}`, `totalCount`). New shared `PageInfo` GraphQL model; new `CandidateConnection`/`CandidateEdge` types; new `CandidateFilterInput` (search, status, currentCompany, currentTitle, location — all case-insensitive contains except status); new `CandidateSortField` + `SortOrder` enums (NAME/CREATED_AT/UPDATED_AT × ASC/DESC, default UPDATED_AT DESC). Cursor = base64url(id), opaque to clients; pagination via Prisma `cursor`+`skip:1`+`take:N+1` to compute `hasNextPage` cheaply; backward pagination via inverted orderBy + reverse. Search spans firstName/lastName/email/currentCompany/currentTitle. Stable ordering enforced by tying every sort to a secondary `id` clause. Data-scope filter (ALL/TEAM_TREE/MY_TEAMS/MINE/EXPLICIT) preserved and AND-combined with user filters. Page size default 20, max 100; rejects `first`+`last` or `after`+`before` combos with `BadRequestException`. TASK-024–027 complete            |
 | 2026-05-04 | Story 2.10 complete — Multi-tenancy & Org Switching      | **Backend:** `TenantModel` GraphQL type; `myTenants` query on `UserResolver` (cross-tenant lookup via `authIdentityId`); `POST /auth/switch-tenant` endpoint (validates refresh token, resolves user in target tenant, revokes old session, issues new one); new `TenantModule` with `TenantService.create()` + `createTenant` GraphQL mutation for org setup. **Frontend:** `Tenant` type + `myTenants` query + `CreateTenant` mutation added to `schema.graphql` + codegen run; Apollo singleton extracted to `apollo-instance.ts` (shared by `ApolloProvider` and `auth-context`); `switchTenant(slug)` added to `auth-context` — calls `/api/auth/switch-tenant`, sets new token, calls `apolloClient.resetStore()` to re-fetch with new tenant; `/api/auth/switch-tenant` Next.js proxy route; `TenantSwitcher` Popover component in sidebar (shows org name + checkmark on current, lists all orgs, "Create organization" link); `/org-setup` page rebuilt — name + auto-slug form, `createTenant` mutation, then `switchTenant` to land in new org; WA-090–092 complete. Sprint 3 complete. |
 
 ---
