@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { AccessLevel, DataScopeType } from "../generated/prisma/enums";
 import { PrismaService } from "../prisma/prisma.service";
 import { PermissionService } from "../permissions/permission.service";
@@ -15,6 +10,10 @@ import { UpdateClientInput } from "./dto/update-client.input";
 import { ClientFilterInput } from "./dto/client-filter.input";
 import { ClientSortField } from "./dto/client-sort";
 import { SortOrder } from "../candidate/dto/candidate-sort";
+import {
+  ClientTimelineEntry,
+  ClientTimelineEventType,
+} from "../common/graphql/models/client-timeline.model";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -262,6 +261,73 @@ export class ClientService {
       where: { clientId, deletedAt: null },
       orderBy: [{ isPrimary: "desc" }, { lastName: "asc" }],
     });
+  }
+
+  async getTimeline(id: string, user: RequestUser): Promise<ClientTimelineEntry[]> {
+    const client = await this.findById(id, user);
+    const db = this.prisma.forTenant(user.tenantId);
+
+    const [contacts, jobs] = await Promise.all([
+      db.clientContact.findMany({
+        where: { clientId: id },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          title: true,
+          createdAt: true,
+          createdById: true,
+        },
+      }),
+      db.job.findMany({
+        where: { clientId: id, deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, title: true, createdAt: true, createdById: true },
+      }),
+    ]);
+
+    const entries: ClientTimelineEntry[] = [
+      {
+        id: `${id}:created`,
+        type: ClientTimelineEventType.CLIENT_CREATED,
+        title: "Client added",
+        description: client.name,
+        occurredAt: client.createdAt,
+        userId: (client as { createdById?: string | null }).createdById ?? null,
+      },
+      ...(
+        contacts as Array<{
+          id: string;
+          firstName: string;
+          lastName: string;
+          title: string | null;
+          createdAt: Date;
+          createdById: string | null;
+        }>
+      ).map((c) => ({
+        id: `contact:${c.id}`,
+        type: ClientTimelineEventType.CONTACT_ADDED,
+        title: "Contact added",
+        description: [c.firstName, c.lastName, c.title ? `(${c.title})` : null]
+          .filter(Boolean)
+          .join(" "),
+        occurredAt: c.createdAt,
+        userId: c.createdById ?? null,
+      })),
+      ...(
+        jobs as Array<{ id: string; title: string; createdAt: Date; createdById: string | null }>
+      ).map((j) => ({
+        id: `job:${j.id}`,
+        type: ClientTimelineEventType.JOB_OPENED,
+        title: "Job opened",
+        description: j.title,
+        occurredAt: j.createdAt,
+        userId: j.createdById ?? null,
+      })),
+    ];
+
+    return entries.sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
   }
 
   async adjustActiveJobCount(clientId: string, tenantId: string, delta: 1 | -1) {

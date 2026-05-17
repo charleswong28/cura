@@ -136,6 +136,13 @@ export type CandidateSortField = "CREATED_AT" | "NAME" | "UPDATED_AT";
 
 export type CandidateStatus = "ACTIVE" | "BLACKLISTED" | "INACTIVE" | "PLACED";
 
+export type ClientConnection = {
+  __typename?: "ClientConnection";
+  edges: Array<ClientEdge>;
+  pageInfo: PageInfo;
+  totalCount: Scalars["Int"]["output"];
+};
+
 export type ClientContactModel = {
   __typename?: "ClientContactModel";
   clientId: Scalars["String"]["output"];
@@ -153,6 +160,19 @@ export type ClientContactModel = {
   updatedAt: Scalars["DateTime"]["output"];
 };
 
+export type ClientEdge = {
+  __typename?: "ClientEdge";
+  cursor: Scalars["String"]["output"];
+  node: ClientModel;
+};
+
+export type ClientFilterInput = {
+  industry?: InputMaybe<Scalars["String"]["input"]>;
+  /** Free-text match on name and industry */
+  search?: InputMaybe<Scalars["String"]["input"]>;
+  status?: InputMaybe<ClientStatus>;
+};
+
 export type ClientModel = {
   __typename?: "ClientModel";
   activeJobCount: Scalars["Float"]["output"];
@@ -165,6 +185,7 @@ export type ClientModel = {
   industry?: Maybe<Scalars["String"]["output"]>;
   jobs: Array<JobModel>;
   name: Scalars["String"]["output"];
+  notes?: Maybe<Scalars["String"]["output"]>;
   parentId?: Maybe<Scalars["String"]["output"]>;
   phone?: Maybe<Scalars["String"]["output"]>;
   status: ClientStatus;
@@ -174,7 +195,21 @@ export type ClientModel = {
   website?: Maybe<Scalars["String"]["output"]>;
 };
 
+export type ClientSortField = "CREATED_AT" | "NAME" | "UPDATED_AT";
+
 export type ClientStatus = "ACTIVE" | "INACTIVE" | "PROSPECT";
+
+export type ClientTimelineEntry = {
+  __typename?: "ClientTimelineEntry";
+  description?: Maybe<Scalars["String"]["output"]>;
+  id: Scalars["ID"]["output"];
+  occurredAt: Scalars["DateTime"]["output"];
+  title: Scalars["String"]["output"];
+  type: ClientTimelineEventType;
+  userId?: Maybe<Scalars["String"]["output"]>;
+};
+
+export type ClientTimelineEventType = "CLIENT_CREATED" | "CONTACT_ADDED" | "JOB_OPENED";
 
 export type CompleteInterviewInput = {
   feedback?: InputMaybe<Scalars["String"]["input"]>;
@@ -211,8 +246,10 @@ export type CreateClientInput = {
   bdUserId?: InputMaybe<Scalars["String"]["input"]>;
   industry?: InputMaybe<Scalars["String"]["input"]>;
   name: Scalars["String"]["input"];
+  notes?: InputMaybe<Scalars["String"]["input"]>;
   parentId?: InputMaybe<Scalars["String"]["input"]>;
   phone?: InputMaybe<Scalars["String"]["input"]>;
+  status?: InputMaybe<ClientStatus>;
   website?: InputMaybe<Scalars["String"]["input"]>;
 };
 
@@ -562,8 +599,10 @@ export type Query = {
   candidates: CandidateConnection;
   /** Get a client by ID */
   client: ClientModel;
-  /** List all clients in the tenant */
-  clients: Array<ClientModel>;
+  /** Timeline of relationship events for a client */
+  clientTimeline: Array<ClientTimelineEntry>;
+  /** List clients visible to the current user */
+  clients: ClientConnection;
   /** Get a job by ID */
   job: JobModel;
   /** Get a job application by ID */
@@ -610,6 +649,20 @@ export type QueryCandidatesArgs = {
 
 export type QueryClientArgs = {
   id: Scalars["ID"]["input"];
+};
+
+export type QueryClientTimelineArgs = {
+  id: Scalars["ID"]["input"];
+};
+
+export type QueryClientsArgs = {
+  after?: InputMaybe<Scalars["String"]["input"]>;
+  before?: InputMaybe<Scalars["String"]["input"]>;
+  filter?: InputMaybe<ClientFilterInput>;
+  first?: InputMaybe<Scalars["Int"]["input"]>;
+  last?: InputMaybe<Scalars["Int"]["input"]>;
+  sortBy?: InputMaybe<ClientSortField>;
+  sortOrder?: InputMaybe<SortOrder>;
 };
 
 export type QueryJobArgs = {
@@ -712,6 +765,7 @@ export type UpdateClientInput = {
   bdUserId?: InputMaybe<Scalars["String"]["input"]>;
   industry?: InputMaybe<Scalars["String"]["input"]>;
   name?: InputMaybe<Scalars["String"]["input"]>;
+  notes?: InputMaybe<Scalars["String"]["input"]>;
   parentId?: InputMaybe<Scalars["String"]["input"]>;
   phone?: InputMaybe<Scalars["String"]["input"]>;
   status?: InputMaybe<ClientStatus>;
@@ -919,6 +973,172 @@ export type CandidateQuery = {
   };
 };
 
+export type ClientFieldsFragment = {
+  __typename?: "ClientModel";
+  id: string;
+  name: string;
+  industry?: string | null;
+  website?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  status: ClientStatus;
+  notes?: string | null;
+  bdUserId?: string | null;
+  parentId?: string | null;
+  activeJobCount: number;
+  totalJobCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateClientMutationVariables = Exact<{
+  input: CreateClientInput;
+}>;
+
+export type CreateClientMutation = {
+  __typename?: "Mutation";
+  createClient: {
+    __typename?: "ClientModel";
+    id: string;
+    name: string;
+    industry?: string | null;
+    website?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    status: ClientStatus;
+    notes?: string | null;
+    bdUserId?: string | null;
+    parentId?: string | null;
+    activeJobCount: number;
+    totalJobCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+};
+
+export type UpdateClientMutationVariables = Exact<{
+  id: Scalars["ID"]["input"];
+  input: UpdateClientInput;
+}>;
+
+export type UpdateClientMutation = {
+  __typename?: "Mutation";
+  updateClient: {
+    __typename?: "ClientModel";
+    id: string;
+    name: string;
+    industry?: string | null;
+    website?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    status: ClientStatus;
+    notes?: string | null;
+    bdUserId?: string | null;
+    parentId?: string | null;
+    activeJobCount: number;
+    totalJobCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+};
+
+export type DeleteClientMutationVariables = Exact<{
+  id: Scalars["ID"]["input"];
+}>;
+
+export type DeleteClientMutation = {
+  __typename?: "Mutation";
+  deleteClient: { __typename?: "ClientModel"; id: string; deletedAt?: string | null };
+};
+
+export type ClientsQueryVariables = Exact<{
+  first?: InputMaybe<Scalars["Int"]["input"]>;
+  after?: InputMaybe<Scalars["String"]["input"]>;
+  last?: InputMaybe<Scalars["Int"]["input"]>;
+  before?: InputMaybe<Scalars["String"]["input"]>;
+  filter?: InputMaybe<ClientFilterInput>;
+  sortBy?: InputMaybe<ClientSortField>;
+  sortOrder?: InputMaybe<SortOrder>;
+}>;
+
+export type ClientsQuery = {
+  __typename?: "Query";
+  clients: {
+    __typename?: "ClientConnection";
+    totalCount: number;
+    edges: Array<{
+      __typename?: "ClientEdge";
+      cursor: string;
+      node: {
+        __typename?: "ClientModel";
+        id: string;
+        name: string;
+        industry?: string | null;
+        website?: string | null;
+        phone?: string | null;
+        address?: string | null;
+        status: ClientStatus;
+        notes?: string | null;
+        bdUserId?: string | null;
+        parentId?: string | null;
+        activeJobCount: number;
+        totalJobCount: number;
+        createdAt: string;
+        updatedAt: string;
+      };
+    }>;
+    pageInfo: {
+      __typename?: "PageInfo";
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      startCursor?: string | null;
+      endCursor?: string | null;
+    };
+  };
+};
+
+export type ClientQueryVariables = Exact<{
+  id: Scalars["ID"]["input"];
+}>;
+
+export type ClientQuery = {
+  __typename?: "Query";
+  client: {
+    __typename?: "ClientModel";
+    id: string;
+    name: string;
+    industry?: string | null;
+    website?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    status: ClientStatus;
+    notes?: string | null;
+    bdUserId?: string | null;
+    parentId?: string | null;
+    activeJobCount: number;
+    totalJobCount: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+};
+
+export type ClientTimelineQueryVariables = Exact<{
+  id: Scalars["ID"]["input"];
+}>;
+
+export type ClientTimelineQuery = {
+  __typename?: "Query";
+  clientTimeline: Array<{
+    __typename?: "ClientTimelineEntry";
+    id: string;
+    type: ClientTimelineEventType;
+    title: string;
+    description?: string | null;
+    occurredAt: string;
+    userId?: string | null;
+  }>;
+};
+
 export type CreateTenantMutationVariables = Exact<{
   input: CreateTenantInput;
 }>;
@@ -998,6 +1218,35 @@ export const CandidateFieldsFragmentDoc = {
     },
   ],
 } as unknown as DocumentNode<CandidateFieldsFragment, unknown>;
+export const ClientFieldsFragmentDoc = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "ClientFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "ClientModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "name" } },
+          { kind: "Field", name: { kind: "Name", value: "industry" } },
+          { kind: "Field", name: { kind: "Name", value: "website" } },
+          { kind: "Field", name: { kind: "Name", value: "phone" } },
+          { kind: "Field", name: { kind: "Name", value: "address" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "notes" } },
+          { kind: "Field", name: { kind: "Name", value: "bdUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "parentId" } },
+          { kind: "Field", name: { kind: "Name", value: "activeJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "totalJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<ClientFieldsFragment, unknown>;
 export const CreateCandidateDocument = {
   kind: "Document",
   definitions: [
@@ -1411,6 +1660,466 @@ export const CandidateDocument = {
     },
   ],
 } as unknown as DocumentNode<CandidateQuery, CandidateQueryVariables>;
+export const CreateClientDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "CreateClient" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "input" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "CreateClientInput" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "createClient" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "input" },
+                value: { kind: "Variable", name: { kind: "Name", value: "input" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "FragmentSpread", name: { kind: "Name", value: "ClientFields" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "ClientFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "ClientModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "name" } },
+          { kind: "Field", name: { kind: "Name", value: "industry" } },
+          { kind: "Field", name: { kind: "Name", value: "website" } },
+          { kind: "Field", name: { kind: "Name", value: "phone" } },
+          { kind: "Field", name: { kind: "Name", value: "address" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "notes" } },
+          { kind: "Field", name: { kind: "Name", value: "bdUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "parentId" } },
+          { kind: "Field", name: { kind: "Name", value: "activeJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "totalJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<CreateClientMutation, CreateClientMutationVariables>;
+export const UpdateClientDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "UpdateClient" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "input" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "UpdateClientInput" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "updateClient" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "input" },
+                value: { kind: "Variable", name: { kind: "Name", value: "input" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "FragmentSpread", name: { kind: "Name", value: "ClientFields" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "ClientFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "ClientModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "name" } },
+          { kind: "Field", name: { kind: "Name", value: "industry" } },
+          { kind: "Field", name: { kind: "Name", value: "website" } },
+          { kind: "Field", name: { kind: "Name", value: "phone" } },
+          { kind: "Field", name: { kind: "Name", value: "address" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "notes" } },
+          { kind: "Field", name: { kind: "Name", value: "bdUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "parentId" } },
+          { kind: "Field", name: { kind: "Name", value: "activeJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "totalJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateClientMutation, UpdateClientMutationVariables>;
+export const DeleteClientDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "DeleteClient" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "deleteClient" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "Field", name: { kind: "Name", value: "id" } },
+                { kind: "Field", name: { kind: "Name", value: "deletedAt" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<DeleteClientMutation, DeleteClientMutationVariables>;
+export const ClientsDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "query",
+      name: { kind: "Name", value: "Clients" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "first" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "Int" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "after" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "String" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "last" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "Int" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "before" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "String" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "filter" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "ClientFilterInput" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "sortBy" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "ClientSortField" } },
+        },
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "sortOrder" } },
+          type: { kind: "NamedType", name: { kind: "Name", value: "SortOrder" } },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "clients" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "first" },
+                value: { kind: "Variable", name: { kind: "Name", value: "first" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "after" },
+                value: { kind: "Variable", name: { kind: "Name", value: "after" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "last" },
+                value: { kind: "Variable", name: { kind: "Name", value: "last" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "before" },
+                value: { kind: "Variable", name: { kind: "Name", value: "before" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "filter" },
+                value: { kind: "Variable", name: { kind: "Name", value: "filter" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "sortBy" },
+                value: { kind: "Variable", name: { kind: "Name", value: "sortBy" } },
+              },
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "sortOrder" },
+                value: { kind: "Variable", name: { kind: "Name", value: "sortOrder" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                {
+                  kind: "Field",
+                  name: { kind: "Name", value: "edges" },
+                  selectionSet: {
+                    kind: "SelectionSet",
+                    selections: [
+                      { kind: "Field", name: { kind: "Name", value: "cursor" } },
+                      {
+                        kind: "Field",
+                        name: { kind: "Name", value: "node" },
+                        selectionSet: {
+                          kind: "SelectionSet",
+                          selections: [
+                            {
+                              kind: "FragmentSpread",
+                              name: { kind: "Name", value: "ClientFields" },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+                {
+                  kind: "Field",
+                  name: { kind: "Name", value: "pageInfo" },
+                  selectionSet: {
+                    kind: "SelectionSet",
+                    selections: [
+                      { kind: "Field", name: { kind: "Name", value: "hasNextPage" } },
+                      { kind: "Field", name: { kind: "Name", value: "hasPreviousPage" } },
+                      { kind: "Field", name: { kind: "Name", value: "startCursor" } },
+                      { kind: "Field", name: { kind: "Name", value: "endCursor" } },
+                    ],
+                  },
+                },
+                { kind: "Field", name: { kind: "Name", value: "totalCount" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "ClientFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "ClientModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "name" } },
+          { kind: "Field", name: { kind: "Name", value: "industry" } },
+          { kind: "Field", name: { kind: "Name", value: "website" } },
+          { kind: "Field", name: { kind: "Name", value: "phone" } },
+          { kind: "Field", name: { kind: "Name", value: "address" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "notes" } },
+          { kind: "Field", name: { kind: "Name", value: "bdUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "parentId" } },
+          { kind: "Field", name: { kind: "Name", value: "activeJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "totalJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<ClientsQuery, ClientsQueryVariables>;
+export const ClientDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "query",
+      name: { kind: "Name", value: "Client" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "client" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "FragmentSpread", name: { kind: "Name", value: "ClientFields" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      kind: "FragmentDefinition",
+      name: { kind: "Name", value: "ClientFields" },
+      typeCondition: { kind: "NamedType", name: { kind: "Name", value: "ClientModel" } },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          { kind: "Field", name: { kind: "Name", value: "id" } },
+          { kind: "Field", name: { kind: "Name", value: "name" } },
+          { kind: "Field", name: { kind: "Name", value: "industry" } },
+          { kind: "Field", name: { kind: "Name", value: "website" } },
+          { kind: "Field", name: { kind: "Name", value: "phone" } },
+          { kind: "Field", name: { kind: "Name", value: "address" } },
+          { kind: "Field", name: { kind: "Name", value: "status" } },
+          { kind: "Field", name: { kind: "Name", value: "notes" } },
+          { kind: "Field", name: { kind: "Name", value: "bdUserId" } },
+          { kind: "Field", name: { kind: "Name", value: "parentId" } },
+          { kind: "Field", name: { kind: "Name", value: "activeJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "totalJobCount" } },
+          { kind: "Field", name: { kind: "Name", value: "createdAt" } },
+          { kind: "Field", name: { kind: "Name", value: "updatedAt" } },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<ClientQuery, ClientQueryVariables>;
+export const ClientTimelineDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "query",
+      name: { kind: "Name", value: "ClientTimeline" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "id" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "ID" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "clientTimeline" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "id" },
+                value: { kind: "Variable", name: { kind: "Name", value: "id" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "Field", name: { kind: "Name", value: "id" } },
+                { kind: "Field", name: { kind: "Name", value: "type" } },
+                { kind: "Field", name: { kind: "Name", value: "title" } },
+                { kind: "Field", name: { kind: "Name", value: "description" } },
+                { kind: "Field", name: { kind: "Name", value: "occurredAt" } },
+                { kind: "Field", name: { kind: "Name", value: "userId" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<ClientTimelineQuery, ClientTimelineQueryVariables>;
 export const CreateTenantDocument = {
   kind: "Document",
   definitions: [

@@ -1,0 +1,50 @@
+query Clients(
+  $first: Int
+  $after: String
+  $last: Int
+  $before: String
+  $filter: ClientFilterInput
+  $sortBy: ClientSortField
+  $sortOrder: SortOrder
+) {
+  clients(
+    first: $first
+    after: $after
+    last: $last
+    before: $before
+    filter: $filter
+    sortBy: $sortBy
+    sortOrder: $sortOrder
+  ) {
+    edges {
+      cursor
+      node {
+        ...ClientFields
+      }
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+    totalCount
+  }
+}
+
+query Client($id: ID!) {
+  client(id: $id) {
+    ...ClientFields
+  }
+}
+
+query ClientTimeline($id: ID!) {
+  clientTimeline(id: $id) {
+    id
+    type
+    title
+    description
+    occurredAt
+    userId
+  }
+}
