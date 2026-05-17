@@ -28,6 +28,9 @@ export class ClientModel {
   status!: ClientStatus;
 
   @Field(() => String, { nullable: true })
+  notes!: string | null;
+
+  @Field(() => String, { nullable: true })
   bdUserId!: string | null;
 
   @Field(() => String, { nullable: true })
