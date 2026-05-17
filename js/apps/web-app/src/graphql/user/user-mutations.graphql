@@ -1,0 +1,10 @@
+mutation UpdateMyProfile($input: UpdateProfileInput!) {
+  updateMyProfile(input: $input) {
+    id
+    email
+    firstName
+    lastName
+    firstLogin
+    lastInactiveAt
+  }
+}

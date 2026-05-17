@@ -6,6 +6,8 @@ query Me {
     firstName
     lastName
     mfaEnrolled
+    firstLogin
+    lastInactiveAt
   }
 }
 

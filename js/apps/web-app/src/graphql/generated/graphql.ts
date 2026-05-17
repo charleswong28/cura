@@ -162,6 +162,7 @@ export type Mutation = {
   updateCandidate: Candidate;
   updateClient: Client;
   updateJob: Job;
+  updateMyProfile: User;
 };
 
 export type MutationCreateCandidateArgs = {
@@ -205,6 +206,10 @@ export type MutationUpdateClientArgs = {
 export type MutationUpdateJobArgs = {
   id: Scalars["ID"]["input"];
   input: UpdateJobInput;
+};
+
+export type MutationUpdateMyProfileArgs = {
+  input: UpdateProfileInput;
 };
 
 export type PageInfo = {
@@ -313,13 +318,20 @@ export type UpdateJobInput = {
   title?: InputMaybe<Scalars["String"]["input"]>;
 };
 
+export type UpdateProfileInput = {
+  firstName?: InputMaybe<Scalars["String"]["input"]>;
+  lastName?: InputMaybe<Scalars["String"]["input"]>;
+};
+
 export type User = {
   __typename?: "User";
   authIdentityId?: Maybe<Scalars["String"]["output"]>;
   createdAt: Scalars["DateTime"]["output"];
   email: Scalars["String"]["output"];
+  firstLogin?: Maybe<Scalars["DateTime"]["output"]>;
   firstName: Scalars["String"]["output"];
   id: Scalars["ID"]["output"];
+  lastInactiveAt?: Maybe<Scalars["DateTime"]["output"]>;
   lastName: Scalars["String"]["output"];
   loginable: Scalars["Boolean"]["output"];
   mfaEnrolled: Scalars["Boolean"]["output"];
@@ -735,6 +747,23 @@ export type CreateTenantMutation = {
   createTenant: { __typename?: "Tenant"; id: string; name: string; slug: string };
 };
 
+export type UpdateMyProfileMutationVariables = Exact<{
+  input: UpdateProfileInput;
+}>;
+
+export type UpdateMyProfileMutation = {
+  __typename?: "Mutation";
+  updateMyProfile: {
+    __typename?: "User";
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    firstLogin?: string | null;
+    lastInactiveAt?: string | null;
+  };
+};
+
 export type MeQueryVariables = Exact<{ [key: string]: never }>;
 
 export type MeQuery = {
@@ -747,6 +776,8 @@ export type MeQuery = {
     firstName: string;
     lastName: string;
     mfaEnrolled: boolean;
+    firstLogin?: string | null;
+    lastInactiveAt?: string | null;
   };
 };
 
@@ -2198,6 +2229,53 @@ export const CreateTenantDocument = {
     },
   ],
 } as unknown as DocumentNode<CreateTenantMutation, CreateTenantMutationVariables>;
+export const UpdateMyProfileDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "mutation",
+      name: { kind: "Name", value: "UpdateMyProfile" },
+      variableDefinitions: [
+        {
+          kind: "VariableDefinition",
+          variable: { kind: "Variable", name: { kind: "Name", value: "input" } },
+          type: {
+            kind: "NonNullType",
+            type: { kind: "NamedType", name: { kind: "Name", value: "UpdateProfileInput" } },
+          },
+        },
+      ],
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "updateMyProfile" },
+            arguments: [
+              {
+                kind: "Argument",
+                name: { kind: "Name", value: "input" },
+                value: { kind: "Variable", name: { kind: "Name", value: "input" } },
+              },
+            ],
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "Field", name: { kind: "Name", value: "id" } },
+                { kind: "Field", name: { kind: "Name", value: "email" } },
+                { kind: "Field", name: { kind: "Name", value: "firstName" } },
+                { kind: "Field", name: { kind: "Name", value: "lastName" } },
+                { kind: "Field", name: { kind: "Name", value: "firstLogin" } },
+                { kind: "Field", name: { kind: "Name", value: "lastInactiveAt" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UpdateMyProfileMutation, UpdateMyProfileMutationVariables>;
 export const MeDocument = {
   kind: "Document",
   definitions: [
@@ -2220,6 +2298,8 @@ export const MeDocument = {
                 { kind: "Field", name: { kind: "Name", value: "firstName" } },
                 { kind: "Field", name: { kind: "Name", value: "lastName" } },
                 { kind: "Field", name: { kind: "Name", value: "mfaEnrolled" } },
+                { kind: "Field", name: { kind: "Name", value: "firstLogin" } },
+                { kind: "Field", name: { kind: "Name", value: "lastInactiveAt" } },
               ],
             },
           },

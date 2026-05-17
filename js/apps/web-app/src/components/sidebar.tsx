@@ -11,7 +11,6 @@ import {
   PanelLeftClose,
   PanelLeft,
   Menu,
-  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -39,36 +38,36 @@ interface MobileSidebarProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function UserSection({ collapsed }: { collapsed: boolean }) {
-  const { user, logout } = useAuth();
+function UserSection({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
+  const { user } = useAuth();
+  const pathname = usePathname();
+  const isActive = pathname.startsWith("/profile");
 
   const initials = user
     ? `${user.displayName.split(" ")[0]?.[0] ?? ""}${user.displayName.split(" ")[1]?.[0] ?? ""}`.toUpperCase()
     : "?";
 
   return (
-    <div className={cn("flex items-center gap-2 px-2 py-3", collapsed ? "flex-col" : "flex-row")}>
-      {/* Avatar */}
+    <Link
+      href="/profile"
+      onClick={onNavigate}
+      title={user?.displayName ?? "Profile"}
+      className={cn(
+        "mx-2 my-2 flex items-center gap-2 rounded-md px-2 py-2 transition-colors",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        collapsed && "justify-center"
+      )}
+    >
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
         {initials}
       </div>
 
       {!collapsed && (
-        <span className="flex-1 truncate text-sm font-medium text-sidebar-foreground">
-          {user?.displayName ?? "—"}
-        </span>
+        <span className="flex-1 truncate text-sm font-medium">{user?.displayName ?? "—"}</span>
       )}
-
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={logout}
-        title="Sign out"
-        className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-      >
-        <LogOut className="h-4 w-4" />
-      </Button>
-    </div>
+    </Link>
   );
 }
 
@@ -150,7 +149,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
       <Separator />
 
-      {/* User info + logout */}
+      {/* User info */}
       <UserSection collapsed={collapsed} />
 
       <Separator />
@@ -203,8 +202,8 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
 
         <Separator />
 
-        {/* User info + logout */}
-        <UserSection collapsed={false} />
+        {/* User info */}
+        <UserSection collapsed={false} onNavigate={() => onOpenChange(false)} />
 
         <Separator />
 

@@ -24,7 +24,8 @@ type Documents = {
   "mutation CreateJob($input: CreateJobInput!) {\n  createJob(input: $input) {\n    ...JobFields\n  }\n}\n\nmutation UpdateJob($id: ID!, $input: UpdateJobInput!) {\n  updateJob(id: $id, input: $input) {\n    ...JobFields\n  }\n}\n\nmutation DeleteJob($id: ID!) {\n  deleteJob(id: $id)\n}": typeof types.CreateJobDocument;
   "query Jobs($first: Int, $after: String, $search: String, $status: JobStatus, $priority: JobPriority, $sortBy: String, $sortOrder: String) {\n  jobs(\n    first: $first\n    after: $after\n    search: $search\n    status: $status\n    priority: $priority\n    sortBy: $sortBy\n    sortOrder: $sortOrder\n  ) {\n    edges {\n      cursor\n      node {\n        ...JobFields\n      }\n    }\n    pageInfo {\n      hasNextPage\n      endCursor\n    }\n    totalCount\n  }\n}\n\nquery Job($id: ID!) {\n  job(id: $id) {\n    ...JobFields\n  }\n}": typeof types.JobsDocument;
   "mutation CreateTenant($input: CreateTenantInput!) {\n  createTenant(input: $input) {\n    id\n    name\n    slug\n  }\n}": typeof types.CreateTenantDocument;
-  "query Me {\n  me {\n    id\n    authIdentityId\n    email\n    firstName\n    lastName\n    mfaEnrolled\n  }\n}\n\nquery MyTenants {\n  myTenants {\n    id\n    name\n    slug\n  }\n}": typeof types.MeDocument;
+  "mutation UpdateMyProfile($input: UpdateProfileInput!) {\n  updateMyProfile(input: $input) {\n    id\n    email\n    firstName\n    lastName\n    firstLogin\n    lastInactiveAt\n  }\n}": typeof types.UpdateMyProfileDocument;
+  "query Me {\n  me {\n    id\n    authIdentityId\n    email\n    firstName\n    lastName\n    mfaEnrolled\n    firstLogin\n    lastInactiveAt\n  }\n}\n\nquery MyTenants {\n  myTenants {\n    id\n    name\n    slug\n  }\n}": typeof types.MeDocument;
 };
 const documents: Documents = {
   "fragment CandidateFields on Candidate {\n  id\n  firstName\n  lastName\n  email\n  phone\n  currentCompany\n  currentTitle\n  location\n  status\n  notes\n  linkedinUrl\n  githubUrl\n  createdAt\n  updatedAt\n}":
@@ -47,7 +48,9 @@ const documents: Documents = {
     types.JobsDocument,
   "mutation CreateTenant($input: CreateTenantInput!) {\n  createTenant(input: $input) {\n    id\n    name\n    slug\n  }\n}":
     types.CreateTenantDocument,
-  "query Me {\n  me {\n    id\n    authIdentityId\n    email\n    firstName\n    lastName\n    mfaEnrolled\n  }\n}\n\nquery MyTenants {\n  myTenants {\n    id\n    name\n    slug\n  }\n}":
+  "mutation UpdateMyProfile($input: UpdateProfileInput!) {\n  updateMyProfile(input: $input) {\n    id\n    email\n    firstName\n    lastName\n    firstLogin\n    lastInactiveAt\n  }\n}":
+    types.UpdateMyProfileDocument,
+  "query Me {\n  me {\n    id\n    authIdentityId\n    email\n    firstName\n    lastName\n    mfaEnrolled\n    firstLogin\n    lastInactiveAt\n  }\n}\n\nquery MyTenants {\n  myTenants {\n    id\n    name\n    slug\n  }\n}":
     types.MeDocument,
 };
 
@@ -129,8 +132,14 @@ export function graphql(
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(
-  source: "query Me {\n  me {\n    id\n    authIdentityId\n    email\n    firstName\n    lastName\n    mfaEnrolled\n  }\n}\n\nquery MyTenants {\n  myTenants {\n    id\n    name\n    slug\n  }\n}"
-): (typeof documents)["query Me {\n  me {\n    id\n    authIdentityId\n    email\n    firstName\n    lastName\n    mfaEnrolled\n  }\n}\n\nquery MyTenants {\n  myTenants {\n    id\n    name\n    slug\n  }\n}"];
+  source: "mutation UpdateMyProfile($input: UpdateProfileInput!) {\n  updateMyProfile(input: $input) {\n    id\n    email\n    firstName\n    lastName\n    firstLogin\n    lastInactiveAt\n  }\n}"
+): (typeof documents)["mutation UpdateMyProfile($input: UpdateProfileInput!) {\n  updateMyProfile(input: $input) {\n    id\n    email\n    firstName\n    lastName\n    firstLogin\n    lastInactiveAt\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(
+  source: "query Me {\n  me {\n    id\n    authIdentityId\n    email\n    firstName\n    lastName\n    mfaEnrolled\n    firstLogin\n    lastInactiveAt\n  }\n}\n\nquery MyTenants {\n  myTenants {\n    id\n    name\n    slug\n  }\n}"
+): (typeof documents)["query Me {\n  me {\n    id\n    authIdentityId\n    email\n    firstName\n    lastName\n    mfaEnrolled\n    firstLogin\n    lastInactiveAt\n  }\n}\n\nquery MyTenants {\n  myTenants {\n    id\n    name\n    slug\n  }\n}"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

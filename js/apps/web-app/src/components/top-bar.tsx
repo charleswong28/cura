@@ -19,6 +19,7 @@ const routeLabels: Record<string, string> = {
   clients: "Clients",
   jobs: "Jobs",
   settings: "Settings",
+  profile: "Profile",
   new: "New",
 };
 

@@ -95,6 +95,8 @@ type User {
   lastName: String!
   loginable: Boolean!
   mfaEnrolled: Boolean!
+  firstLogin: DateTime
+  lastInactiveAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
 }
@@ -281,4 +283,11 @@ type Mutation {
   createJob(input: CreateJobInput!): Job!
   updateJob(id: ID!, input: UpdateJobInput!): Job!
   deleteJob(id: ID!): Boolean!
+
+  updateMyProfile(input: UpdateProfileInput!): User!
+}
+
+input UpdateProfileInput {
+  firstName: String
+  lastName: String
 }

@@ -22,6 +22,7 @@ interface AuthContextValue {
   completeMfa: (challengeToken: string, code: string) => Promise<void>;
   switchTenant: (tenantSlug: string) => Promise<void>;
   logout: () => Promise<void>;
+  patchUser: (partial: Partial<AuthUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -100,6 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [router]
   );
 
+  const patchUser = useCallback((partial: Partial<AuthUser>) => {
+    setUser((prev) => (prev ? { ...prev, ...partial } : prev));
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -111,7 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, completeMfa, switchTenant, logout }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, completeMfa, switchTenant, logout, patchUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
