@@ -1,4 +1,4 @@
-fragment CandidateFields on Candidate {
+fragment CandidateFields on CandidateModel {
   id
   firstName
   lastName

@@ -11,12 +11,11 @@ const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_URL ?? "http://localhos
  */
 const cache = new InMemoryCache({
   typePolicies: {
-    Tenant: { keyFields: ["id"] },
-    User: { keyFields: ["id"] },
-    Candidate: { keyFields: ["id"] },
-    Client: { keyFields: ["id"] },
-    Job: { keyFields: ["id"] },
-    TenantSettings: { keyFields: ["id"] },
+    TenantModel: { keyFields: ["id"] },
+    UserModel: { keyFields: ["id"] },
+    CandidateModel: { keyFields: ["id"] },
+    ClientModel: { keyFields: ["id"] },
+    JobModel: { keyFields: ["id"] },
   },
 });
 

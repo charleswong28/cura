@@ -1,16 +1,18 @@
 query Candidates(
   $first: Int
   $after: String
-  $search: String
-  $status: CandidateStatus
-  $sortBy: String
-  $sortOrder: String
+  $last: Int
+  $before: String
+  $filter: CandidateFilterInput
+  $sortBy: CandidateSortField
+  $sortOrder: SortOrder
 ) {
   candidates(
     first: $first
     after: $after
-    search: $search
-    status: $status
+    last: $last
+    before: $before
+    filter: $filter
     sortBy: $sortBy
     sortOrder: $sortOrder
   ) {
@@ -22,6 +24,8 @@ query Candidates(
     }
     pageInfo {
       hasNextPage
+      hasPreviousPage
+      startCursor
       endCursor
     }
     totalCount

@@ -11,5 +11,8 @@ mutation UpdateCandidate($id: ID!, $input: UpdateCandidateInput!) {
 }
 
 mutation DeleteCandidate($id: ID!) {
-  deleteCandidate(id: $id)
+  deleteCandidate(id: $id) {
+    id
+    deletedAt
+  }
 }
