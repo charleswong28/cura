@@ -57,10 +57,13 @@ services:
       NODE_ENV: development
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
+      API_URL: http://api:8000
     ports:
       - "${WEB_PORT:-3001}:3001"
     volumes:
       - ../js/apps/web-app/src:/app/apps/web-app/src
+    depends_on:
+      - api
 
   web-home-page:
     build:
@@ -88,6 +91,9 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-cura}:${POSTGRES_PASSWORD:-cura}@postgres:5432/${POSTGRES_DB:-cura_dev}
       REDIS_URL: redis://:${REDIS_PASSWORD:-cura}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-}
+      MFA_SECRET: ${MFA_SECRET:-}
+      APP_URL: ${APP_URL:-http://localhost:3001}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
       CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}
       CHOKIDAR_USEPOLLING: "true"

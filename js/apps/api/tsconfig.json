@@ -5,7 +5,9 @@
     "rootDir": "./src",
     "incremental": true,
     "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test"]

@@ -1,4 +1,10 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  CanActivate,
+  ExecutionContext,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import * as jwt from "jsonwebtoken";
 import { PrismaService } from "../prisma/prisma.service";
@@ -10,10 +16,10 @@ import { RequestUser } from "./auth.types";
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
-    private readonly reflector: Reflector,
-    private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
-    private readonly permCache: PermissionCacheService
+    @Inject(Reflector) private readonly reflector: Reflector,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(RedisService) private readonly redis: RedisService,
+    @Inject(PermissionCacheService) private readonly permCache: PermissionCacheService
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {

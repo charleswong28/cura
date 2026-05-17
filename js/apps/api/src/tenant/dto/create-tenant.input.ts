@@ -3,13 +3,13 @@ import { IsString, Matches, MaxLength, MinLength } from "class-validator";
 
 @InputType()
 export class CreateTenantInput {
-  @Field()
+  @Field(() => String)
   @IsString()
   @MinLength(2)
   @MaxLength(100)
   name!: string;
 
-  @Field()
+  @Field(() => String)
   @IsString()
   @MinLength(2)
   @MaxLength(50)

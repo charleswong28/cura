@@ -74,8 +74,10 @@ type CandidateModel {
   deletedAt: DateTime
   email: String
   firstName: String!
+  githubUrl: String
   id: ID!
   lastName: String!
+  linkedinUrl: String
   location: String
   notes: String
   ownerUserId: String
@@ -144,11 +146,14 @@ input CreateCandidateInput {
   currentTitle: String
   email: String
   firstName: String!
+  githubUrl: String
   lastName: String!
+  linkedinUrl: String
   location: String
   notes: String
   ownerUserId: String
   phone: String
+  status: CandidateStatus
 }
 
 input CreateClientContactInput {
@@ -202,6 +207,11 @@ input CreateTeamInput {
   kind: TeamKind!
   name: String!
   parentId: ID
+}
+
+input CreateTenantInput {
+  name: String!
+  slug: String!
 }
 
 """
@@ -330,6 +340,9 @@ type Mutation {
   """Create a new team"""
   createTeam(input: CreateTeamInput!): TeamModel!
 
+  """Create a new tenant; the caller becomes its first member"""
+  createTenant(input: CreateTenantInput!): TenantModel!
+
   """Deactivate a user — revokes all sessions"""
   deactivateUser(userId: ID!): UserModel!
 
@@ -405,7 +418,7 @@ type Query {
   """Get a candidate by ID"""
   candidate(id: ID!): CandidateModel!
 
-  """List all candidates in the tenant"""
+  """List candidates visible to the current user"""
   candidates: [CandidateModel!]!
 
   """Get a client by ID"""
@@ -428,6 +441,9 @@ type Query {
 
   """Current user's profile"""
   me: UserModel!
+
+  """All tenants the current auth identity belongs to"""
+  myTenants: [TenantModel!]!
   ping: String!
 
   """Single role by ID"""
@@ -504,18 +520,26 @@ enum TeamRole {
   MEMBER
 }
 
+type TenantModel {
+  createdAt: DateTime!
+  id: ID!
+  name: String!
+  slug: String!
+}
+
 input UpdateCandidateInput {
   currentCompany: String
   currentTitle: String
   email: String
   firstName: String
+  githubUrl: String
   lastName: String
+  linkedinUrl: String
   location: String
   notes: String
   ownerUserId: String
   phone: String
   status: CandidateStatus
-  updatedById: String
 }
 
 input UpdateClientInput {

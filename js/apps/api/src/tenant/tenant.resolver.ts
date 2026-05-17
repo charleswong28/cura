@@ -13,7 +13,10 @@ export class TenantResolver {
   @Mutation(() => TenantModel, {
     description: "Create a new tenant; the caller becomes its first member",
   })
-  async createTenant(@CurrentUser() user: RequestUser, @Args("input") input: CreateTenantInput) {
+  async createTenant(
+    @CurrentUser() user: RequestUser,
+    @Args("input", { type: () => CreateTenantInput }) input: CreateTenantInput
+  ) {
     return this.tenantService.create(user.userId, input);
   }
 }
