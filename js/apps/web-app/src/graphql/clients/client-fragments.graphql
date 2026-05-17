@@ -1,0 +1,16 @@
+fragment ClientFields on ClientModel {
+  id
+  name
+  industry
+  website
+  phone
+  address
+  status
+  notes
+  bdUserId
+  parentId
+  activeJobCount
+  totalJobCount
+  createdAt
+  updatedAt
+}

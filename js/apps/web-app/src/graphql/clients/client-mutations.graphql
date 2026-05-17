@@ -1,0 +1,18 @@
+mutation CreateClient($input: CreateClientInput!) {
+  createClient(input: $input) {
+    ...ClientFields
+  }
+}
+
+mutation UpdateClient($id: ID!, $input: UpdateClientInput!) {
+  updateClient(id: $id, input: $input) {
+    ...ClientFields
+  }
+}
+
+mutation DeleteClient($id: ID!) {
+  deleteClient(id: $id) {
+    id
+    deletedAt
+  }
+}

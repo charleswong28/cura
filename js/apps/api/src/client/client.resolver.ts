@@ -3,6 +3,7 @@ import { Resolver, Query, Mutation, Args, ID, Int, ResolveField, Parent } from "
 import { ClientModel } from "../common/graphql/models/client.model";
 import { ClientConnection } from "../common/graphql/models/client-connection.model";
 import { ClientContactModel } from "../common/graphql/models/client-contact.model";
+import { ClientTimelineEntry } from "../common/graphql/models/client-timeline.model";
 import { JobModel } from "../common/graphql/models/job.model";
 import { CurrentUser, RequirePermission, type RequestUser } from "../auth";
 import { ClientService } from "./client.service";
@@ -32,12 +33,30 @@ export class ClientResolver {
     @Args("sortBy", { type: () => ClientSortField, nullable: true }) sortBy?: ClientSortField,
     @Args("sortOrder", { type: () => SortOrder, nullable: true }) sortOrder?: SortOrder
   ) {
-    return this.clientService.findAll(user, { first, after, last, before, filter, sortBy, sortOrder });
+    return this.clientService.findAll(user, {
+      first,
+      after,
+      last,
+      before,
+      filter,
+      sortBy,
+      sortOrder,
+    });
   }
 
   @Query(() => ClientModel, { description: "Get a client by ID" })
   async client(@CurrentUser() user: RequestUser, @Args("id", { type: () => ID }) id: string) {
     return this.clientService.findById(id, user);
+  }
+
+  @Query(() => [ClientTimelineEntry], {
+    description: "Timeline of relationship events for a client",
+  })
+  async clientTimeline(
+    @CurrentUser() user: RequestUser,
+    @Args("id", { type: () => ID }) id: string
+  ) {
+    return this.clientService.getTimeline(id, user);
   }
 
   @Mutation(() => ClientModel, { description: "Create a new client" })
