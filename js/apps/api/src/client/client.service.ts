@@ -185,6 +185,9 @@ export class ClientService {
   async create(user: RequestUser, input: CreateClientInput) {
     const db = this.prisma.forTenant(user.tenantId);
 
+    // Default BD owner to creator so they get the OWNER auto-grant (§5.5).
+    const bdUserId = input.bdUserId ?? user.userId;
+
     const client = await db.client.create({
       data: {
         id: generateId(),
@@ -195,7 +198,7 @@ export class ClientService {
         phone: input.phone ?? null,
         address: input.address ?? null,
         parentId: input.parentId ?? null,
-        bdUserId: input.bdUserId ?? null,
+        bdUserId,
         status: input.status,
         notes: input.notes ?? null,
         createdById: user.userId,
@@ -206,7 +209,7 @@ export class ClientService {
       user.tenantId,
       user.userId,
       client.id,
-      input.bdUserId ?? null
+      bdUserId
     );
 
     return client;
