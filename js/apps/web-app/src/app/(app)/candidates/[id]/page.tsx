@@ -1,15 +1,25 @@
 "use client";
 
 import { use, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { ArrowLeft, Github, Linkedin, Mail, MapPin, Phone, Pencil } from "lucide-react";
+import { ArrowLeft, Github, Linkedin, Mail, MapPin, Phone, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { CandidateStatusBadge } from "@/components/candidates/candidate-status-badge";
 import {
   CandidateForm,
@@ -24,6 +34,9 @@ import {
   UpdateCandidateDocument,
   type UpdateCandidateMutation,
   type UpdateCandidateMutationVariables,
+  DeleteCandidateDocument,
+  type DeleteCandidateMutation,
+  type DeleteCandidateMutationVariables,
 } from "@/graphql/generated/graphql";
 
 interface PageProps {
@@ -64,6 +77,22 @@ export default function CandidateDetailPage({ params }: PageProps) {
     UpdateCandidateMutation,
     UpdateCandidateMutationVariables
   >(UpdateCandidateDocument);
+
+  const [deleteCandidate, { loading: deleting }] = useMutation<
+    DeleteCandidateMutation,
+    DeleteCandidateMutationVariables
+  >(DeleteCandidateDocument);
+
+  async function handleDelete() {
+    if (!candidate) return;
+    try {
+      await deleteCandidate({ variables: { id: candidate.id } });
+      toast.success(`${candidate.firstName} ${candidate.lastName} deleted`);
+      router.push("/candidates");
+    } catch {
+      // Apollo errorLink will toast the GraphQL error.
+    }
+  }
 
   async function handleSubmit(values: CandidateFormValues) {
     if (!candidate) return;
@@ -125,10 +154,36 @@ export default function CandidateDetailPage({ params }: PageProps) {
           description={candidate.currentTitle ?? undefined}
         >
           {!editing ? (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              <Pencil />
-              Edit
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                <Pencil />
+                Edit
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                    <Trash2 />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Delete {candidate.firstName} {candidate.lastName}?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+                      {deleting ? "Deleting…" : "Delete"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           ) : null}
         </PageHeader>
       </div>
