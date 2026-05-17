@@ -3,12 +3,32 @@
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@apollo/client/react";
-import { ArrowLeft, Briefcase, Building2, Globe, MapPin, Pencil, Phone } from "lucide-react";
+import {
+  ArrowLeft,
+  Briefcase,
+  Building2,
+  Globe,
+  MapPin,
+  Pencil,
+  Phone,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ClientStatusBadge } from "@/components/clients/client-status-badge";
 import { ClientForm, type ClientFormValues, toClientInput } from "@/components/clients/client-form";
 import {
@@ -16,9 +36,13 @@ import {
   type ClientFieldsFragment,
   type ClientQuery,
   type ClientQueryVariables,
+  ClientsDocument,
   ClientTimelineDocument,
   type ClientTimelineQuery,
   type ClientTimelineQueryVariables,
+  DeleteClientDocument,
+  type DeleteClientMutation,
+  type DeleteClientMutationVariables,
   UpdateClientDocument,
   type UpdateClientMutation,
   type UpdateClientMutationVariables,
@@ -57,6 +81,29 @@ export default function ClientDetailPage({ params }: PageProps) {
     UpdateClientMutation,
     UpdateClientMutationVariables
   >(UpdateClientDocument);
+
+  const [deleteClient, { loading: deleting }] = useMutation<
+    DeleteClientMutation,
+    DeleteClientMutationVariables
+  >(DeleteClientDocument, {
+    refetchQueries: [{ query: ClientsDocument, variables: { first: 20 } }],
+    awaitRefetchQueries: false,
+  });
+
+  async function handleDelete() {
+    if (!client) return;
+    try {
+      await deleteClient({ variables: { id: client.id } });
+      const jobsNote =
+        client.totalJobCount > 0
+          ? ` ${client.totalJobCount} linked job${client.totalJobCount === 1 ? "" : "s"} archived.`
+          : "";
+      toast.success(`${client.name} deleted.${jobsNote}`);
+      router.push("/clients");
+    } catch {
+      // Apollo errorLink will toast the GraphQL error.
+    }
+  }
 
   async function handleSubmit(values: ClientFormValues) {
     if (!client) return;
@@ -115,10 +162,46 @@ export default function ClientDetailPage({ params }: PageProps) {
         <BackLink onClick={() => router.push("/clients")} />
         <PageHeader title={client.name} description={client.industry ?? undefined}>
           {!editing ? (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              <Pencil />
-              Edit
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                <Pencil />
+                Edit
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete {client.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {client.totalJobCount > 0
+                        ? `This will also archive ${client.totalJobCount} linked job${
+                            client.totalJobCount === 1 ? "" : "s"
+                          }${
+                            client.activeJobCount > 0
+                              ? ` (${client.activeJobCount} currently active)`
+                              : ""
+                          }. This cannot be undone.`
+                        : "This cannot be undone."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+                      {deleting ? "Deleting…" : "Delete"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           ) : null}
         </PageHeader>
       </div>
