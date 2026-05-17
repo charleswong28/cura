@@ -39,8 +39,8 @@ export class PermissionCacheService {
       const result = await this.prisma.$queryRaw<Array<{ etag: Date }>>`
         SELECT MAX(GREATEST(ur.assigned_at, r.updated_at)) AS etag
         FROM user_roles ur
-        JOIN roles r ON ur.role_id = r.id
-        WHERE ur.user_id = ${userId} AND (r.tenant_id = ${tenantId} OR r.tenant_id IS NULL)
+        JOIN roles r ON ur."roleId" = r.id
+        WHERE ur."userId" = ${userId} AND (r.tenant_id = ${tenantId} OR r.tenant_id IS NULL)
       `;
 
       if (result.length === 0 || !result[0].etag) {

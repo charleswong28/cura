@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { GqlExecutionContext } from "@nestjs/graphql";
 import * as jwt from "jsonwebtoken";
 import { PrismaService } from "../prisma/prisma.service";
 import { RedisService } from "./redis.service";
@@ -31,8 +32,11 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     }
 
-    const request = ctx.switchToHttp().getRequest();
-    const authHeader = request.headers.authorization;
+    const request = this.getRequest(ctx);
+    if (!request) {
+      throw new UnauthorizedException("Request context unavailable.");
+    }
+    const authHeader = request.headers?.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       throw new UnauthorizedException("Missing or invalid authorization header.");
@@ -92,5 +96,12 @@ export class JwtAuthGuard implements CanActivate {
     request.user = requestUser;
 
     return true;
+  }
+
+  private getRequest(ctx: ExecutionContext): any {
+    if (ctx.getType<string>() === "graphql") {
+      return GqlExecutionContext.create(ctx).getContext()?.req;
+    }
+    return ctx.switchToHttp().getRequest();
   }
 }

@@ -41,14 +41,28 @@ export class GraphqlExceptionFilter implements ExceptionFilter {
       });
     }
 
-    // Unexpected error — log full stack, return generic message
+    // Unexpected error — log full stack, return generic message (verbose in dev)
     this.logger.error(
       "Unhandled exception in GraphQL resolver",
       exception instanceof Error ? exception.stack : String(exception)
     );
 
-    return new GraphQLError("Internal server error", {
-      extensions: { code: "INTERNAL_SERVER_ERROR" },
+    const isDev = process.env["NODE_ENV"] !== "production";
+    const devMessage =
+      exception instanceof Error ? exception.message : String(exception ?? "Unknown error");
+    const devStack = exception instanceof Error ? exception.stack?.split("\n") : undefined;
+
+    return new GraphQLError(isDev ? devMessage : "Internal server error", {
+      extensions: {
+        code: "INTERNAL_SERVER_ERROR",
+        ...(isDev && {
+          exception: {
+            name: exception instanceof Error ? exception.name : "Unknown",
+            message: devMessage,
+            stacktrace: devStack,
+          },
+        }),
+      },
     });
   }
 
@@ -67,7 +81,16 @@ export class GraphqlExceptionFilter implements ExceptionFilter {
         "Unhandled exception in HTTP handler",
         exception instanceof Error ? exception.stack : String(exception)
       );
-      response.status(500).json({ statusCode: 500, message: "Internal server error" });
+      const isDev = process.env["NODE_ENV"] !== "production";
+      response.status(500).json({
+        statusCode: 500,
+        message: isDev && exception instanceof Error ? exception.message : "Internal server error",
+        ...(isDev &&
+          exception instanceof Error && {
+            error: exception.name,
+            stacktrace: exception.stack?.split("\n"),
+          }),
+      });
     }
   }
 }

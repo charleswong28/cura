@@ -162,7 +162,7 @@ model User {
   id             String        @id
   tenantId       String        @map("tenant_id")
   tenant         Tenant        @relation(fields: [tenantId], references: [id])
-  authIdentityId String?       @unique @map("auth_identity_id")
+  authIdentityId String?       @map("auth_identity_id")
   authIdentity   AuthIdentity? @relation(fields: [authIdentityId], references: [id])
   email          String
   firstName      String        @map("first_name")
@@ -187,7 +187,9 @@ model User {
   activityLogs      ActivityLog[]
 
   @@unique([tenantId, email])
+  @@unique([tenantId, authIdentityId])
   @@index([tenantId])
+  @@index([authIdentityId])
   @@map("users")
 }
 
