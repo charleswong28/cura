@@ -551,6 +551,7 @@ model Client {
   parent          Client?      @relation("ClientHierarchy", fields: [parentId], references: [id])
   children        Client[]     @relation("ClientHierarchy")
   status          ClientStatus @default(PROSPECT)
+  notes           String?
   activeJobCount  Int          @default(0) @map("active_job_count")
   totalJobCount   Int          @default(0) @map("total_job_count")
   deletedAt       DateTime?    @map("deleted_at")
