@@ -281,9 +281,9 @@
 
 > Delete a candidate with confirmation dialog.
 
-- [ ] **WA-044:** Add delete button on candidate detail page
-- [ ] **WA-045:** Build confirmation dialog (shadcn `AlertDialog`) — "Delete [Name]? This cannot be undone."
-- [ ] **WA-046:** Wire to `deleteCandidate` mutation and redirect to candidate list on success
+- [x] **WA-044:** Add delete button on candidate detail page
+- [x] **WA-045:** Build confirmation dialog (shadcn `AlertDialog`) — "Delete [Name]? This cannot be undone."
+- [x] **WA-046:** Wire to `deleteCandidate` mutation and redirect to candidate list on success
 
 ---
 
@@ -483,7 +483,7 @@
 ### Current Sprint
 
 **Sprint:** Sprint 4 — In Progress
-**Active Stories:** Stories 3.1 + 3.2 + 3.3 + 3.4 + 3.5 + 3.6 complete; Story 3.7 (Delete) next
+**Active Stories:** Stories 3.1 + 3.2 + 3.3 + 3.4 + 3.5 + 3.6 + 3.7 complete; Sprint 4 done — Sprint 5 next (Client CRUD)
 **Blocked Items:** None
 
 ---
