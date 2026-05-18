@@ -1487,6 +1487,20 @@ export type MyTenantsQuery = {
   myTenants: Array<{ __typename?: "TenantModel"; id: string; name: string; slug: string }>;
 };
 
+export type UsersQueryVariables = Exact<{ [key: string]: never }>;
+
+export type UsersQuery = {
+  __typename?: "Query";
+  users: Array<{
+    __typename?: "UserModel";
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    loginable: boolean;
+  }>;
+};
+
 export const CandidateFieldsFragmentDoc = {
   kind: "Document",
   definitions: [
@@ -3248,3 +3262,32 @@ export const MyTenantsDocument = {
     },
   ],
 } as unknown as DocumentNode<MyTenantsQuery, MyTenantsQueryVariables>;
+export const UsersDocument = {
+  kind: "Document",
+  definitions: [
+    {
+      kind: "OperationDefinition",
+      operation: "query",
+      name: { kind: "Name", value: "Users" },
+      selectionSet: {
+        kind: "SelectionSet",
+        selections: [
+          {
+            kind: "Field",
+            name: { kind: "Name", value: "users" },
+            selectionSet: {
+              kind: "SelectionSet",
+              selections: [
+                { kind: "Field", name: { kind: "Name", value: "id" } },
+                { kind: "Field", name: { kind: "Name", value: "firstName" } },
+                { kind: "Field", name: { kind: "Name", value: "lastName" } },
+                { kind: "Field", name: { kind: "Name", value: "email" } },
+                { kind: "Field", name: { kind: "Name", value: "loginable" } },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as unknown as DocumentNode<UsersQuery, UsersQueryVariables>;

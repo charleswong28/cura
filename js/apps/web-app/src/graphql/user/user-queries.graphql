@@ -18,3 +18,13 @@ query MyTenants {
     slug
   }
 }
+
+query Users {
+  users {
+    id
+    firstName
+    lastName
+    email
+    loginable
+  }
+}
