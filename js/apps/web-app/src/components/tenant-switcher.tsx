@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import { Popover } from "radix-ui";
 import { Check, ChevronsUpDown, Plus, Loader2 } from "lucide-react";
@@ -19,6 +19,12 @@ export function TenantSwitcher({ collapsed }: TenantSwitcherProps) {
   const { user, switchTenant } = useAuth();
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
+
+  // Mount-gate: Radix Popover's useId differs between SSR and client because
+  // the React tree shifts once AuthProvider hydrates `user`. Defer to client
+  // to avoid `aria-controls` mismatches — same pattern as `JobFilters`.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const { data } = useQuery(MyTenantsDocument, { skip: !user });
   const tenants: Tenant[] = data?.myTenants ?? [];
@@ -51,6 +57,11 @@ export function TenantSwitcher({ collapsed }: TenantSwitcherProps) {
         </div>
       </div>
     );
+  }
+
+  if (!mounted) {
+    // Reserve the same vertical footprint to avoid layout shift on hydration.
+    return <div className="h-9 w-full" />;
   }
 
   return (

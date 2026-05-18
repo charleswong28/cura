@@ -122,11 +122,12 @@ export class PermissionService {
     const cascadeLevel = await this.checkCascade(user, resourceType, resourceId);
     if (cascadeLevel !== null) return cascadeLevel;
 
-    // Data-scope ALL grants implicit VIEW on every record of the resource type.
-    // Without this, admin roles can list rows (data-scope filter passes) but
-    // can't traverse to them via ResolveField (which calls assertCan(VIEW)).
+    // Data-scope ALL = tenant-wide admin access (per authn-authz-technical-plan.md §5.1).
+    // Returns OWNER so admins can EDIT/DELETE any row in the tenant without needing
+    // explicit Permission rows; functional permission strings (e.g. `job:delete`)
+    // already gate which actions an admin can attempt.
     const scope = await this.getDataScope(user, resourceType);
-    if (scope === DataScopeType.ALL) return AccessLevel.VIEW;
+    if (scope === DataScopeType.ALL) return AccessLevel.OWNER;
 
     return null;
   }
